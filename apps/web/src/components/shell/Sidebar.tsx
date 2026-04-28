@@ -17,6 +17,7 @@ const REGISTRY_NAV = [
   { href: '/box-types',        icon: '📫', label: 'Tipi imballo' },
   { href: '/boxes',            icon: '📮', label: 'Imballi' },
   { href: '/auto-gen-rules',   icon: '🤖', label: 'Regole auto-gen' },
+  { href: '/workflows',        icon: '🔀', label: 'Flussi di lavoro' },
 ]
 
 export function Sidebar() {
