@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels'
 import { PageHeader, StatusBadge } from '@mes/ui'
 import { sdk } from '../../../../lib/sdk'
+import { WorkflowCanvas } from '../../../../components/workflow/WorkflowCanvas'
 
 export default function WorkflowEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -99,11 +100,11 @@ export default function WorkflowEditorPage() {
           {/* Canvas pane — 35% */}
           <Panel defaultSize={35} minSize={25}>
             <div className="h-full flex flex-col bg-neutral-50 hairline-r overflow-hidden">
-              <div className="px-3 py-2 hairline-b">
+              <div className="px-3 py-2 hairline-b flex-shrink-0">
                 <span className="uppercase-label">Canvas</span>
               </div>
-              <div className="flex-1 flex items-center justify-center text-neutral-400 text-xs p-4 text-center">
-                Grafico React Flow<br />(disponibile in D4)
+              <div className="flex-1 overflow-hidden">
+                <WorkflowCanvas workflow={workflow} />
               </div>
             </div>
           </Panel>
