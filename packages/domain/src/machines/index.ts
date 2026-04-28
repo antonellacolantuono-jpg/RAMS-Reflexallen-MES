@@ -6,3 +6,10 @@ export type { WorkOrderContext, WorkOrderEvent, WorkOrderStatus } from './work-o
 
 export { boxMachine } from './box.machine.js'
 export type { BoxContext, BoxEvent, BoxStatus } from './box.machine.js'
+
+export { workflowVersionMachine } from './workflow.machine.js'
+export type {
+  WorkflowVersionContext,
+  WorkflowVersionEvent,
+  WorkflowVersionStatus,
+} from './workflow.machine.js'

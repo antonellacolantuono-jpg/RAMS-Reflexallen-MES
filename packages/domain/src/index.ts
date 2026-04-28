@@ -28,3 +28,19 @@ export {
   remainingCapacity,
   fillRate,
 } from './rules/box.rules.js'
+
+// workflow rules
+export {
+  validateWorkflowStructure,
+  canEdit,
+  canTransition,
+} from './rules/workflow.rules.js'
+export type {
+  ValidationError,
+  ValidationResult,
+  WorkflowStep,
+  WorkflowGroup,
+  WorkflowPhase,
+  WorkflowStructure,
+  AvailableRefs,
+} from './rules/workflow.rules.js'
