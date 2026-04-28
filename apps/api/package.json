@@ -12,6 +12,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@mes/domain": "workspace:*",
     "@mes/prisma": "workspace:*",
     "@mes/schemas": "workspace:*",
     "@nestjs/common": "^10.3.10",

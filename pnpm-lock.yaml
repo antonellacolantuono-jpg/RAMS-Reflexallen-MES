@@ -20,6 +20,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@mes/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@mes/prisma':
         specifier: workspace:*
         version: link:../../packages/prisma
