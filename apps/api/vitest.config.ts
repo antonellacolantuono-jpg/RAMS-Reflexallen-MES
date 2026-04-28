@@ -4,5 +4,10 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     globals: true,
+    server: {
+      deps: {
+        inline: ['@mes/domain'],
+      },
+    },
   },
 })
