@@ -4,7 +4,8 @@
 > It establishes the project context. You don't need to paste it manually.
 >
 > **Specifications version**: v1.2
-> **Last updated**: 2026-04-27
+> **Last updated**: 2026-04-29
+> **CLAUDE.md version**: 1.2
 
 ---
 
@@ -28,30 +29,54 @@ This is an **INTERNAL MES** — built for Reflexallen's own use. The system must
 
 ---
 
+## ⚙️ Current operating mode — DEV MODE (read this carefully)
+
+**As of April 28-29, 2026, the project is in DEV MODE**: a fully local setup with **no Docker, no external services**. This is intentional — no production deployment yet, all infrastructure is in-process or local-filesystem.
+
+| Concern | Production target | DEV MODE current |
+|---|---|---|
+| Database | PostgreSQL 16 | **SQLite** (`packages/prisma/dev.db`) |
+| Cache | Redis 7 | **In-memory `Map`** (`@mes/cache` placeholder) |
+| Queue | BullMQ | **Sync execution** (`@mes/queue` placeholder) |
+| Storage | MinIO (S3) | **Local filesystem** (`@mes/storage` placeholder) |
+| Containerization | Docker Compose | **None** (run with `pnpm dev`) |
+
+**When writing code in DEV MODE:**
+- Use Prisma normally (it abstracts the DB engine)
+- Use `@mes/cache`, `@mes/queue`, `@mes/storage` interfaces — the placeholder implementations satisfy them
+- Do NOT add Docker, PostgreSQL drivers, Redis clients, BullMQ, MinIO SDK
+- The migration to production stack is a separate future workstream — do NOT pre-emptively code for it
+
+When in doubt about whether to use a production-stack feature, default to the DEV MODE equivalent.
+
+---
+
 ## 🛠️ Tech stack (NON-NEGOTIABLE)
 
 ### Backend
 - **Runtime**: Node.js 20+ LTS
 - **Framework**: NestJS 10+ (modular monolith with domain-driven design)
 - **ORM**: Prisma 5+
-- **Database**: PostgreSQL 16
-- **Cache/Queue**: Redis 7 + BullMQ
+- **Database**: SQLite in DEV MODE; PostgreSQL 16 in production
+- **Cache/Queue**: in-memory + sync in DEV MODE; Redis 7 + BullMQ in production
 - **Real-time**: Socket.IO
-- **Storage**: MinIO (S3-compatible)
+- **Storage**: local fs in DEV MODE; MinIO in production
 - **Validation**: Zod (shared FE/BE schemas)
+- **PIN/Password Hashing**: **Argon2id** (NEVER bcrypt)
 
 ### Frontend
 - **Framework**: Next.js 14 (App Router)
 - **UI**: React 18 + TypeScript 5 strict mode
-- **Styling**: Tailwind CSS + shadcn/ui
-- **State**: TanStack Query + Zustand
+- **Styling**: Tailwind CSS + shadcn-style primitives in `@mes/ui` (NOT Material UI, NOT Bootstrap, NOT styled-components)
+- **State**: TanStack Query (server) + Zustand (client/canvas)
 - **State Machines**: XState 5
-- **Workflow Designer**: React Flow
+- **Workflow Designer Canvas**: `@xyflow/react` (modern successor of `reactflow`) + `@dagrejs/dagre`
+- **Forms**: react-hook-form + Zod
 
 ### DevOps
 - **Monorepo**: Turborepo + pnpm workspaces
-- **Local dev**: Docker Compose
-- **Testing**: Vitest (unit) + Playwright (E2E)
+- **Local dev**: `pnpm dev` (no Docker)
+- **Testing**: Vitest (unit + integration); Playwright (E2E, only when explicitly requested)
 
 ---
 
@@ -59,15 +84,29 @@ This is an **INTERNAL MES** — built for Reflexallen's own use. The system must
 
 The repository contains comprehensive documentation organized in tiers. Read on-demand based on what you're working on.
 
-### TIER 0 — Project meta (read once, refer back)
+### TIER 0 — Project meta + state (read at the start of every session)
 
 ```
 README.md
   - Project overview, structure, getting started
-  
+
 CHANGELOG.md
   - History of all changes (specifications, prompts, code)
-  - Read to understand recent project evolution
+
+STATUS.md                   ⬅️ ALWAYS READ THIS FIRST
+  - The current state of the repo (what is done, what is pending, what is broken)
+  - Verification evidence with literal command outputs
+  - Re-baselined roadmap
+
+TODO.md                     ⬅️ ALWAYS READ THIS BEFORE PROPOSING CHANGES
+  - Known issues with severity, file location, acceptance criterion
+  - DO NOT silently fix items here unless they block the current task
+  - When fixing, move entry to "Resolved" section with commit hash
+
+prompts/DOD_TEMPLATE.md     ⬅️ THE LAW for declaring any work "done"
+  - Universal Definition of Done checklist
+  - Every claim must be paired with literal command output
+  - No paraphrasing, no "looks good"
 
 docs/VERSIONING.md
   - Versioning rules (3 dimensions: specs, prompts, code)
@@ -75,7 +114,7 @@ docs/VERSIONING.md
   - Conventional commits guide
 ```
 
-### TIER 1 — Core Specifications (read FIRST in every session)
+### TIER 1 — Core Specifications (read FIRST in every build session)
 
 ```
 docs/MASTER_SPECIFICATION.md  (3230 lines)
@@ -95,6 +134,11 @@ docs/CONVENTIONS.md  (1392 lines)
   - Quick reference: naming, folders, imports, commits
   - Per-module conventions
   - READ FULLY at start, REFER BACK during work
+
+docs/TESTING_STRATEGY.md
+  - Pyramid (~70/25/5 unit/integration/E2E)
+  - What to test where, mocking strategy, coverage targets
+  - Anti-patterns (brittle E2E, over-mocking, flaky tests)
 
 docs/design-tokens.md
   - Design tokens from Claude Design (colors, typography, spacing)
@@ -159,33 +203,35 @@ docs/extensions/MOCK_DATA_PNEUMATIC_AIR.md
 
 ---
 
-## 🏗️ Monorepo structure (target)
-
-This is what you'll build incrementally:
+## 🏗️ Monorepo structure (current state — verified April 28)
 
 ```
-RAMS_V4/
+RAMS-Reflexallen-MES/
 ├── CLAUDE.md                      ← This file (auto-loaded)
+├── STATUS.md                      ← Current ground truth
+├── TODO.md                        ← Known issues
 ├── apps/
-│   ├── api/                       NestJS backend
-│   ├── web/                       Next.js admin
-│   ├── hmi/                       Next.js shop floor (touch UI)
-│   └── worker/                    BullMQ workers
+│   ├── api/                       NestJS backend (13 registry modules done)
+│   ├── web/                       Next.js admin (18 routes done)
+│   └── hmi/                       Next.js shop floor (login mockup done)
 │
 ├── packages/
-│   ├── prisma/                    Prisma schema + migrations + seed
-│   ├── types/                     Shared TypeScript types
-│   ├── schemas/                   Zod schemas (FE+BE)
-│   ├── ui/                        shadcn/ui customized + design tokens
-│   ├── sdk/                       Typed API client
-│   ├── config/                    Shared config (eslint, tsconfig, prettier)
-│   └── domain/                    Pure domain logic (state machines, rules)
+│   ├── prisma/                    Prisma schema (63 models) + migrations + seed
+│   ├── types/                     11 enum files
+│   ├── schemas/                   Zod schemas (registries + legacy)
+│   ├── ui/                        16 base + 8 Tier-2 primitives + Reflexallen tokens
+│   ├── sdk/                       Typed API client + 13 registry clients
+│   ├── domain/                    XState machines + pure rules
+│   ├── cache/                     in-memory placeholder (DEV MODE)
+│   ├── queue/                     sync placeholder (DEV MODE)
+│   └── storage/                   local fs placeholder (DEV MODE)
 │
-├── docs/                          Specifications (tier 1-4)
-├── prompts/                       Build task prompts (one per step)
+├── docs/                          Specifications (tiers 1-4)
+├── design-system/                 Reflexallen handoff bundle (brand SVGs, fonts)
+├── prompts/                       Build task prompts + DOD_TEMPLATE
+│   └── archive/                   Obsolete prompts kept for reference
 ├── scripts/                       Automation
 │
-├── docker-compose.yml
 ├── turbo.json
 ├── pnpm-workspace.yaml
 ├── package.json
@@ -225,61 +271,89 @@ Reflectance thresholds, color CIE-Lab measurements, Homologation certificates wi
 
 This is a session-based collaboration. Follow this pattern strictly:
 
+### PHASE 0 — PRE-FLIGHT CHECK (start of every session)
+
+Before any task, run these 5 commands and confirm output is healthy:
+
+```powershell
+git status                                          # working tree clean?
+git log --oneline | Select-Object -First 5          # recent commits?
+git worktree list                                   # any orphaned worktree?
+git branch -a                                       # any leftover branch?
+netstat -ano | findstr ":3000 :3001 :3002"          # zombie servers?
+```
+
+If any of these shows something unexpected, **STOP and investigate** before proceeding. This pre-flight check exists because on April 28, 2026, hours were lost when work was thought to be missing but actually existed in an uncommitted worktree.
+
 ### PHASE 1 — PLAN (always first)
-- I give you a task (one of the prompts/PROMPT_*.md files)
-- You read relevant specifications
-- You propose a plan: files to create/modify, dependencies, steps
+- The user gives you a specific prompt (one of `prompts/PROMPT_*.md`)
+- You read the prompt, then the files it references (TIER 0 always; TIER 1-4 as needed)
+- You propose a plan: deliverables, files to create/modify, dependencies, time estimates
 - You DO NOT write code yet
-- You wait for my approval
+- You list any ambiguity for the user to clarify
+- You wait for explicit "go"
 
-### PHASE 2 — BUILD (after approval)
-- You implement the plan step by step
-- You run commands one at a time, showing output
-- You ask before installing large packages (>50MB)
-- You ask before destructive operations (rm, drop database)
-- If a step fails, you debug and retry, but tell me before changing approach
+### PHASE 2 — BUILD (after approval, one deliverable at a time)
+- You implement one deliverable
+- You run the verification commands from `prompts/DOD_TEMPLATE.md` for that deliverable
+- You **paste the literal command output in chat** — no paraphrasing, no "all good", no summaries
+- You suggest a Conventional Commits message; user does the commit
+- You wait for the user's "ok next" before moving to the next deliverable
 
-### PHASE 3 — VERIFY (after build)
-- You run: pnpm build, pnpm test, pnpm lint, docker compose up
-- You report results honestly (don't hide failing tests)
-- You list known limitations or TODOs
-- You wait for my review
+### PHASE 3 — VERIFY (after build, before declaring done)
+- Run the FULL DoD checklist (sections A through F of `prompts/DOD_TEMPLATE.md`)
+- Paste literal output for every section — every claim has a corresponding command
+- List known limitations and any TODO items uncovered (add to `TODO.md`)
+- Update `STATUS.md` with the new verified state (use only past-tense, never aspirational)
 
-### PHASE 4 — COMMIT (always done by me)
-- YOU NEVER COMMIT to git
-- I review your work, then I do `git commit` and `git push` myself
+### PHASE 4 — COMMIT (always done by the user)
+- YOU NEVER COMMIT to git. The user does that.
 - You can suggest commit messages, but don't execute git operations
+- The user reviews your output, then commits and pushes
 
 ---
 
 ## 📏 Rules & constraints
 
 ### DO
+
+- ✓ Run **PRE-FLIGHT CHECK** at the start of every session
+- ✓ Read **STATUS.md** and **TODO.md** before proposing any plan
 - ✓ Read specifications BEFORE writing code (every session)
+- ✓ Follow **DOD_TEMPLATE.md** for every claim of "done" — paste literal command output
 - ✓ Follow the BEST_PRACTICES.md patterns exactly
 - ✓ Use TypeScript strict mode
 - ✓ Use Zod for ALL validation (no ad-hoc validation)
 - ✓ Use Prisma transactions for multi-entity operations
 - ✓ Emit domain events for important state changes
-- ✓ Add audit logging for all entity mutations
+- ✓ Add audit logging for all entity mutations (use `AuditLogService` from PROMPT_2)
+- ✓ Enforce `plantId` filter on every query (multi-tenant)
+- ✓ Use **Argon2id** for any PIN/password hashing
 - ✓ Write tests as you build (don't defer)
 - ✓ Use English for code, comments, commits
 - ✓ Use Italian for end-user UI text (Reflexallen is Italian)
 - ✓ Keep commits atomic (one logical change per commit suggestion)
 - ✓ Apply design tokens from docs/design-tokens.md to Tailwind
-- ✓ Suggest CHANGELOG.md entries for significant changes (user commits, but you suggest the entry)
+- ✓ Suggest CHANGELOG.md entries for significant changes
 - ✓ Follow Conventional Commits format (see docs/VERSIONING.md)
 
 ### DON'T
-- ✗ Don't commit to git (I do that)
-- ✗ Don't push to remote (I do that)
+
+- ✗ **Don't claim "done" without literal command output for every DoD section.** "Tests pass" without the literal pass/fail summary line is a violation. So is "build is clean" without the exit code.
+- ✗ **Don't modify `packages/prisma/schema.prisma` without explicit approval.** The 63 models exist as-is; modifications cascade across all 13 registries.
+- ✗ **Don't silently fix items in `TODO.md`.** They are tracked because someone deferred them on purpose; touching them outside scope creates regressions.
+- ✗ **Don't expand scope.** If a deliverable seems to require something outside the prompt, STOP and ask.
+- ✗ Don't commit to git (the user does that)
+- ✗ Don't push to remote (the user does that)
 - ✗ Don't deviate from tech stack without asking
 - ✗ Don't use libraries not in approved list without asking
 - ✗ Don't skip writing tests (test coverage matters)
 - ✗ Don't use `any` type (always proper types)
 - ✗ Don't bypass Zod validation
-- ✗ Don't hard-delete data (always soft delete)
+- ✗ Don't hard-delete data (always soft delete via `deletedAt`)
 - ✗ Don't use raw SQL when Prisma supports the query
+- ✗ Don't use **bcrypt** — Argon2id only
+- ✗ Don't add Docker, PostgreSQL drivers, Redis, BullMQ, MinIO — DEV MODE only
 - ✗ Don't mix concerns (separate UI, business logic, data access)
 - ✗ Don't optimize prematurely (build correct first, then fast)
 
@@ -310,24 +384,28 @@ OEE             — Overall Equipment Effectiveness (Availability × Perf × Qua
 HMI             — Human-Machine Interface (operator touchscreen UI)
 ```
 
-For full vocabulary: docs/CONVENTIONS.md section "Glossary"
+For full vocabulary: `docs/CONVENTIONS.md` section "Glossary"
 
 ---
 
 ## 🚦 Build progression
 
-The MES is built incrementally through a series of prompts. The user will give them to you in order:
+The MES is built incrementally through a series of prompts. The user gives them in order:
 
-| Step | Prompt File | What you build |
-|---|---|---|
-| 1 | `prompts/PROMPT_1_FOUNDATION.md` | Monorepo, Docker, Prisma schema, apps skeleton |
-| 2 | `prompts/PROMPT_2_REGISTRIES.md` | 13 master data registries with CRUD |
-| 3 | `prompts/PROMPT_3_WORKFLOW_DESIGNER.md` | Workflow canvas + 4-pane configurator |
-| 4 | `prompts/PROMPT_4_AUTO_GENERATION.md` | Auto-generation engine (7 rules) |
-| 5 | `prompts/PROMPT_5_EXECUTION_HMI.md` | HMI shop floor with step renderer |
-| 6 | `prompts/PROMPT_6_DASHBOARD_REPORTING.md` | OEE, FPY, KPI dashboards |
+| Step | Prompt File | What you build | Status |
+|---|---|---|---|
+| 1 | `prompts/PROMPT_1_FOUNDATION.md` | Monorepo, Prisma schema, apps skeleton | ✅ Done |
+| 2 | `prompts/PROMPT_2_REGISTRIES.md` | 13 master data registries with CRUD | ✅ Done (commit b376142, April 28) |
+| 3a | `prompts/PROMPT_3a_CORE.md` | Workflow Designer canvas + 4-pane + 3 forms + CRUD | ⏭️ Next |
+| 3b | `prompts/PROMPT_3b_ADVANCED.md` | Remaining 5 forms + validation + versioning UI + templates | 📝 Skeleton |
+| 3c | `prompts/PROMPT_3c_SNAPSHOT_PREVIEW.md` | WorkflowSnapshot + live preview + performance + E2E | 📝 Skeleton (requires WO release flow) |
+| 4 | `prompts/PROMPT_4_AUTO_GENERATION.md` | Auto-generation engine (7 rules) | 📝 Spec only |
+| 5 | `prompts/PROMPT_5_EXECUTION_HMI.md` | HMI shop floor with step renderer + PIN auth | 📝 Spec only |
+| 6 | `prompts/PROMPT_6_DASHBOARD_REPORTING.md` | OEE, FPY, KPI dashboards | 📝 Spec only |
 
-Steps 3-6 don't exist yet at the time of writing. They'll be added as we progress.
+Obsolete / replaced prompts are in `prompts/archive/`:
+- `PROMPT_1B_obsolete.md` — was a foundation-completion patch, no longer needed (PROMPT_2 already merged the work)
+- `PROMPT_3_WORKFLOW_DESIGNER_obsolete.md` — was a 13-step monolith, replaced by 3a/3b/3c
 
 ---
 
@@ -336,16 +414,19 @@ Steps 3-6 don't exist yet at the time of writing. They'll be added as we progres
 When you start a new session:
 
 1. **Read this file** (CLAUDE.md) — done automatically when Claude Code starts
-2. **Wait for the user to give you a specific prompt** (e.g., paste of `prompts/PROMPT_1_FOUNDATION.md`)
-3. **Before building, read the additional files mentioned in that prompt**
-4. **Propose a plan, don't code yet**
-5. **Wait for "Plan approved. Go."**
+2. **Read STATUS.md and TODO.md** — to know the current ground truth and pending issues
+3. **Run the PRE-FLIGHT CHECK** (5 commands above) and confirm output
+4. **Wait for the user to give you a specific prompt**
+5. **Before building, read the additional files mentioned in that prompt** (TIER 0 always; TIER 1-4 as needed)
+6. **Propose a plan, don't code yet**
+7. **Wait for "Plan approved. Go."**
 
 If the user just says "hi" or starts with no specific task, respond:
 
-> Hi! I've loaded the Reflexallen MES context from CLAUDE.md.
-> I'm ready to start a build task.
-> Which prompt would you like me to execute? (e.g., PROMPT_1_FOUNDATION, PROMPT_2_REGISTRIES, etc.)
+> Hi! I've loaded the Reflexallen MES context from CLAUDE.md, STATUS.md, and TODO.md.
+> Current state: PROMPT_2 merged on April 28 (13 registries, 127 tests, build verified).
+> I'm ready to start the next build task.
+> Which prompt would you like me to execute?
 
 ---
 
@@ -355,3 +436,4 @@ If the user just says "hi" or starts with no specific task, respond:
 |---|---|---|
 | 1.0 | 2026-04-27 | Created from MASTER_PROMPT.md v2. Reformatted as auto-loaded CLAUDE.md per Anthropic convention. Removed manual paste instructions. Added auto-onboarding behavior. |
 | 1.1 | 2026-04-27 | Added TIER 0 references (README, CHANGELOG, VERSIONING). Added commit conventions to DO list. |
+| 1.2 | 2026-04-29 | Added DEV MODE section (SQLite/in-memory/local fs, no Docker). Added STATUS.md, TODO.md, prompts/DOD_TEMPLATE.md, TESTING_STRATEGY.md to documentation map. Updated repo name to RAMS-Reflexallen-MES. Updated build progression to reflect PROMPT_2 done and PROMPT_3 split into 3a/3b/3c. Added PHASE 0 pre-flight check. Added DoD compliance rule (no "done" without literal command output). Added Argon2id rule, plantId enforcement reminder, archive subfolder reference. Updated stack: shadcn-style primitives in @mes/ui, @xyflow/react for canvas, react-hook-form for forms. |
