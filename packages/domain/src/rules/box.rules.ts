@@ -1,4 +1,4 @@
-import type { BoxContext } from '../machines/box.machine.js'
+import type { BoxContext } from '../machines/box.machine'
 
 export interface RuleResult {
   allowed: boolean

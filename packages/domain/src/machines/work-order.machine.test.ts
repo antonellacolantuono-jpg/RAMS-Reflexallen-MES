@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createActor } from 'xstate'
-import { workOrderMachine } from './work-order.machine.js'
+import { workOrderMachine } from './work-order.machine'
 
 function startActor(qtyTarget = 10, by = 'planner') {
   const actor = createActor(workOrderMachine, {

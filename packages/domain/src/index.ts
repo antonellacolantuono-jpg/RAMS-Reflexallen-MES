@@ -1,7 +1,7 @@
-export * from './machines/index.js'
+export * from './machines/index'
 
 // RuleResult is identical across all rules files — export once
-export type { RuleResult } from './rules/work-order.rules.js'
+export type { RuleResult } from './rules/work-order.rules'
 
 // work-order rules
 export {
@@ -10,7 +10,7 @@ export {
   canComplete,
   isFullyCompleted,
   completionRate,
-} from './rules/work-order.rules.js'
+} from './rules/work-order.rules'
 
 // lot rules
 export {
@@ -18,8 +18,8 @@ export {
   canQuarantine,
   canReject,
   isUsable,
-} from './rules/lot.rules.js'
-export type { LotQualityStatus, LotContext } from './rules/lot.rules.js'
+} from './rules/lot.rules'
+export type { LotQualityStatus, LotContext } from './rules/lot.rules'
 
 // box rules
 export {
@@ -27,14 +27,14 @@ export {
   canAddUnits,
   remainingCapacity,
   fillRate,
-} from './rules/box.rules.js'
+} from './rules/box.rules'
 
 // workflow rules
 export {
   validateWorkflowStructure,
   canEdit,
   canTransition,
-} from './rules/workflow.rules.js'
+} from './rules/workflow.rules'
 export type {
   ValidationError,
   ValidationResult,
@@ -43,4 +43,4 @@ export type {
   WorkflowPhase,
   WorkflowStructure,
   AvailableRefs,
-} from './rules/workflow.rules.js'
+} from './rules/workflow.rules'
