@@ -11,11 +11,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@mes/types": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@mes/config": "workspace:^",
-    "@mes/types": "workspace:*",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }

@@ -39,10 +39,34 @@ export type { SelectProps } from './components/Select'
 export { Drawer } from './components/Drawer'
 export type { DrawerProps } from './components/Drawer'
 
-export { Modal } from './components/Modal'
-export type { ModalProps } from './components/Modal'
+export { Modal, ConfirmModal } from './components/Modal'
+export type { ModalProps, ConfirmModalProps } from './components/Modal'
 
 export { ToastProvider, useToast } from './components/Toast'
 export type { Toast, ToastContextValue, ToastVariant } from './components/Toast'
+
+export { DataTable } from './components/DataTable'
+export type { DataTableProps, Column, PaginationState } from './components/DataTable'
+
+export { PageHeader } from './components/PageHeader'
+export type { PageHeaderProps } from './components/PageHeader'
+
+export { SearchBar } from './components/SearchBar'
+export type { SearchBarProps, FilterChip } from './components/SearchBar'
+
+export { BulkActionBar } from './components/BulkActionBar'
+export type { BulkActionBarProps, BulkAction } from './components/BulkActionBar'
+
+export { TrashBannerBar } from './components/TrashBannerBar'
+export type { TrashBannerBarProps } from './components/TrashBannerBar'
+
+export { ActivityFeed } from './components/ActivityFeed'
+export type { ActivityFeedProps, AuditEntry } from './components/ActivityFeed'
+
+export { EntityDetail } from './components/EntityDetail'
+export type { EntityDetailProps, EntityTab, Breadcrumb } from './components/EntityDetail'
+
+export { EntityForm } from './components/EntityForm'
+export type { EntityFormProps } from './components/EntityForm'
 
 export { cn } from './utils/cn'
