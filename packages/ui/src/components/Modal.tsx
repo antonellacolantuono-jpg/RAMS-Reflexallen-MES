@@ -1,13 +1,163 @@
+'use client'
+
 import * as React from 'react'
+import { createPortal } from 'react-dom'
+import { cn } from '../utils/cn'
 
 export interface ModalProps {
-  open?: boolean
-  onClose?: () => void
-  title?: string
-  width?: number
+  open?: boolean | undefined
+  onClose?: (() => void) | undefined
+  title?: string | undefined
+  description?: string | undefined
+  width?: number | undefined
   children?: React.ReactNode
+  footer?: React.ReactNode
+  className?: string | undefined
 }
 
-export function Modal(_props: ModalProps): null {
-  return null
+export interface ConfirmModalProps {
+  open?: boolean | undefined
+  onClose?: (() => void) | undefined
+  onConfirm?: (() => void) | undefined
+  title?: string | undefined
+  description?: string | undefined
+  confirmLabel?: string | undefined
+  cancelLabel?: string | undefined
+  variant?: 'danger' | 'default' | undefined
+  isLoading?: boolean | undefined
+}
+
+export function Modal({ open = false, onClose, title, description, width = 480, children, footer, className }: ModalProps) {
+  const [mounted, setMounted] = React.useState(false)
+  const [visible, setVisible] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  React.useEffect(() => {
+    if (open) {
+      setVisible(true)
+    } else {
+      const t = setTimeout(() => setVisible(false), 150)
+      return () => clearTimeout(t)
+    }
+  }, [open])
+
+  React.useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose?.()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  if (!mounted || !visible) return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className={cn(
+          'absolute inset-0 bg-black/40 transition-opacity duration-150',
+          open ? 'opacity-100' : 'opacity-0',
+        )}
+        onClick={onClose}
+        aria-hidden
+      />
+
+      {/* Dialog */}
+      <div
+        className={cn(
+          'relative flex max-h-[90vh] flex-col rounded-xl bg-white shadow-2xl transition-all duration-150',
+          open ? 'opacity-100 scale-100' : 'opacity-0 scale-95',
+          className,
+        )}
+        style={{ width, maxWidth: '95vw' }}
+        role="dialog"
+        aria-modal
+        aria-label={title}
+      >
+        {/* Header */}
+        {(title || onClose) && (
+          <div className="flex items-start justify-between border-b border-neutral-200 px-5 py-4 shrink-0">
+            <div>
+              {title && <h2 className="text-base font-semibold text-neutral-900">{title}</h2>}
+              {description && <p className="mt-0.5 text-sm text-neutral-500">{description}</p>}
+            </div>
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="ml-4 rounded-md p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 shrink-0"
+                aria-label="Chiudi"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+
+        {/* Footer */}
+        {footer && (
+          <div className="border-t border-neutral-200 px-5 py-4 shrink-0 flex justify-end gap-2">
+            {footer}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+export function ConfirmModal({
+  open,
+  onClose,
+  onConfirm,
+  title = 'Conferma',
+  description,
+  confirmLabel = 'Conferma',
+  cancelLabel = 'Annulla',
+  variant = 'default',
+  isLoading,
+}: ConfirmModalProps) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title}
+      description={description}
+      width={400}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-neutral-200 px-3.5 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isLoading}
+            className={cn(
+              'rounded-md px-3.5 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50',
+              variant === 'danger'
+                ? 'bg-error-600 hover:bg-error-700'
+                : 'bg-primary-600 hover:bg-primary-700',
+            )}
+          >
+            {isLoading ? 'Attendere…' : confirmLabel}
+          </button>
+        </>
+      }
+    />
+  )
 }

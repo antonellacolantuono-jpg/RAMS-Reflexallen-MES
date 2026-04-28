@@ -1,6 +1,8 @@
+// Legacy schemas (kept for backward compat)
 export * from './plant.schema'
-export * from './item.schema'
 export * from './work-order.schema'
-export * from './equipment.schema'
 export * from './lot.schema'
 export * from './user.schema'
+
+// Registry schemas (include item, equipment, and 13 registries)
+export * from './registries'
