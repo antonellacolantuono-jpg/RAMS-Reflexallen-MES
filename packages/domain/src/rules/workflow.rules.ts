@@ -1,4 +1,4 @@
-import type { WorkflowVersionStatus } from '../machines/workflow.machine.js'
+import type { WorkflowVersionStatus } from '../machines/workflow.machine'
 
 export interface ValidationError {
   field: string

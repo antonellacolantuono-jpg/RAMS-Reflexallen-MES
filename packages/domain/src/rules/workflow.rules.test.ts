@@ -3,8 +3,8 @@ import {
   validateWorkflowStructure,
   canEdit,
   canTransition,
-} from './workflow.rules.js'
-import type { WorkflowStructure, AvailableRefs } from './workflow.rules.js'
+} from './workflow.rules'
+import type { WorkflowStructure, AvailableRefs } from './workflow.rules'
 
 const emptyRefs: AvailableRefs = {
   skillIds: new Set(),

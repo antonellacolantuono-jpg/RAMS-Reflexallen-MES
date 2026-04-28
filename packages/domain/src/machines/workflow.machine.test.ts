@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createActor } from 'xstate'
-import { workflowVersionMachine } from './workflow.machine.js'
+import { workflowVersionMachine } from './workflow.machine'
 
 function startActor(by = 'engineer') {
   const actor = createActor(workflowVersionMachine, {

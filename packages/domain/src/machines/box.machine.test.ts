@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createActor } from 'xstate'
-import { boxMachine } from './box.machine.js'
+import { boxMachine } from './box.machine'
 
 function startActor(maxUnits = 20) {
   const actor = createActor(boxMachine, {

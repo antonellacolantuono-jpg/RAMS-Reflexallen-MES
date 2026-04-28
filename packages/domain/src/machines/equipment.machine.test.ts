@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createActor } from 'xstate'
-import { equipmentMachine } from './equipment.machine.js'
+import { equipmentMachine } from './equipment.machine'
 
 function startActor(equipmentId = 'EQ-001', by = 'admin') {
   const actor = createActor(equipmentMachine, { input: { equipmentId, by } })

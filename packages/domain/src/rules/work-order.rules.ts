@@ -1,4 +1,4 @@
-import type { WorkOrderContext } from '../machines/work-order.machine.js'
+import type { WorkOrderContext } from '../machines/work-order.machine'
 
 export interface RuleResult {
   allowed: boolean
