@@ -80,6 +80,38 @@ WARNING  no output files found for task @mes/storage#build. Please check your `o
 
 ---
 
+### TODO-005 — Add CFRP workflow templates to Workflow Designer
+
+**Discovered**: 2026-04-29 (planning PROMPT_3)
+**File**: `packages/prisma/seed.ts` + future Workflow Designer templates
+**Spec source**: `docs/extensions/CFRP_MODULE.md`, `docs/extensions/WORKFLOW_CFRP.md`, `docs/extensions/WORKFLOW_CFRP_DETAILED.md`
+**Symptom**: PROMPT_3a (Workflow Designer Core) ships with templates and seed data only for Pneumatic Air. CFRP-specific workflows (Mold management, Out-time tracking, Cure Cycles, NDT, prepreg roll lifecycle) are not yet usable in the designer.
+**Acceptance criterion**:
+- Seed adds at least one mock CFRP item (e.g., `MC-FAIRING-001`), one mock Mold, one Cure Cycle Recipe.
+- Workflow Designer "New from Template" wizard offers "CFRP — Standard Lamination" template.
+- Process Engineer can create a CFRP workflow that includes: prepreg checkout → layup → vacuum bag → autoclave cure → NDT.
+- All ECE/IATF compliance fields (out-time tracking, cure cycle telemetry references) are configurable per step.
+**Estimated effort**: 4-6 hours (likely PROMPT_3b or a separate PROMPT_3.5)
+**Blocker for**: full MVP coverage of CFRP production line.
+
+---
+
+### TODO-006 — Add Safety Devices workflow templates to Workflow Designer
+
+**Discovered**: 2026-04-29 (planning PROMPT_3)
+**File**: `packages/prisma/seed.ts` + future Workflow Designer templates
+**Spec source**: `docs/extensions/SAFETY_DEVICES_MODULE.md`, `docs/extensions/WORKFLOW_SAFETY_DEVICES.md`, `docs/extensions/WORKFLOW_SAFETY_DEVICES_DETAILED.md`
+**Symptom**: PROMPT_3a (Workflow Designer Core) ships with templates and seed data only for Pneumatic Air. Safety Devices workflows (reflective film lamination, reflectance testing, homologation cert checks, aging tests, ECE-R104 compliance) are not yet usable in the designer.
+**Acceptance criterion**:
+- Seed adds at least one Safety Device item, one Reflective Film Roll, one Homologation Certificate, one Reflectance Test record.
+- Workflow Designer "New from Template" wizard offers "Safety Device — Reflective Lamination" template.
+- Process Engineer can create a Safety Device workflow that includes: film checkout → lamination → reflectance test → cross-cut adhesion test → ECE certification.
+- ECE-R104 reflectance threshold values are wired into the QC step configuration.
+**Estimated effort**: 4-6 hours (likely PROMPT_3b or a separate PROMPT_3.5)
+**Blocker for**: full MVP coverage of Safety Devices production line.
+
+---
+
 ## 🟢 Low priority (nice to have)
 
 _No entries yet._
