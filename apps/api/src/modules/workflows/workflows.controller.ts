@@ -49,19 +49,19 @@ export class WorkflowsController extends BaseRegistryController<WorkflowModel> {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  override findOne(@Param('id') id: string) {
     return this.workflowsService.findDetailById(id)
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() body: unknown) {
+  override create(@Body() body: unknown) {
     const dto = CreateWorkflowSchema.parse(body)
     return this.workflowsService.create(dto, 'system')
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: unknown) {
+  override update(@Param('id') id: string, @Body() body: unknown) {
     const dto = UpdateWorkflowSchema.parse(body)
     return this.workflowsService.update(id, dto, 'system')
   }

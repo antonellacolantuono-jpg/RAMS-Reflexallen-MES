@@ -40,14 +40,23 @@ export class WorkflowsService extends BaseRegistryService<WorkflowModel> {
   }
 
   async create(dto: CreateWorkflowDto, actorId: string): Promise<WorkflowDetailModel> {
-    const entity = await this.repo.create({ ...dto, createdBy: actorId })
+    const entity = await this.repo.create({
+      ...dto,
+      description: dto.description ?? null,
+      itemId: dto.itemId ?? null,
+      createdBy: actorId,
+    })
     await this.recordCreate(entity, actorId)
     return entity
   }
 
   async update(id: string, dto: UpdateWorkflowDto, actorId: string): Promise<WorkflowModel> {
     const before = await this.findById(id)
-    const after = await this.repo.update(id, { ...dto, updatedBy: actorId })
+    const after = await this.repo.update(id, {
+      ...(dto.name !== undefined ? { name: dto.name } : {}),
+      ...(dto.description !== undefined ? { description: dto.description } : {}),
+      updatedBy: actorId,
+    })
     await this.recordUpdate(before, after, actorId)
     return after
   }
@@ -116,10 +125,10 @@ export class WorkflowsService extends BaseRegistryService<WorkflowModel> {
               steps: g.steps.map((s) => ({
                 id: `step-input-${s.order}`,
                 groupId: `group-input-${g.order}`,
-                skillId: s.skillId,
-                deviceId: s.deviceId,
-                recipeId: s.recipeId,
-                toolId: s.toolId,
+                skillId: s.skillId ?? null,
+                deviceId: s.deviceId ?? null,
+                recipeId: s.recipeId ?? null,
+                toolId: s.toolId ?? null,
               })),
             })),
           })),
