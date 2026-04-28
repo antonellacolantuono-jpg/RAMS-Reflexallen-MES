@@ -1,0 +1,51 @@
+# Node.js
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js
+.next/
+out/
+build/
+dist/
+.turbo/
+
+# Prisma
+*.db
+*.db-journal
+prisma/migrations/*.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+# .env.example is intentionally NOT ignored — keep it committed
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Logs
+*.log
+
+# Build artifacts & cache
+.cache/
+coverage/
+*.tsbuildinfo
+
+# Dev uploads
+uploads/
+
+# Claude Code session artifacts
+.claude/

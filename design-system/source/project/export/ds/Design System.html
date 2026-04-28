@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RAMS · Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Fahkwang:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+<link rel="stylesheet" href="styles/tokens.css">
+<meta name="ext-resource-dependency" content="assets/brand/reflexallen-logomark-light.svg" data-resource-id="logoLight">
+<meta name="ext-resource-dependency" content="assets/brand/reflexallen-logomark-dark.svg" data-resource-id="logoDark">
+<meta name="ext-resource-dependency" content="assets/brand/reflexallen-completed-light.svg" data-resource-id="completedLight">
+<meta name="ext-resource-dependency" content="assets/brand/reflexallen-completed-dark.svg" data-resource-id="completedDark">
+<meta name="ext-resource-dependency" content="assets/brand/reflexallen-nopayoff-light.svg" data-resource-id="nopayoffLight">
+<meta name="ext-resource-dependency" content="assets/brand/reflexallen-nopayoff-dark.svg" data-resource-id="nopayoffDark">
+<style>
+  html { scroll-behavior: smooth; }
+  body { background: var(--paper-2); }
+  main section:last-child { border-bottom: 0; }
+  .font-fahkwang { font-family: 'Fahkwang', sans-serif; }
+  .font-avenir { font-family: 'Avenir Next', Avenir, 'Nunito Sans', system-ui, sans-serif; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<template id="__bundler_thumbnail" data-bg-color="#F5F4F2">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#F5F4F2"/>
+    <g transform="translate(420, 200)" fill="none" stroke="#1F0B28" stroke-width="3">
+      <rect x="0" y="0" width="120" height="160" rx="6"/>
+      <rect x="140" y="0" width="120" height="160" rx="6"/>
+      <rect x="280" y="0" width="80" height="160" rx="6"/>
+      <rect x="0" y="180" width="200" height="100" rx="6"/>
+      <rect x="220" y="180" width="140" height="100" rx="6"/>
+    </g>
+    <text x="600" y="500" font-family="sans-serif" font-size="56" font-weight="600" fill="#1F0B28" text-anchor="middle" letter-spacing="6">RAMS</text>
+    <text x="600" y="540" font-family="sans-serif" font-size="18" fill="#6B5E72" text-anchor="middle" letter-spacing="4">DESIGN SYSTEM</text>
+  </svg>
+</template>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="primitives.jsx"></script>
+<script type="text/babel" src="design-system.jsx"></script>
+</body>
+</html>

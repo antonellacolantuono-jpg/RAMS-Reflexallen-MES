@@ -1,0 +1,22 @@
+{
+  "name": "@mes/schemas",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@mes/config": "workspace:^",
+    "@mes/types": "workspace:*",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,1816 @@
+// ============================================================================
+// Reflexallen MES — Prisma Schema v1.2
+// Database: SQLite (DEV MODE) — see docs/DEV_MODE.md for production migration
+// ============================================================================
+// NOTE: SQLite does not support Prisma enums. All enum-typed fields use String
+// with allowed values documented in comments. Enum declarations are kept as
+// comments for reference and for future PostgreSQL migration.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUM VALUE REFERENCE (String fields — SQLite does not support native enums)
+// ============================================================================
+// UserRole:               admin | planner | supervisor | quality | operator | viewer
+// OperatorStatus:         active | inactive | suspended
+// ItemType:               finished_good | semi_finished | raw_material | component | consumable
+// TrackingMode:           none | lot | serial
+// UnitOfMeasure:          pc | g | kg | t | mm | cm | m | ml | l | m3 | s | min | h | m2
+// EquipmentHierarchyLevel: enterprise | site | area | work_center | work_unit | equipment_module
+// EquipmentClass:         production | storage | transport | test | maintenance | administrative
+// EquipmentStatus:        available | reserved | in_use | cleaning | maintenance | broken | offline | decommissioned
+// DeviceType:             scanner | printer | leak_tester | press | welder | robot | oven | washer | conveyor | agv | forklift | measurement | autoclave | custom
+// ToolWearStatus:         new | good | worn | at_limit | replaced
+// RecipeStatus:           draft | approved | deprecated
+// RecipeParameterType:    numeric | string | enum | boolean
+// WorkOrderStatus:        draft | planned | released | in_progress | on_hold | completed | partially_completed | closed | cancelled
+// WorkOrderPriority:      low | normal | high | urgent
+// WorkOrderType:          production | rework | prototype
+// PhaseCategory:          inbound | setup | production | quality_control | outbound | teardown
+// GroupCategory:          skills_check | bom_check | tooling_check | device_setup | device_execution | assembly | qc | logistics | packaging | measurement | identification | material_handling | storage | documentation | device_reset | cleanup
+// StepCategory:           production | logistics | identification | quality_control | decision | information | setup | teardown
+// StepType:               normal | warning | informative
+// StepSource:             manual | auto_generated | overridden
+// LotQualityStatus:       approved | quarantine | rejected
+// SerialStatus:           allocated | in_production | completed | rework | scrapped | on_hold
+// BoxStatus:              empty | filling | full | sealed | shipped | returned | damaged
+// AttentionSeverity:      info | warning | critical
+// MaintenanceType:        preventive | corrective | calibration | inspection
+// MaintenanceStatus:      scheduled | in_progress | completed | cancelled | overdue | deferred
+// AssignmentStatus:       proposed | accepted | declined | active | completed
+// HoldStatus:             active | released | rejected
+// WorkflowVersionStatus:  draft | approved | deprecated
+// FAIStatus:              pending | approved | rejected
+// CureCycleStatus:        running | completed | aborted
+// HomologationStatus:     active | expired | revoked
+// TestResult:             pass | fail
+// AgingSpecimenStatus:    ongoing | completed | aborted
+
+// ============================================================================
+// 1. PLANT
+// ============================================================================
+
+model Plant {
+  id       String  @id @default(cuid())
+  code     String  @unique
+  name     String
+  timezone String  @default("Europe/Rome")
+  locale   String  @default("it-IT")
+  address  String?
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  users                    User[]
+  operators                Operator[]
+  skills                   Skill[]
+  items                    Item[]
+  equipmentNodes           EquipmentNode[]
+  recipes                  Recipe[]
+  boxTypes                 BoxType[]
+  boxes                    Box[]
+  causeCodes               CauseCode[]
+  lots                     Lot[]
+  workflows                Workflow[]
+  workOrders               WorkOrder[]
+  shifts                   Shift[]
+  maintenanceOrders        MaintenanceOrder[]
+  attentionPoints          AttentionPoint[]
+  auditLogs                AuditLog[]
+  domainEvents             DomainEvent[]
+  homologationCertificates HomologationCertificate[]
+
+  @@map("plants")
+}
+
+// ============================================================================
+// 2. USER
+// ============================================================================
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         String    @default("operator") // UserRole
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  plantId      String    @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+
+  plant    Plant     @relation(fields: [plantId], references: [id])
+  operator Operator?
+
+  @@index([plantId, role])
+  @@index([email])
+  @@map("users")
+}
+
+// ============================================================================
+// 3. OPERATOR
+// ============================================================================
+
+model Operator {
+  id        String  @id @default(cuid())
+  badge     String  @unique
+  userId    String? @unique @map("user_id")
+  status    String  @default("active") // OperatorStatus
+  plantId   String  @map("plant_id")
+  firstName String  @map("first_name")
+  lastName  String  @map("last_name")
+  photoUrl  String? @map("photo_url")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant            Plant                 @relation(fields: [plantId], references: [id])
+  user             User?                 @relation(fields: [userId], references: [id])
+  operatorSkills   OperatorSkill[]
+  shiftAssignments ShiftAssignment[]
+  assignments      WorkOrderAssignment[]
+
+  @@index([plantId, status])
+  @@index([badge])
+  @@map("operators")
+}
+
+// ============================================================================
+// 4. SKILL
+// ============================================================================
+
+model Skill {
+  id          String  @id @default(cuid())
+  code        String
+  name        String
+  category    String
+  description String?
+  plantId     String  @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant             Plant                    @relation(fields: [plantId], references: [id])
+  operatorSkills    OperatorSkill[]
+  steps             Step[]
+  coverageOverrides SkillsCoverageOverride[]
+
+  @@unique([plantId, code])
+  @@index([plantId])
+  @@map("skills")
+}
+
+// ============================================================================
+// 5. OPERATOR SKILL (M:N join with expiry)
+// ============================================================================
+
+model OperatorSkill {
+  id          String    @id @default(cuid())
+  operatorId  String    @map("operator_id")
+  skillId     String    @map("skill_id")
+  certifiedAt DateTime  @map("certified_at")
+  expiresAt   DateTime? @map("expires_at")
+  level       String    @default("certified") // certified | advanced | instructor
+  certifiedBy String    @map("certified_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  operator Operator @relation(fields: [operatorId], references: [id])
+  skill    Skill    @relation(fields: [skillId], references: [id])
+
+  @@unique([operatorId, skillId])
+  @@index([skillId])
+  @@index([expiresAt])
+  @@map("operator_skills")
+}
+
+// ============================================================================
+// 6. ITEM
+// ============================================================================
+
+model Item {
+  id           String  @id @default(cuid())
+  code         String
+  name         String
+  itemType     String  @map("item_type") // ItemType
+  trackingMode String  @default("lot") @map("tracking_mode") // TrackingMode
+  uom          String  @default("pc") // UnitOfMeasure
+  description  String?
+  plantId      String  @map("plant_id")
+  isActive     Boolean @default(true) @map("is_active")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant                    Plant                    @relation(fields: [plantId], references: [id])
+  boms                     BOM[]
+  lots                     Lot[]
+  workflows                Workflow[]
+  workOrders               WorkOrder[]
+  recipes                  Recipe[]
+  homologationCertificates HomologationCertificate[]
+
+  @@unique([plantId, code])
+  @@index([plantId, itemType])
+  @@map("items")
+}
+
+// ============================================================================
+// 7. BOM
+// ============================================================================
+
+model BOM {
+  id            String    @id @default(cuid())
+  itemId        String    @map("item_id")
+  version       Int       @default(1)
+  status        String    @default("draft") // draft | approved | deprecated
+  effectiveFrom DateTime? @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+  notes         String?
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  item       Item        @relation(fields: [itemId], references: [id])
+  lines      BOMLine[]
+  workOrders WorkOrder[]
+
+  @@unique([itemId, version])
+  @@index([itemId, status])
+  @@map("boms")
+}
+
+// ============================================================================
+// 8. BOM LINE
+// ============================================================================
+
+model BOMLine {
+  id          String  @id @default(cuid())
+  bomId       String  @map("bom_id")
+  componentId String  @map("component_id")
+  qty         Float
+  uom         String  @default("pc") // UnitOfMeasure
+  position    Int     @default(0)
+  isOptional  Boolean @default(false) @map("is_optional")
+  notes       String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  bom BOM @relation(fields: [bomId], references: [id], onDelete: Cascade)
+
+  @@index([bomId, position])
+  @@map("bom_lines")
+}
+
+// ============================================================================
+// 9. EQUIPMENT NODE (ISA-95 hierarchy — self-referential tree)
+// ============================================================================
+
+model EquipmentNode {
+  id          String  @id @default(cuid())
+  code        String
+  name        String
+  level       String  // EquipmentHierarchyLevel
+  class       String  @default("production") // EquipmentClass
+  status      String  @default("available") // EquipmentStatus
+  parentId    String? @map("parent_id")
+  plantId     String  @map("plant_id")
+  description String?
+
+  // Equipment management extensions (v1.2)
+  lastMaintenanceAt    DateTime? @map("last_maintenance_at")
+  nextMaintenanceDueAt DateTime? @map("next_maintenance_due_at")
+  totalCyclesCount     Int       @default(0) @map("total_cycles_count")
+  totalRunHoursMin     Int       @default(0) @map("total_run_hours_min")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant             Plant               @relation(fields: [plantId], references: [id])
+  parent            EquipmentNode?      @relation("EquipmentHierarchy", fields: [parentId], references: [id])
+  children          EquipmentNode[]     @relation("EquipmentHierarchy")
+  devices           Device[]
+  tools             Tool[]
+  maintenanceOrders MaintenanceOrder[]
+  maintenanceLogs   MaintenanceLog[]
+  stateLogs         EquipmentStateLog[]
+  downtime          DowntimeEvent[]
+  continuousRuns    ContinuousProductionRun[]
+  molds             Mold[]
+
+  @@unique([plantId, code])
+  @@index([plantId, level])
+  @@index([parentId])
+  @@index([status])
+  @@map("equipment_nodes")
+}
+
+// ============================================================================
+// 10. DEVICE
+// ============================================================================
+
+model Device {
+  id              String    @id @default(cuid())
+  equipmentNodeId String    @map("equipment_node_id")
+  deviceType      String    @map("device_type") // DeviceType
+  ipAddress       String?   @map("ip_address")
+  serialNumber    String?   @unique @map("serial_number")
+  firmwareVersion String?   @map("firmware_version")
+  lastConnectedAt DateTime? @map("last_connected_at")
+  isMock          Boolean   @default(false) @map("is_mock")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  equipmentNode EquipmentNode @relation(fields: [equipmentNodeId], references: [id])
+  recipes       Recipe[]
+  steps         Step[]
+
+  @@index([equipmentNodeId])
+  @@map("devices")
+}
+
+// ============================================================================
+// 11. TOOL
+// ============================================================================
+
+model Tool {
+  id                 String    @id @default(cuid())
+  code               String
+  name               String
+  equipmentNodeId    String?   @map("equipment_node_id")
+  currentCyclesCount Int       @default(0) @map("current_cycles_count")
+  maxCycles          Int?      @map("max_cycles")
+  wearStatus         String    @default("new") @map("wear_status") // ToolWearStatus
+  lastUsedAt         DateTime? @map("last_used_at")
+  replacedAt         DateTime? @map("replaced_at")
+  replacementCount   Int       @default(0) @map("replacement_count")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  equipmentNode EquipmentNode?    @relation(fields: [equipmentNodeId], references: [id])
+  wearHistory   ToolWearHistory[]
+  steps         Step[]
+
+  @@index([equipmentNodeId])
+  @@index([wearStatus])
+  @@map("tools")
+}
+
+// ============================================================================
+// 12. RECIPE
+// ============================================================================
+
+model Recipe {
+  id       String  @id @default(cuid())
+  code     String
+  name     String
+  deviceId String? @map("device_id")
+  itemId   String? @map("item_id")
+  status   String  @default("draft") // RecipeStatus
+  plantId  String  @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant          Plant           @relation(fields: [plantId], references: [id])
+  device         Device?         @relation(fields: [deviceId], references: [id])
+  item           Item?           @relation(fields: [itemId], references: [id])
+  recipeVersions RecipeVersion[]
+  steps          Step[]
+
+  @@unique([plantId, code])
+  @@index([plantId, status])
+  @@map("recipes")
+}
+
+// ============================================================================
+// 13. RECIPE VERSION
+// ============================================================================
+
+model RecipeVersion {
+  id         String    @id @default(cuid())
+  recipeId   String    @map("recipe_id")
+  version    Int
+  status     String    @default("draft") // RecipeStatus
+  parameters String    // JSON serialized: RecipeParameter[]
+  approvedBy String?   @map("approved_by")
+  approvedAt DateTime? @map("approved_at")
+  notes      String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String   @map("created_by")
+
+  recipe Recipe @relation(fields: [recipeId], references: [id])
+
+  @@unique([recipeId, version])
+  @@index([recipeId, status])
+  @@map("recipe_versions")
+}
+
+// ============================================================================
+// 14. BOX TYPE
+// ============================================================================
+
+model BoxType {
+  id            String  @id @default(cuid())
+  code          String
+  name          String
+  maxWeightG    Float?  @map("max_weight_g")
+  maxVolumeL    Float?  @map("max_volume_l")
+  maxUnitsCount Int?    @map("max_units_count")
+  isReturnable  Boolean @default(false) @map("is_returnable")
+  description   String?
+  plantId       String  @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant Plant @relation(fields: [plantId], references: [id])
+  boxes Box[]
+
+  @@unique([plantId, code])
+  @@index([plantId])
+  @@map("box_types")
+}
+
+// ============================================================================
+// 15. BOX
+// ============================================================================
+
+model Box {
+  id                String    @id @default(cuid())
+  code              String    @unique
+  boxTypeId         String    @map("box_type_id")
+  status            String    @default("empty") // BoxStatus
+  currentWeightG    Float     @default(0) @map("current_weight_g")
+  currentVolumeL    Float     @default(0) @map("current_volume_l")
+  currentUnitsCount Int       @default(0) @map("current_units_count")
+  lotId             String?   @map("lot_id")
+  sealedAt          DateTime? @map("sealed_at")
+  sealedBy          String?   @map("sealed_by")
+  cyclesCount       Int       @default(0) @map("cycles_count")
+  plantId           String    @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  boxType BoxType @relation(fields: [boxTypeId], references: [id])
+  plant   Plant   @relation(fields: [plantId], references: [id])
+
+  @@index([plantId, status])
+  @@index([lotId])
+  @@map("boxes")
+}
+
+// ============================================================================
+// 16. ATTENTION POINT
+// ============================================================================
+
+model AttentionPoint {
+  id          String    @id @default(cuid())
+  entityType  String    @map("entity_type")
+  entityId    String    @map("entity_id")
+  severity    String    @default("warning") // AttentionSeverity
+  message     String
+  resolvedAt  DateTime? @map("resolved_at")
+  resolvedBy  String?   @map("resolved_by")
+  resolveNote String?   @map("resolve_note")
+  plantId     String    @map("plant_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String   @map("created_by")
+
+  plant Plant @relation(fields: [plantId], references: [id])
+
+  @@index([plantId, entityType, entityId])
+  @@index([resolvedAt])
+  @@map("attention_points")
+}
+
+// ============================================================================
+// 17. CAUSE CODE
+// ============================================================================
+
+model CauseCode {
+  id          String  @id @default(cuid())
+  code        String
+  name        String
+  category    String  // defect | downtime | scrap | rework
+  phase       String? // which phase category it applies to
+  description String?
+  plantId     String  @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant    Plant           @relation(fields: [plantId], references: [id])
+  downtime DowntimeEvent[]
+
+  @@unique([plantId, code])
+  @@index([plantId, category])
+  @@map("cause_codes")
+}
+
+// ============================================================================
+// 18. LOT
+// ============================================================================
+
+model Lot {
+  id            String    @id @default(cuid())
+  lotNumber     String
+  itemId        String    @map("item_id")
+  qty           Float
+  qualityStatus String    @default("quarantine") @map("quality_status") // LotQualityStatus
+  supplierRef   String?   @map("supplier_ref")
+  expiresAt     DateTime? @map("expires_at")
+  notes         String?
+  plantId       String    @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant               Plant                @relation(fields: [plantId], references: [id])
+  item                Item                 @relation(fields: [itemId], references: [id])
+  movements           LotMovement[]
+  holds               LotHold[]
+  prepregRolls        PrepregRoll[]
+  reflectiveFilmRolls ReflectiveFilmRoll[]
+  samples             Sample[]
+  agingTestSpecimens  AgingTestSpecimen[]
+  reflectanceTests    ReflectanceTest[]
+
+  @@unique([plantId, lotNumber])
+  @@index([plantId, qualityStatus])
+  @@index([itemId])
+  @@map("lots")
+}
+
+// ============================================================================
+// 19. LOT MOVEMENT
+// ============================================================================
+
+model LotMovement {
+  id           String  @id @default(cuid())
+  lotId        String  @map("lot_id")
+  fromLocation String? @map("from_location")
+  toLocation   String? @map("to_location")
+  qty          Float
+  movedBy      String  @map("moved_by")
+  reason       String?
+
+  movedAt   DateTime @map("moved_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  lot Lot @relation(fields: [lotId], references: [id])
+
+  @@index([lotId, movedAt])
+  @@map("lot_movements")
+}
+
+// ============================================================================
+// 20. WORKFLOW
+// ============================================================================
+
+model Workflow {
+  id               String  @id @default(cuid())
+  code             String
+  name             String
+  itemId           String? @map("item_id")
+  currentVersionId String? @map("current_version_id")
+  description      String?
+  plantId          String  @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant            Plant             @relation(fields: [plantId], references: [id])
+  item             Item?             @relation(fields: [itemId], references: [id])
+  workflowVersions WorkflowVersion[]
+
+  @@unique([plantId, code])
+  @@index([plantId])
+  @@map("workflows")
+}
+
+// ============================================================================
+// 21. WORKFLOW VERSION
+// ============================================================================
+
+model WorkflowVersion {
+  id         String    @id @default(cuid())
+  workflowId String    @map("workflow_id")
+  version    Int
+  status     String    @default("draft") // WorkflowVersionStatus
+  approvedBy String?   @map("approved_by")
+  approvedAt DateTime? @map("approved_at")
+  notes      String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String   @map("created_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String   @map("updated_by")
+
+  workflow          Workflow           @relation(fields: [workflowId], references: [id])
+  phases            Phase[]
+  workflowSnapshots WorkflowSnapshot[]
+
+  @@unique([workflowId, version])
+  @@index([workflowId, status])
+  @@map("workflow_versions")
+}
+
+// ============================================================================
+// 22. PHASE
+// ============================================================================
+
+model Phase {
+  id                String  @id @default(cuid())
+  workflowVersionId String  @map("workflow_version_id")
+  order             Int
+  category          String  // PhaseCategory
+  name              String
+  isCycleBased      Boolean @default(false) @map("is_cycle_based")
+  isAutoGenerated   Boolean @default(false) @map("is_auto_generated")
+  description       String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String   @map("created_by")
+  updatedBy String   @map("updated_by")
+
+  workflowVersion   WorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  groups            Group[]
+  wipContainersFrom WIPContainer[]  @relation("WIPFrom")
+  wipContainersTo   WIPContainer[]  @relation("WIPTo")
+
+  @@index([workflowVersionId, order])
+  @@map("phases")
+}
+
+// ============================================================================
+// 23. GROUP
+// ============================================================================
+
+model Group {
+  id               String  @id @default(cuid())
+  phaseId          String  @map("phase_id")
+  order            Int
+  category         String  // GroupCategory
+  name             String
+  supportsParallel Boolean @default(false) @map("supports_parallel")
+  supportsRecovery Boolean @default(false) @map("supports_recovery")
+  isAutoGenerated  Boolean @default(false) @map("is_auto_generated")
+  description      String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String   @map("created_by")
+  updatedBy String   @map("updated_by")
+
+  phase Phase  @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  steps Step[]
+
+  @@index([phaseId, order])
+  @@map("groups")
+}
+
+// ============================================================================
+// 24. STEP
+// ============================================================================
+
+model Step {
+  id              String  @id @default(cuid())
+  groupId         String  @map("group_id")
+  order           Int
+  category        String  // StepCategory
+  actionType      String  @map("action_type") // StepActionType value
+  type            String  @default("normal") // StepType
+  source          String  @default("manual") // StepSource
+  name            String
+  instructions    String?
+  skillId         String? @map("skill_id")
+  deviceId        String? @map("device_id")
+  recipeId        String? @map("recipe_id")
+  toolId          String? @map("tool_id")
+  standardTimeSec Int?    @map("standard_time_sec")
+  isRequired      Boolean @default(true) @map("is_required")
+  partReference   String? @map("part_reference") // PartReference enum value
+  noTargetPolicy  String? @map("no_target_policy") // NoTargetPolicy enum value
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String   @map("created_by")
+  updatedBy String   @map("updated_by")
+
+  group          Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  skill          Skill?          @relation(fields: [skillId], references: [id])
+  device         Device?         @relation(fields: [deviceId], references: [id])
+  recipe         Recipe?         @relation(fields: [recipeId], references: [id])
+  tool           Tool?           @relation(fields: [toolId], references: [id])
+  stepExecutions StepExecution[]
+
+  @@index([groupId, order])
+  @@map("steps")
+}
+
+// ============================================================================
+// 25. WORKFLOW SNAPSHOT (immutable at WO release — ADR-001)
+// ============================================================================
+
+model WorkflowSnapshot {
+  id                String @id @default(cuid())
+  workflowVersionId String @map("workflow_version_id")
+  workOrderId       String @unique @map("work_order_id")
+  snapshotData      String @map("snapshot_data") // JSON serialized full workflow
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String   @map("created_by")
+
+  workflowVersion WorkflowVersion @relation(fields: [workflowVersionId], references: [id])
+  workOrder       WorkOrder       @relation(fields: [workOrderId], references: [id])
+
+  @@index([workflowVersionId])
+  @@map("workflow_snapshots")
+}
+
+// ============================================================================
+// 26. WORK ORDER
+// ============================================================================
+
+model WorkOrder {
+  id             String    @id @default(cuid())
+  code           String
+  itemId         String    @map("item_id")
+  bomId          String?   @map("bom_id")
+  status         String    @default("draft") // WorkOrderStatus
+  priority       String    @default("normal") // WorkOrderPriority
+  type           String    @default("production") // WorkOrderType
+  qtyTarget      Int       @map("qty_target")
+  qtyProduced    Int       @default(0) @map("qty_produced")
+  qtyScrap       Int       @default(0) @map("qty_scrap")
+  qtyRework      Int       @default(0) @map("qty_rework")
+  scheduledStart DateTime? @map("scheduled_start")
+  scheduledEnd   DateTime? @map("scheduled_end")
+  actualStart    DateTime? @map("actual_start")
+  actualEnd      DateTime? @map("actual_end")
+  releasedAt     DateTime? @map("released_at")
+  releasedBy     String?   @map("released_by")
+  closedAt       DateTime? @map("closed_at")
+  closedBy       String?   @map("closed_by")
+  notes          String?
+  plantId        String    @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant             Plant                     @relation(fields: [plantId], references: [id])
+  item              Item                      @relation(fields: [itemId], references: [id])
+  bom               BOM?                      @relation(fields: [bomId], references: [id])
+  workflowSnapshot  WorkflowSnapshot?
+  productionRecords ProductionRecord[]
+  stepExecutions    StepExecution[]
+  downtimeEvents    DowntimeEvent[]
+  assignments       WorkOrderAssignment[]
+  faiReports        FAIReport[]
+  wipContainers     WIPContainer[]
+  continuousRuns    ContinuousProductionRun[]
+  cureCycleRuns     CureCycleRun[]
+  moldCycles        MoldCycle[]
+  layupLogs         LayupLog[]
+  vacuumBagTests    VacuumBagTest[]
+  ndtResults        NDTResult[]
+  samples           Sample[]
+  reflectanceTests  ReflectanceTest[]
+  colorimetryTests  ColorimetryTest[]
+  laminationRecords LaminationRecord[]
+  crossCutTests     CrossCutAdhesionTest[]
+  agingSpecimens    AgingTestSpecimen[]
+
+  @@unique([plantId, code])
+  @@index([plantId, status])
+  @@index([itemId])
+  @@index([scheduledStart])
+  @@map("work_orders")
+}
+
+// ============================================================================
+// 27. PRODUCTION RECORD (per piece/cycle)
+// ============================================================================
+
+model ProductionRecord {
+  id           String  @id @default(cuid())
+  workOrderId  String  @map("work_order_id")
+  serialNumber String? @map("serial_number")
+  cycleNumber  Int     @map("cycle_number")
+  stepId       String? @map("step_id")
+  result       String  // ok | nok | rework
+  operatorId   String? @map("operator_id")
+  notes        String?
+
+  startedAt   DateTime  @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+
+  @@index([workOrderId, cycleNumber])
+  @@index([serialNumber])
+  @@map("production_records")
+}
+
+// ============================================================================
+// 28. STEP EXECUTION
+// ============================================================================
+
+model StepExecution {
+  id          String  @id @default(cuid())
+  workOrderId String  @map("work_order_id")
+  stepId      String  @map("step_id")
+  operatorId  String? @map("operator_id")
+  result      String? // ok | nok | rework | skipped
+  durationSec Int?    @map("duration_sec")
+  notes       String?
+  data        String? // JSON serialized: captured form data
+
+  startedAt   DateTime  @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  step      Step      @relation(fields: [stepId], references: [id])
+
+  @@index([workOrderId, stepId])
+  @@index([operatorId])
+  @@map("step_executions")
+}
+
+// ============================================================================
+// 29. DOWNTIME EVENT
+// ============================================================================
+
+model DowntimeEvent {
+  id              String  @id @default(cuid())
+  workOrderId     String  @map("work_order_id")
+  equipmentNodeId String? @map("equipment_node_id")
+  causeCodeId     String? @map("cause_code_id")
+  description     String?
+  durationMin     Int?    @map("duration_min")
+  impact          String  @default("minor") // minor | major | critical
+  reportedBy      String  @map("reported_by")
+
+  startedAt DateTime  @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  workOrder     WorkOrder      @relation(fields: [workOrderId], references: [id])
+  equipmentNode EquipmentNode? @relation(fields: [equipmentNodeId], references: [id])
+  causeCode     CauseCode?     @relation(fields: [causeCodeId], references: [id])
+
+  @@index([workOrderId])
+  @@index([equipmentNodeId])
+  @@map("downtime_events")
+}
+
+// ============================================================================
+// v1.2 — 30. MAINTENANCE ORDER
+// ============================================================================
+
+model MaintenanceOrder {
+  id              String    @id @default(cuid())
+  code            String
+  equipmentNodeId String    @map("equipment_node_id")
+  type            String    // MaintenanceType
+  status          String    @default("scheduled") // MaintenanceStatus
+  priority        String    @default("normal")
+  description     String
+  plannedStart    DateTime  @map("planned_start")
+  plannedEnd      DateTime  @map("planned_end")
+  actualStart     DateTime? @map("actual_start")
+  actualEnd       DateTime? @map("actual_end")
+  assignedToId    String?   @map("assigned_to_id")
+  startedBy       String?   @map("started_by")
+  completedBy     String?   @map("completed_by")
+  cancelledBy     String?   @map("cancelled_by")
+  cancelReason    String?   @map("cancel_reason")
+  plantId         String    @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant         Plant           @relation(fields: [plantId], references: [id])
+  equipmentNode EquipmentNode   @relation(fields: [equipmentNodeId], references: [id])
+  log           MaintenanceLog?
+
+  @@unique([plantId, code])
+  @@index([equipmentNodeId, status])
+  @@index([plannedStart])
+  @@map("maintenance_orders")
+}
+
+// ============================================================================
+// v1.2 — 31. MAINTENANCE LOG
+// ============================================================================
+
+model MaintenanceLog {
+  id                 String    @id @default(cuid())
+  maintenanceOrderId String    @unique @map("maintenance_order_id")
+  equipmentNodeId    String    @map("equipment_node_id")
+  type               String    // MaintenanceType
+  actionsPerformed   String    @map("actions_performed") // JSON serialized
+  partsReplaced      String?   @map("parts_replaced") // JSON serialized
+  findings           String?
+  recommendations    String?
+  performedBy        String    @map("performed_by")
+  performedAt        DateTime  @map("performed_at")
+  durationMinutes    Int?      @map("duration_minutes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  maintenanceOrder MaintenanceOrder @relation(fields: [maintenanceOrderId], references: [id], onDelete: Restrict)
+  equipmentNode    EquipmentNode    @relation(fields: [equipmentNodeId], references: [id])
+
+  @@index([equipmentNodeId, performedAt])
+  @@map("maintenance_logs")
+}
+
+// ============================================================================
+// v1.2 — 32. EQUIPMENT STATE LOG
+// ============================================================================
+
+model EquipmentStateLog {
+  id                String   @id @default(cuid())
+  equipmentNodeId   String   @map("equipment_node_id")
+  fromState         String?  @map("from_state") // EquipmentStatus
+  toState           String   @map("to_state") // EquipmentStatus
+  transitionedBy    String   @map("transitioned_by")
+  triggeredBy       String   @map("triggered_by") // user | system | maintenance
+  reason            String?
+  relatedEntityType String?  @map("related_entity_type")
+  relatedEntityId   String?  @map("related_entity_id")
+
+  transitionedAt DateTime @default(now()) @map("transitioned_at")
+
+  equipmentNode EquipmentNode @relation(fields: [equipmentNodeId], references: [id])
+
+  @@index([equipmentNodeId, transitionedAt])
+  @@map("equipment_state_log")
+}
+
+// ============================================================================
+// v1.2 — 33. TOOL WEAR HISTORY
+// ============================================================================
+
+model ToolWearHistory {
+  id                  String  @id @default(cuid())
+  toolId              String  @map("tool_id")
+  previousCyclesCount Int     @map("previous_cycles_count")
+  replacedBy          String  @map("replaced_by")
+  reason              String?
+
+  replacedAt DateTime @default(now()) @map("replaced_at")
+
+  tool Tool @relation(fields: [toolId], references: [id])
+
+  @@index([toolId, replacedAt])
+  @@map("tool_wear_history")
+}
+
+// ============================================================================
+// v1.2 — 34. WORK ORDER ASSIGNMENT
+// ============================================================================
+
+model WorkOrderAssignment {
+  id            String    @id @default(cuid())
+  workOrderId   String    @map("work_order_id")
+  operatorId    String    @map("operator_id")
+  status        String    @default("proposed") // AssignmentStatus
+  assignedAt    DateTime  @default(now()) @map("assigned_at")
+  acceptedAt    DateTime? @map("accepted_at")
+  startedAt     DateTime? @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  declineReason String?   @map("decline_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String   @map("created_by")
+  updatedBy String   @map("updated_by")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  operator  Operator  @relation(fields: [operatorId], references: [id])
+
+  @@unique([workOrderId, operatorId])
+  @@index([workOrderId, status])
+  @@index([operatorId, status])
+  @@map("work_order_assignments")
+}
+
+// ============================================================================
+// v1.2 — 35. SKILLS COVERAGE OVERRIDE
+// ============================================================================
+
+model SkillsCoverageOverride {
+  id             String   @id @default(cuid())
+  workOrderId    String   @map("work_order_id")
+  missingSkillId String   @map("missing_skill_id")
+  overriddenBy   String   @map("overridden_by")
+  reason         String
+  approvedAt     DateTime @map("approved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  skill Skill @relation(fields: [missingSkillId], references: [id])
+
+  @@index([workOrderId])
+  @@map("skills_coverage_overrides")
+}
+
+// ============================================================================
+// v1.2 — 36. SHIFT
+// ============================================================================
+
+model Shift {
+  id           String @id @default(cuid())
+  code         String
+  name         String
+  startTime    String @map("start_time") // HH:MM format
+  endTime      String @map("end_time") // HH:MM format
+  breakMinutes Int    @default(0) @map("break_minutes")
+  plantId      String @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant       Plant             @relation(fields: [plantId], references: [id])
+  assignments ShiftAssignment[]
+
+  @@unique([plantId, code])
+  @@index([plantId])
+  @@map("shifts")
+}
+
+// ============================================================================
+// v1.2 — 37. SHIFT ASSIGNMENT
+// ============================================================================
+
+model ShiftAssignment {
+  id          String   @id @default(cuid())
+  shiftId     String   @map("shift_id")
+  operatorId  String   @map("operator_id")
+  date        DateTime
+  workOrderId String?  @map("work_order_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String   @map("created_by")
+
+  shift    Shift    @relation(fields: [shiftId], references: [id])
+  operator Operator @relation(fields: [operatorId], references: [id])
+
+  @@unique([shiftId, operatorId, date])
+  @@index([date])
+  @@map("shift_assignments")
+}
+
+// ============================================================================
+// v1.2 — 38. CONTINUOUS PRODUCTION RUN
+// ============================================================================
+
+model ContinuousProductionRun {
+  id                   String  @id @default(cuid())
+  workOrderId          String  @map("work_order_id")
+  equipmentNodeId      String  @map("equipment_node_id")
+  modeType             String  @map("mode_type") // extrusion | lamination
+  status               String  @default("running") // running | paused | completed | aborted
+  totalMeters          Float   @default(0) @map("total_meters")
+  telemetryIntervalMin Int     @default(5) @map("telemetry_interval_min")
+  startedBy            String  @map("started_by")
+  completedBy          String? @map("completed_by")
+
+  startedAt DateTime  @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String    @map("updated_by")
+
+  workOrder     WorkOrder     @relation(fields: [workOrderId], references: [id])
+  equipmentNode EquipmentNode @relation(fields: [equipmentNodeId], references: [id])
+
+  @@index([workOrderId])
+  @@index([equipmentNodeId, status])
+  @@map("continuous_production_runs")
+}
+
+// ============================================================================
+// v1.2 — 39. SAMPLE
+// ============================================================================
+
+model Sample {
+  id           String  @id @default(cuid())
+  workOrderId  String  @map("work_order_id")
+  lotId        String? @map("lot_id")
+  sampleNumber Int     @map("sample_number")
+  isPPAP       Boolean @default(false) @map("is_ppap")
+  takenBy      String  @map("taken_by")
+  notes        String?
+
+  takenAt   DateTime @map("taken_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  workOrder        WorkOrder              @relation(fields: [workOrderId], references: [id])
+  lot              Lot?                   @relation(fields: [lotId], references: [id])
+  results          SampleResult[]
+  faiReport        FAIReport?
+  reflectanceTests ReflectanceTest[]
+  colorimetryTests ColorimetryTest[]
+  crossCutTests    CrossCutAdhesionTest[]
+
+  @@unique([workOrderId, sampleNumber])
+  @@index([workOrderId])
+  @@map("samples")
+}
+
+// ============================================================================
+// v1.2 — 40. SAMPLE RESULT
+// ============================================================================
+
+model SampleResult {
+  id         String  @id @default(cuid())
+  sampleId   String  @map("sample_id")
+  parameter  String
+  value      Float
+  uom        String?
+  inSpec     Boolean @map("in_spec")
+  testMethod String? @map("test_method")
+  notes      String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String   @map("created_by")
+
+  sample Sample @relation(fields: [sampleId], references: [id])
+
+  @@index([sampleId])
+  @@map("sample_results")
+}
+
+// ============================================================================
+// v1.2 — 41. FAI REPORT (First Article Inspection / PPAP)
+// ============================================================================
+
+model FAIReport {
+  id          String    @id @default(cuid())
+  workOrderId String    @map("work_order_id")
+  sampleId    String    @unique @map("sample_id")
+  status      String    @default("pending") // FAIStatus
+  approvedBy  String?   @map("approved_by")
+  approvedAt  DateTime? @map("approved_at")
+  rejectedBy  String?   @map("rejected_by")
+  rejectedAt  DateTime? @map("rejected_at")
+  qcNotes     String?   @map("qc_notes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String   @map("created_by")
+  updatedBy String   @map("updated_by")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  sample    Sample    @relation(fields: [sampleId], references: [id])
+
+  @@index([workOrderId, status])
+  @@map("fai_reports")
+}
+
+// ============================================================================
+// v1.2 — 42. WIP CONTAINER
+// ============================================================================
+
+model WIPContainer {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  workOrderId String  @map("work_order_id")
+  fromPhaseId String? @map("from_phase_id")
+  toPhaseId   String? @map("to_phase_id")
+  qty         Int
+  status      String  @default("open") // open | closed | consumed
+  notes       String?
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  closedAt   DateTime? @map("closed_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdBy  String    @map("created_by")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  fromPhase Phase?    @relation("WIPFrom", fields: [fromPhaseId], references: [id])
+  toPhase   Phase?    @relation("WIPTo", fields: [toPhaseId], references: [id])
+
+  @@index([workOrderId, status])
+  @@map("wip_containers")
+}
+
+// ============================================================================
+// v1.2 — 43. LOT HOLD
+// ============================================================================
+
+model LotHold {
+  id         String    @id @default(cuid())
+  lotId      String    @map("lot_id")
+  reason     String
+  heldBy     String    @map("held_by")
+  status     String    @default("active") // HoldStatus
+  affectsQty Float?    @map("affects_qty")
+  notes      String?
+
+  heldAt    DateTime @map("held_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String   @map("updated_by")
+
+  lot     Lot             @relation(fields: [lotId], references: [id])
+  actions LotHoldAction[]
+
+  @@index([lotId, status])
+  @@map("lot_holds")
+}
+
+// ============================================================================
+// v1.2 — 44. LOT HOLD ACTION
+// ============================================================================
+
+model LotHoldAction {
+  id          String  @id @default(cuid())
+  lotHoldId   String  @map("lot_hold_id")
+  action      String  // release | reject | escalate | extend
+  performedBy String  @map("performed_by")
+  notes       String?
+
+  performedAt DateTime @default(now()) @map("performed_at")
+
+  lotHold LotHold @relation(fields: [lotHoldId], references: [id])
+
+  @@index([lotHoldId])
+  @@map("lot_hold_actions")
+}
+
+// ============================================================================
+// v1.2 CFRP — 45. MOLD
+// ============================================================================
+
+model Mold {
+  id                 String    @id @default(cuid())
+  code               String
+  name               String
+  equipmentNodeId    String?   @map("equipment_node_id")
+  currentCyclesCount Int       @default(0) @map("current_cycles_count")
+  maxCycles          Int?      @map("max_cycles")
+  status             String    @default("available") // available | in_use | maintenance | retired
+  material           String?
+  notes              String?
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  equipmentNode EquipmentNode? @relation(fields: [equipmentNodeId], references: [id])
+  cycles        MoldCycle[]
+  cureCycleRuns CureCycleRun[]
+  layupLogs     LayupLog[]
+
+  @@index([status])
+  @@map("molds")
+}
+
+// ============================================================================
+// v1.2 CFRP — 46. MOLD CYCLE
+// ============================================================================
+
+model MoldCycle {
+  id          String @id @default(cuid())
+  moldId      String @map("mold_id")
+  workOrderId String @map("work_order_id")
+  operatorId  String @map("operator_id")
+
+  usedAt    DateTime @default(now()) @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  mold      Mold      @relation(fields: [moldId], references: [id])
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+
+  @@index([moldId, usedAt])
+  @@index([workOrderId])
+  @@map("mold_cycles")
+}
+
+// ============================================================================
+// v1.2 CFRP — 47. PREPREG ROLL
+// ============================================================================
+
+model PrepregRoll {
+  id                 String  @id @default(cuid())
+  lotId              String  @map("lot_id")
+  rollNumber         String  @map("roll_number")
+  materialCode       String  @map("material_code")
+  outTimeBudgetHours Float   @default(720) @map("out_time_budget_hours") // 30 days default
+  outTimeUsedHours   Float   @default(0) @map("out_time_used_hours")
+  status             String  @default("ok") // ok | warning | expired
+  widthMm            Float?  @map("width_mm")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  lot            Lot                    @relation(fields: [lotId], references: [id])
+  outTimeRecords PrepregOutTimeRecord[]
+
+  @@unique([lotId, rollNumber])
+  @@index([status])
+  @@map("prepreg_rolls")
+}
+
+// ============================================================================
+// v1.2 CFRP — 48. PREPREG OUT TIME RECORD
+// ============================================================================
+
+model PrepregOutTimeRecord {
+  id            String  @id @default(cuid())
+  prepregRollId String  @map("prepreg_roll_id")
+  workOrderId   String  @map("work_order_id")
+  hoursAdded    Float   @map("hours_added")
+  reason        String?
+
+  exposedFrom DateTime @map("exposed_from")
+  exposedTo   DateTime @map("exposed_to")
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String   @map("created_by")
+
+  prepregRoll PrepregRoll @relation(fields: [prepregRollId], references: [id])
+
+  @@index([prepregRollId])
+  @@index([workOrderId])
+  @@map("prepreg_out_time_records")
+}
+
+// ============================================================================
+// v1.2 CFRP — 49. CURE CYCLE RUN
+// ============================================================================
+
+model CureCycleRun {
+  id             String    @id @default(cuid())
+  workOrderId    String    @map("work_order_id")
+  autoclaveId    String?   @map("autoclave_id") // EquipmentNode ID
+  moldId         String?   @map("mold_id")
+  programCode    String?   @map("program_code")
+  status         String    @default("running") // CureCycleStatus
+  targetTempC    Float?    @map("target_temp_c")
+  targetPressBar Float?    @map("target_press_bar")
+  notes          String?
+
+  startedAt DateTime  @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  workOrder WorkOrder            @relation(fields: [workOrderId], references: [id])
+  mold      Mold?                @relation(fields: [moldId], references: [id])
+  telemetry CureCycleTelemetry[]
+
+  @@index([workOrderId])
+  @@index([status])
+  @@map("cure_cycle_runs")
+}
+
+// ============================================================================
+// v1.2 CFRP — 50. CURE CYCLE TELEMETRY
+// ============================================================================
+
+model CureCycleTelemetry {
+  id             String  @id @default(cuid())
+  cureCycleRunId String  @map("cure_cycle_run_id")
+  tempC          Float?  @map("temp_c")
+  pressureBar    Float?  @map("pressure_bar")
+  vacuumMbar     Float?  @map("vacuum_mbar")
+  sensorId       String? @map("sensor_id")
+
+  recordedAt DateTime @map("recorded_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  cureCycleRun CureCycleRun @relation(fields: [cureCycleRunId], references: [id], onDelete: Cascade)
+
+  @@index([cureCycleRunId, recordedAt])
+  @@map("cure_cycle_telemetry")
+}
+
+// ============================================================================
+// v1.2 CFRP — 51. LAYUP LOG
+// ============================================================================
+
+model LayupLog {
+  id               String  @id @default(cuid())
+  workOrderId      String  @map("work_order_id")
+  moldId           String  @map("mold_id")
+  operatorId       String  @map("operator_id")
+  layerCount       Int     @map("layer_count")
+  totalThicknessMm Float?  @map("total_thickness_mm")
+  notes            String?
+
+  completedAt DateTime @map("completed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String   @map("created_by")
+
+  workOrder      WorkOrder       @relation(fields: [workOrderId], references: [id])
+  mold           Mold            @relation(fields: [moldId], references: [id])
+  vacuumBagTests VacuumBagTest[]
+
+  @@index([workOrderId])
+  @@map("layup_logs")
+}
+
+// ============================================================================
+// v1.2 CFRP — 52. VACUUM BAG TEST
+// ============================================================================
+
+model VacuumBagTest {
+  id               String  @id @default(cuid())
+  workOrderId      String  @map("work_order_id")
+  layupLogId       String? @map("layup_log_id")
+  passedVacuumMbar Float?  @map("passed_vacuum_mbar")
+  result           String  // TestResult: pass | fail
+  notes            String?
+  testedBy         String  @map("tested_by")
+
+  testedAt  DateTime @map("tested_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  layupLog  LayupLog? @relation(fields: [layupLogId], references: [id])
+
+  @@index([workOrderId])
+  @@map("vacuum_bag_tests")
+}
+
+// ============================================================================
+// v1.2 CFRP — 53. NDT RESULT
+// ============================================================================
+
+model NDTResult {
+  id           String  @id @default(cuid())
+  workOrderId  String  @map("work_order_id")
+  serialNumber String? @map("serial_number")
+  method       String  // ultrasound | xray | visual
+  defectsFound String? @map("defects_found") // JSON serialized
+  result       String  // TestResult: pass | fail
+  notes        String?
+  testedBy     String  @map("tested_by")
+
+  testedAt  DateTime @map("tested_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+
+  @@index([workOrderId])
+  @@map("ndt_results")
+}
+
+// ============================================================================
+// v1.2 SAFETY — 54. REFLECTIVE FILM ROLL
+// ============================================================================
+
+model ReflectiveFilmRoll {
+  id            String @id @default(cuid())
+  lotId         String @map("lot_id")
+  rollNumber    String @map("roll_number")
+  materialGrade String @map("material_grade")
+  widthMm       Float  @map("width_mm")
+  lengthM       Float  @map("length_m")
+  status        String @default("available") // available | in_use | consumed | expired
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  lot               Lot                @relation(fields: [lotId], references: [id])
+  laminationRecords LaminationRecord[]
+
+  @@unique([lotId, rollNumber])
+  @@index([status])
+  @@map("reflective_film_rolls")
+}
+
+// ============================================================================
+// v1.2 SAFETY — 55. HOMOLOGATION CERTIFICATE
+// ============================================================================
+
+model HomologationCertificate {
+  id           String    @id @default(cuid())
+  code         String    @unique // E{country}-104R-{seq}/{year}
+  itemId       String    @map("item_id")
+  authorityRef String?   @map("authority_ref")
+  status       String    @default("active") // HomologationStatus
+  issuedAt     DateTime  @map("issued_at")
+  expiresAt    DateTime  @map("expires_at")
+  notes        String?
+  plantId      String    @map("plant_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(1)
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  plant Plant @relation(fields: [plantId], references: [id])
+  item  Item  @relation(fields: [itemId], references: [id])
+
+  @@index([plantId, status])
+  @@index([itemId])
+  @@map("homologation_certificates")
+}
+
+// ============================================================================
+// v1.2 SAFETY — 56. REFLECTANCE TEST
+// ============================================================================
+
+model ReflectanceTest {
+  id            String  @id @default(cuid())
+  workOrderId   String  @map("work_order_id")
+  lotId         String? @map("lot_id")
+  sampleId      String? @map("sample_id")
+  ra            Float? // reflectance coefficient A
+  rb            Float? // reflectance coefficient B
+  passThreshold Float?  @map("pass_threshold")
+  result        String  // TestResult: pass | fail
+  notes         String?
+  testedBy      String  @map("tested_by")
+
+  testedAt  DateTime @map("tested_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  lot       Lot?      @relation(fields: [lotId], references: [id])
+  sample    Sample?   @relation(fields: [sampleId], references: [id])
+
+  @@index([workOrderId])
+  @@map("reflectance_tests")
+}
+
+// ============================================================================
+// v1.2 SAFETY — 57. COLORIMETRY TEST
+// ============================================================================
+
+model ColorimetryTest {
+  id          String  @id @default(cuid())
+  workOrderId String  @map("work_order_id")
+  sampleId    String? @map("sample_id")
+  cieL        Float   @map("cie_l")
+  cieA        Float   @map("cie_a")
+  cieB        Float   @map("cie_b")
+  colorClass  String? @map("color_class") // white | yellow | red | amber
+  result      String  // TestResult: pass | fail
+  notes       String?
+  testedBy    String  @map("tested_by")
+
+  testedAt  DateTime @map("tested_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  sample    Sample?   @relation(fields: [sampleId], references: [id])
+
+  @@index([workOrderId])
+  @@map("colorimetry_tests")
+}
+
+// ============================================================================
+// v1.2 SAFETY — 58. LAMINATION RECORD
+// ============================================================================
+
+model LaminationRecord {
+  id           String  @id @default(cuid())
+  workOrderId  String  @map("work_order_id")
+  filmRollId   String  @map("film_roll_id")
+  substrateRef String? @map("substrate_ref")
+  pressureBar  Float?  @map("pressure_bar")
+  tempC        Float?  @map("temp_c")
+  speedMmin    Float?  @map("speed_m_min")
+  operatorId   String  @map("operator_id")
+  notes        String?
+
+  laminatedAt DateTime @map("laminated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String   @map("created_by")
+
+  workOrder WorkOrder          @relation(fields: [workOrderId], references: [id])
+  filmRoll  ReflectiveFilmRoll @relation(fields: [filmRollId], references: [id])
+
+  @@index([workOrderId])
+  @@map("lamination_records")
+}
+
+// ============================================================================
+// v1.2 SAFETY — 59. CROSS CUT ADHESION TEST
+// ============================================================================
+
+model CrossCutAdhesionTest {
+  id          String  @id @default(cuid())
+  workOrderId String  @map("work_order_id")
+  sampleId    String? @map("sample_id")
+  rating      Int // 0-5 scale per ISO 2409
+  result      String  // TestResult: pass | fail
+  notes       String?
+  testedBy    String  @map("tested_by")
+
+  testedAt  DateTime @map("tested_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  sample    Sample?   @relation(fields: [sampleId], references: [id])
+
+  @@index([workOrderId])
+  @@map("cross_cut_adhesion_tests")
+}
+
+// ============================================================================
+// v1.2 SAFETY — 60. AGING TEST SPECIMEN
+// ============================================================================
+
+model AgingTestSpecimen {
+  id             String    @id @default(cuid())
+  workOrderId    String    @map("work_order_id")
+  lotId          String?   @map("lot_id")
+  specimenNumber Int       @map("specimen_number")
+  agingCondition String    @map("aging_condition") // xenon | thermal | humidity | salt_spray
+  scheduledEndAt DateTime  @map("scheduled_end_at")
+  status         String    @default("ongoing") // AgingSpecimenStatus
+  notes          String?
+
+  startedAt DateTime  @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  createdBy String    @map("created_by")
+  updatedBy String    @map("updated_by")
+
+  workOrder    WorkOrder              @relation(fields: [workOrderId], references: [id])
+  lot          Lot?                   @relation(fields: [lotId], references: [id])
+  measurements AgingTestMeasurement[]
+
+  @@unique([workOrderId, specimenNumber])
+  @@index([status])
+  @@map("aging_test_specimens")
+}
+
+// ============================================================================
+// v1.2 SAFETY — 61. AGING TEST MEASUREMENT
+// ============================================================================
+
+model AgingTestMeasurement {
+  id                  String  @id @default(cuid())
+  agingTestSpecimenId String  @map("aging_test_specimen_id")
+  reflectanceRa       Float?  @map("reflectance_ra")
+  colorCieL           Float?  @map("color_cie_l")
+  colorCieA           Float?  @map("color_cie_a")
+  colorCieB           Float?  @map("color_cie_b")
+  result              String? // pass | fail | marginal
+  notes               String?
+  measuredBy          String  @map("measured_by")
+
+  measuredAt DateTime @map("measured_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  agingTestSpecimen AgingTestSpecimen @relation(fields: [agingTestSpecimenId], references: [id])
+
+  @@index([agingTestSpecimenId, measuredAt])
+  @@map("aging_test_measurements")
+}
+
+// ============================================================================
+// 62. AUDIT LOG
+// ============================================================================
+
+model AuditLog {
+  id         String  @id @default(cuid())
+  entityType String  @map("entity_type")
+  entityId   String  @map("entity_id")
+  action     String  // create | update | delete | state_change
+  changedBy  String  @map("changed_by")
+  before     String? @map("before") // JSON serialized
+  after      String? @map("after") // JSON serialized
+  ipAddress  String? @map("ip_address")
+  userAgent  String? @map("user_agent")
+  plantId    String  @map("plant_id")
+
+  changedAt DateTime @default(now()) @map("changed_at")
+
+  plant Plant @relation(fields: [plantId], references: [id])
+
+  @@index([plantId, entityType, entityId])
+  @@index([changedBy])
+  @@index([changedAt])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// 63. DOMAIN EVENT
+// ============================================================================
+
+model DomainEvent {
+  id            String    @id @default(cuid())
+  eventType     String    @map("event_type")
+  aggregateType String    @map("aggregate_type")
+  aggregateId   String    @map("aggregate_id")
+  payload       String    @map("payload") // JSON serialized
+  occurredAt    DateTime  @default(now()) @map("occurred_at")
+  processedAt   DateTime? @map("processed_at")
+  plantId       String    @map("plant_id")
+
+  plant Plant @relation(fields: [plantId], references: [id])
+
+  @@index([plantId, aggregateType, aggregateId])
+  @@index([occurredAt])
+  @@index([eventType])
+  @@map("domain_events")
+}

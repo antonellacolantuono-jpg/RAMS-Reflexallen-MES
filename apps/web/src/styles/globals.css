@@ -1,0 +1,37 @@
+@import './tokens.css';
+@import './glass.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Avenir Next Cyr', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    background-color: var(--paper);
+    color: var(--ink);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  .skel {
+    animation: skel-pulse 1.5s ease-in-out infinite;
+    background: linear-gradient(90deg, var(--paper-3) 25%, var(--paper-2) 50%, var(--paper-3) 75%);
+    background-size: 200% 100%;
+  }
+
+  .dot {
+    display: inline-block;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+}
+
+@keyframes skel-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

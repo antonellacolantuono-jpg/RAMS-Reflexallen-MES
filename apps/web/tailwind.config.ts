@@ -1,0 +1,66 @@
+import type { Config } from 'tailwindcss'
+
+const config: Config = {
+  content: ['./src/**/*.{ts,tsx}', '../../packages/ui/src/**/*.{ts,tsx}'],
+  darkMode: ['selector', '[data-theme="dark"]'],
+  theme: {
+    extend: {
+      colors: {
+        paper: 'var(--paper)',
+        'paper-2': 'var(--paper-2)',
+        'paper-3': 'var(--paper-3)',
+        ink: 'var(--ink)',
+        'ink-2': 'var(--ink-2)',
+        'ink-3': 'var(--ink-3)',
+        'ink-4': 'var(--ink-4)',
+        line: 'var(--line)',
+        'line-2': 'var(--line-2)',
+        accent: 'var(--accent)',
+        'accent-2': 'var(--accent-2)',
+        'accent-soft': 'var(--accent-soft)',
+        'accent-ink': 'var(--accent-ink)',
+        ok: 'var(--ok)',
+        'ok-soft': 'var(--ok-soft)',
+        'ok-ink': 'var(--ok-ink)',
+        warn: 'var(--warn)',
+        'warn-soft': 'var(--warn-soft)',
+        'warn-ink': 'var(--warn-ink)',
+        bad: 'var(--bad)',
+        'bad-soft': 'var(--bad-soft)',
+        'bad-ink': 'var(--bad-ink)',
+        info: 'var(--info)',
+        'info-soft': 'var(--info-soft)',
+        'info-ink': 'var(--info-ink)',
+        neutral: 'var(--neutral)',
+        'neutral-soft': 'var(--neutral-soft)',
+        'c-inbound': 'var(--c-inbound)',
+        'c-setup': 'var(--c-setup)',
+        'c-production': 'var(--c-production)',
+        'c-qc': 'var(--c-qc)',
+        'c-outbound': 'var(--c-outbound)',
+        'c-teardown': 'var(--c-teardown)',
+      },
+      borderRadius: {
+        '1': 'var(--r-1)',
+        '2': 'var(--r-2)',
+        '3': 'var(--r-3)',
+        pill: 'var(--r-pill)',
+      },
+      fontFamily: {
+        sans: ['Avenir Next Cyr', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'Menlo', 'Consolas', 'monospace'],
+      },
+      fontSize: {
+        xs: ['10.5px', { lineHeight: '1.4' }],
+        sm: ['12px', { lineHeight: '1.45' }],
+        base: ['13px', { lineHeight: '1.45' }],
+        lg: ['15px', { lineHeight: '1.45' }],
+        xl: ['18px', { lineHeight: '1.4' }],
+        '2xl': ['22px', { lineHeight: '1.3' }],
+      },
+    },
+  },
+  plugins: [],
+}
+
+export default config

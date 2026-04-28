@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MES Suite — Flow Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<link rel="stylesheet" href="styles/tokens.css">
+<style>
+  body { background: #fafafa; overflow: hidden; }
+  .canvas-bg {
+    background-image:
+      radial-gradient(circle, oklch(0.85 0.005 260) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .node {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 4px 14px rgba(0,0,0,.04);
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    overflow: hidden;
+  }
+  .node:hover {
+    border-color: var(--accent);
+    box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 28px rgba(124,58,237,.18);
+    transform: translateY(-1px);
+    z-index: 10;
+  }
+  .node-iframe {
+    pointer-events: none;
+    transform-origin: top left;
+    border: 0;
+  }
+  .phase-band {
+    pointer-events: none;
+  }
+  .phase-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .edge-path {
+    fill: none;
+    stroke-width: 1.5;
+    transition: stroke .15s, stroke-width .15s;
+  }
+  .edge-path.flow      { stroke: oklch(0.55 0.012 260); }
+  .edge-path.auto      { stroke: oklch(0.7 0.13 75); stroke-dasharray: 4 3; }
+  .edge-path.recovery  { stroke: oklch(0.6 0.21 27); }
+  .edge-path.data      { stroke: oklch(0.6 0.14 235); stroke-dasharray: 2 4; }
+  .edge-path.event     { stroke: oklch(0.55 0.17 285); stroke-dasharray: 6 3; }
+  .edge-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    fill: var(--ink-3);
+  }
+  .edge-label-bg { fill: #fafafa; }
+  .surface-back { background: oklch(0.18 0.012 260); color: oklch(0.985 0.003 250); }
+  .surface-hmi  { background: oklch(0.78 0.16 75); color: oklch(0.18 0.012 260); }
+  .surface-andon { background: oklch(0.18 0.012 260); color: oklch(0.78 0.16 75); }
+  .diamond {
+    transform: rotate(45deg);
+    background: var(--paper);
+    border: 1.5px solid oklch(0.55 0.04 260);
+    box-shadow: 0 2px 6px rgba(0,0,0,.06);
+  }
+  .diamond-label {
+    transform: rotate(-45deg);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .pin-info {
+    position: absolute;
+    pointer-events: none;
+    background: oklch(0.18 0.012 260);
+    color: oklch(0.985 0.003 250);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    line-height: 1.4;
+    max-width: 280px;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  }
+  .pin-info b { color: oklch(0.78 0.16 75); }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script src="flowmap-data.js"></script>
+<script type="text/babel" src="flowmap.jsx"></script>
+</body>
+</html>
