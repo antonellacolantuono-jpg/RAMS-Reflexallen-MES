@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { ThemeProvider } from 'next-themes'
 import '../styles/globals.css'
+import '@xyflow/react/dist/style.css'
 
 export const metadata: Metadata = {
   title: 'Reflexallen MES',
