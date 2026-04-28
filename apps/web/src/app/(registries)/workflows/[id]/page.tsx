@@ -6,6 +6,7 @@ import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'reac
 import { PageHeader, StatusBadge } from '@mes/ui'
 import { sdk } from '../../../../lib/sdk'
 import { WorkflowCanvas } from '../../../../components/workflow/WorkflowCanvas'
+import { WorkflowPalette } from '../../../../components/workflow/WorkflowPalette'
 
 export default function WorkflowEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -85,12 +86,12 @@ export default function WorkflowEditorPage() {
 
           {/* Palette pane — 20% */}
           <Panel defaultSize={20} minSize={15}>
-            <div className="h-full flex flex-col bg-[var(--paper-1)] hairline-r overflow-y-auto">
-              <div className="px-3 py-2 hairline-b">
+            <div className="h-full flex flex-col bg-[var(--paper-1)] hairline-r overflow-hidden">
+              <div className="px-3 py-2 hairline-b flex-shrink-0">
                 <span className="uppercase-label">Palette</span>
               </div>
-              <div className="flex-1 flex items-center justify-center text-neutral-400 text-xs p-4 text-center">
-                Trascina nodi<br />sul canvas<br />(disponibile in D5)
+              <div className="flex-1 overflow-hidden">
+                <WorkflowPalette />
               </div>
             </div>
           </Panel>

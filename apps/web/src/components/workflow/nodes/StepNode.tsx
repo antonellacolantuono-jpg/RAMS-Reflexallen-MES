@@ -7,6 +7,7 @@ export type StepNodeData = {
   source: string
   standardTimeSec: number | null
   order: number
+  parentId?: string
 }
 
 export type StepNodeType = Node<StepNodeData, 'stepNode'>
