@@ -1,11 +1,36 @@
+> ⚠️ \*\*OBSOLETE — DO NOT USE\*\*
+
+>
+
+> This prompt was a single 13-step monolith for the entire Workflow Designer (canvas, 8 polymorphic forms, live preview with 11 states, versioning, snapshot, performance, E2E tests). The honest estimate of effort was 32-45 hours of Claude Code work, not the 3-4 hours originally claimed.
+
+>
+
+> Replaced on April 29, 2026 by three smaller prompts:
+
+> - `prompts/PROMPT\_3a\_CORE.md` — canvas + 4-pane + 3 step forms + CRUD (\~8-10h)
+
+> - `prompts/PROMPT\_3b\_ADVANCED.md` — remaining 5 forms + validation + versioning + templates (\~6-8h)
+
+> - `prompts/PROMPT\_3c\_SNAPSHOT\_PREVIEW.md` — snapshot + live preview + performance + E2E (\~8-10h, requires WO release flow first)
+
+>
+
+> Kept here as a reference for the original spec scope. See `STATUS.md` and `TODO.md` for current state.
+
+>
+
+> ---
+
+
 # PROMPT 3 — WORKFLOW DESIGNER v3
 
-> **Type**: Build prompt for Claude Code (Step 3 of 6)
-> **Pre-requisite**: PROMPT_1 + PROMPT_2 completed and committed; CLAUDE.md at repo root
-> **Estimated time**: 3-4 hours
-> **Last updated**: 2026-04-27
+> \*\*Type\*\*: Build prompt for Claude Code (Step 3 of 6)
+> \*\*Pre-requisite\*\*: PROMPT\_1 + PROMPT\_2 completed and committed; CLAUDE.md at repo root
+> \*\*Estimated time\*\*: 3-4 hours
+> \*\*Last updated\*\*: 2026-04-27
 
----
+\---
 
 ## 📋 PROMPT TO PASTE (copy from here)
 
@@ -34,7 +59,7 @@ This is the MOST COMPLEX UI in the MES — invest time getting it right.
 PRE-REQUISITES
 ═══════════════════════════════════════════════════════════════════════════════
 
-You should have already completed and committed PROMPT_2 (registries).
+You should have already completed and committed PROMPT\_2 (registries).
 Verify:
 ✓ All 13 registries CRUD work
 ✓ Seed data populated (120+ entities visible)
@@ -46,16 +71,16 @@ ADDITIONAL READING (do BEFORE planning)
 
 Beyond CLAUDE.md context, also read:
 
-→ docs/MASTER_SPECIFICATION.md sections 8-12 (workflow domain)
-→ docs/MASTER_SPECIFICATION.md section 22 (extensions integration)
-→ docs/BEST_PRACTICES.md sections about workflow service patterns
-→ docs/extensions/INDUSTRIAL_OPERATIONS.md (multi-output, continuous, sample)
-→ docs/extensions/CFRP_MODULE.md (cure cycle long-running steps)
-→ docs/extensions/SAFETY_DEVICES_MODULE.md (aging tests, ECE compliance)
-→ docs/extensions/WORKFLOW_PNEUMATIC_AIR.md (high-level reference)
-→ docs/extensions/WORKFLOW_PNEUMATIC_AIR_DETAILED.md (step-by-step + branching)
-→ docs/extensions/WORKFLOW_CFRP.md (high-level CFRP workflow)
-→ docs/extensions/WORKFLOW_SAFETY_DEVICES.md (high-level Safety workflow)
+→ docs/MASTER\_SPECIFICATION.md sections 8-12 (workflow domain)
+→ docs/MASTER\_SPECIFICATION.md section 22 (extensions integration)
+→ docs/BEST\_PRACTICES.md sections about workflow service patterns
+→ docs/extensions/INDUSTRIAL\_OPERATIONS.md (multi-output, continuous, sample)
+→ docs/extensions/CFRP\_MODULE.md (cure cycle long-running steps)
+→ docs/extensions/SAFETY\_DEVICES\_MODULE.md (aging tests, ECE compliance)
+→ docs/extensions/WORKFLOW\_PNEUMATIC\_AIR.md (high-level reference)
+→ docs/extensions/WORKFLOW\_PNEUMATIC\_AIR\_DETAILED.md (step-by-step + branching)
+→ docs/extensions/WORKFLOW\_CFRP.md (high-level CFRP workflow)
+→ docs/extensions/WORKFLOW\_SAFETY\_DEVICES.md (high-level Safety workflow)
 → docs/design-tokens.md (UI must respect tokens)
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -92,25 +117,25 @@ Read the documents above, then propose a plan covering:
 
    The configurator has 4 panes (resizable):
    
-   2.1 PANE 1: Wizard (left, ~25% width)
+   2.1 PANE 1: Wizard (left, \~25% width)
        - Step-by-step flow to add new elements
        - "Add Phase", "Add Group", "Add Step", "Add Recovery Flow"
        - Smart suggestions based on context
        - Templates ("Standard production phase", "Quality phase", etc.)
    
-   2.2 PANE 2: Element Palette (left-bottom, ~25% width)
+   2.2 PANE 2: Element Palette (left-bottom, \~25% width)
        - Searchable list of: Phases, Groups, Steps, Auto-Gen Rules
        - Drag-drop onto canvas
        - Filter by category
        - Recently used items
    
-   2.3 PANE 3: Canvas (center, ~50% width)
+   2.3 PANE 3: Canvas (center, \~50% width)
        - The main React Flow canvas
        - Selected node has visible bounding box
        - Right-click context menu (delete, duplicate, etc.)
        - Keyboard shortcuts (Del, Ctrl+D, Ctrl+Z, Ctrl+Shift+Z)
    
-   2.4 PANE 4: Configurator Form (right, ~30% width)
+   2.4 PANE 4: Configurator Form (right, \~30% width)
        - Form for the SELECTED node
        - Polymorphic by step category (8 different forms)
        - Zod validation, inline errors
@@ -123,13 +148,13 @@ Read the documents above, then propose a plan covering:
    3.1 The 11 states to preview:
        1. PENDING (waiting to start)
        2. ACTIVE (currently doing)
-       3. ACTIVE_PARALLEL (in parallel group, running)
+       3. ACTIVE\_PARALLEL (in parallel group, running)
        4. PAUSED (operator paused)
        5. SUCCESS (completed OK)
        6. FAILED (failed, no recovery yet)
-       7. RECOVERY_DIAGNOSIS (in recovery, stage 1)
-       8. RECOVERY_ATTEMPT_1 (recovery, stage 2)
-       9. RECOVERY_ATTEMPT_2 (recovery, stage 3)
+       7. RECOVERY\_DIAGNOSIS (in recovery, stage 1)
+       8. RECOVERY\_ATTEMPT\_1 (recovery, stage 2)
+       9. RECOVERY\_ATTEMPT\_2 (recovery, stage 3)
        10. SCRAP (final, scrapped)
        11. SKIPPED (operator skipped with permission)
    
@@ -153,9 +178,9 @@ Read the documents above, then propose a plan covering:
    - UI rendering hints
    
    Categories:
-   4.1 SCAN (scan_qr, scan_serial, verify_id) — input requirements
-   4.2 PRODUCTION (manual, device_execution) — operator actions
-   4.3 QUALITY_CONTROL (visual, dimensional, functional) — checks + thresholds
+   4.1 SCAN (scan\_qr, scan\_serial, verify\_id) — input requirements
+   4.2 PRODUCTION (manual, device\_execution) — operator actions
+   4.3 QUALITY\_CONTROL (visual, dimensional, functional) — checks + thresholds
    4.4 LOGISTICS (pick, place, transfer) — material movement
    4.5 SETUP (auto-gen, BOM check, tool check) — pre-production
    4.6 TEARDOWN (cleanup, reset, archive) — post-production
@@ -169,9 +194,9 @@ Read the documents above, then propose a plan covering:
    - User cannot delete auto-gen steps directly (must remove triggering condition)
    - Show explanatory tooltip ("This step is auto-generated by Rule #2: BOM Check")
    - Configuration in Workflow level (e.g., "Enable BOM check for this WO?")
-   - Full auto-gen logic implementation in PROMPT_4
+   - Full auto-gen logic implementation in PROMPT\_4
 
-6. WORKFLOW VERSIONING & APPROVAL
+6. WORKFLOW VERSIONING \& APPROVAL
    
    6.1 Version states
        - DRAFT (editable, not in use)
@@ -221,7 +246,7 @@ Read the documents above, then propose a plan covering:
    
    Show validation errors inline (red badges) and in a panel.
 
-9. UI TEMPLATES & WIZARDS
+9. UI TEMPLATES \& WIZARDS
    
    To accelerate workflow creation:
    - "New Workflow from Template" (Pneumatic Air, CFRP, Safety, custom)
@@ -229,7 +254,7 @@ Read the documents above, then propose a plan covering:
    - "Add device execution group" (with buffer, parallel steps wizard)
    - "Add recovery flow" (4-stage template)
    
-   Templates use the seed data from MOCK_DATA_PNEUMATIC_AIR.
+   Templates use the seed data from MOCK\_DATA\_PNEUMATIC\_AIR.
 
 10. DEVICE EXECUTION GROUP (special handling)
     
@@ -244,7 +269,7 @@ Read the documents above, then propose a plan covering:
     - Drag steps into parallel lanes
     - Validate timing: sum of parallel steps < main step duration
 
-11. RESPONSIVE & ACCESSIBLE
+11. RESPONSIVE \& ACCESSIBLE
     
     - Desktop primary (1920×1080 minimum)
     - Tablet supported (1024×768)
@@ -303,7 +328,7 @@ STEP 2.2 — API layer
   - Verify: API tests pass (15+ tests)
 
 STEP 2.3 — Frontend: canvas foundation
-  - apps/web: WorkflowDesignerPage at /workflows/[id]
+  - apps/web: WorkflowDesignerPage at /workflows/\[id]
   - Install React Flow + dagre
   - Custom nodes: PhaseNode, GroupNode, StepNode
   - Custom edges: SequentialEdge, ParallelEdge
@@ -358,7 +383,7 @@ STEP 2.9 — Frontend: versioning UI
   - Clone version UI
   - Verify: approval flow end-to-end works
 
-STEP 2.10 — Templates & wizards
+STEP 2.10 — Templates \& wizards
   - "New from Template" wizard
   - Standard phase templates
   - Device Execution Group wizard
@@ -385,7 +410,7 @@ STEP 2.13 — Tests
   - Verify: all pass
 
 ═══════════════════════════════════════════════════════════════════════════════
-PHASE 3 — VERIFY & REPORT
+PHASE 3 — VERIFY \& REPORT
 ═══════════════════════════════════════════════════════════════════════════════
 
 Generate STATUS REPORT covering:
@@ -404,20 +429,20 @@ Generate STATUS REPORT covering:
 ACCEPTANCE CRITERIA
 ═══════════════════════════════════════════════════════════════════════════════
 
-[ ] Canvas with 4-pane configurator works
-[ ] Process Engineer can create workflow from scratch
-[ ] All 8 step categories have polymorphic forms
-[ ] Live preview shows 11 interactive states
-[ ] Auto-generated steps shown with lock (and not editable)
-[ ] Versioning lifecycle works (draft → approved → effective)
-[ ] Validation catches structural issues
-[ ] WorkflowSnapshot created on WO release (immutable)
-[ ] Templates accelerate workflow creation
-[ ] Device Execution Group with parallel steps works
-[ ] Recovery Flow (4 stages) configurable
-[ ] Performance: 100+ nodes render < 1 sec
-[ ] All E2E tests pass
-[ ] Design tokens applied consistently
+\[ ] Canvas with 4-pane configurator works
+\[ ] Process Engineer can create workflow from scratch
+\[ ] All 8 step categories have polymorphic forms
+\[ ] Live preview shows 11 interactive states
+\[ ] Auto-generated steps shown with lock (and not editable)
+\[ ] Versioning lifecycle works (draft → approved → effective)
+\[ ] Validation catches structural issues
+\[ ] WorkflowSnapshot created on WO release (immutable)
+\[ ] Templates accelerate workflow creation
+\[ ] Device Execution Group with parallel steps works
+\[ ] Recovery Flow (4 stages) configurable
+\[ ] Performance: 100+ nodes render < 1 sec
+\[ ] All E2E tests pass
+\[ ] Design tokens applied consistently
 
 ═══════════════════════════════════════════════════════════════════════════════
 GO STEP-BY-STEP
@@ -425,7 +450,7 @@ GO STEP-BY-STEP
 
 Now:
 1. Read the additional files listed above
-2. Verify PROMPT_2 work is intact (registries still functional)
+2. Verify PROMPT\_2 work is intact (registries still functional)
 3. Present detailed plan
 4. Wait for approval
 5. Build step by step
@@ -436,7 +461,7 @@ START WITH THE PLAN.
 
 (End of prompt to paste)
 
----
+\---
 
 ## 📚 Notes for Antonella (NOT to paste to Claude Code)
 
@@ -457,28 +482,32 @@ spend hours daily. The UX must be excellent. The complexity is high because:
 ### Watch out for these issues
 
 **Issue 1**: Claude Code might propose a "simpler" canvas using D3 or custom.
-- Reject. Tell him: "Use React Flow. It's the standard for this use case."
+
+* Reject. Tell him: "Use React Flow. It's the standard for this use case."
 
 **Issue 2**: Claude Code might cut corners on the 11 preview states.
-- Push back. All 11 must render distinctly. They guide stakeholders.
+
+* Push back. All 11 must render distinctly. They guide stakeholders.
 
 **Issue 3**: Claude Code might forget WorkflowSnapshot.
-- This is critical (ADR-001). Verify it's implemented properly.
+
+* This is critical (ADR-001). Verify it's implemented properly.
 
 **Issue 4**: Performance with many nodes.
-- Test with 100+ nodes during build. If slow, optimize before "done".
+
+* Test with 100+ nodes during build. If slow, optimize before "done".
 
 ### How long this should take
 
-| Activity | Estimated time |
-|---|---|
-| Read additional specs | 15-20 min |
-| Plan proposal | 20-30 min |
-| Plan review | 15 min |
-| Build (~13 steps) | 120-180 min |
-| Verify | 30 min |
-| Status report | 10 min |
-| **Total** | **3-4.5 hours** |
+|Activity|Estimated time|
+|-|-|
+|Read additional specs|15-20 min|
+|Plan proposal|20-30 min|
+|Plan review|15 min|
+|Build (\~13 steps)|120-180 min|
+|Verify|30 min|
+|Status report|10 min|
+|**Total**|**3-4.5 hours**|
 
 This is the longest single prompt. If it takes >5 hours, split it.
 
@@ -486,24 +515,29 @@ This is the longest single prompt. If it takes >5 hours, split it.
 
 If splitting is needed:
 
-**Split A — Canvas + basic editing** (~2 hours)
-- Steps 2.1-2.6 (domain, API, canvas, panes, drag-drop, basic forms)
-- Output: can create simple workflow
+**Split A — Canvas + basic editing** (\~2 hours)
 
-**Split B — Polish + advanced features** (~2 hours)
-- Steps 2.7-2.13 (preview states, validation, versioning, snapshot, templates, perf, tests)
-- Output: production-ready
+* Steps 2.1-2.6 (domain, API, canvas, panes, drag-drop, basic forms)
+* Output: can create simple workflow
+
+**Split B — Polish + advanced features** (\~2 hours)
+
+* Steps 2.7-2.13 (preview states, validation, versioning, snapshot, templates, perf, tests)
+* Output: production-ready
 
 ### After this step
 
-After PROMPT_3, Process Engineers can build workflows visually. Next step
-(PROMPT_4) implements the auto-generation engine that produces setup/teardown
+After PROMPT\_3, Process Engineers can build workflows visually. Next step
+(PROMPT\_4) implements the auto-generation engine that produces setup/teardown
 phases automatically based on workflow content.
 
----
+\---
 
 ## 🔄 Change Log
 
-| Version | Date | Changes |
-|---|---|---|
-| 1.0 | 2026-04-27 | Initial v3 prompt (created with CLAUDE.md auto-load pattern) |
+|Version|Date|Changes|
+|-|-|-|
+|1.0|2026-04-27|Initial v3 prompt (created with CLAUDE.md auto-load pattern)|
+
+
+
