@@ -52,10 +52,8 @@ describe('validateWorkflowStructure', () => {
 
   it('rejects empty phases array', () => {
     const result = validateWorkflowStructure({ phases: [] }, emptyRefs)
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.errors[0].field).toBe('phases')
-    }
+    if (result.ok) throw new Error('expected validation to fail')
+    expect(result.errors[0]?.field).toBe('phases')
   })
 
   it('rejects a phase with no groups', () => {
@@ -63,10 +61,8 @@ describe('validateWorkflowStructure', () => {
       phases: [{ id: 'phase-1', groups: [] }],
     }
     const result = validateWorkflowStructure(workflow, emptyRefs)
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.errors[0].field).toContain('phase-1')
-    }
+    if (result.ok) throw new Error('expected validation to fail')
+    expect(result.errors[0]?.field).toContain('phase-1')
   })
 
   it('rejects a group with no steps', () => {
@@ -79,10 +75,8 @@ describe('validateWorkflowStructure', () => {
       ],
     }
     const result = validateWorkflowStructure(workflow, emptyRefs)
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.errors[0].field).toContain('group-1')
-    }
+    if (result.ok) throw new Error('expected validation to fail')
+    expect(result.errors[0]?.field).toContain('group-1')
   })
 
   it('rejects an orphan group whose phaseId does not match its parent phase', () => {
@@ -123,10 +117,8 @@ describe('validateWorkflowStructure', () => {
       ],
     }
     const result = validateWorkflowStructure(workflow, emptyRefs)
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.errors[0].field).toContain('skillId')
-    }
+    if (result.ok) throw new Error('expected validation to fail')
+    expect(result.errors[0]?.field).toContain('skillId')
   })
 
   it('rejects a step with an invalid deviceId', () => {
@@ -145,10 +137,8 @@ describe('validateWorkflowStructure', () => {
       ],
     }
     const result = validateWorkflowStructure(workflow, emptyRefs)
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.errors[0].field).toContain('deviceId')
-    }
+    if (result.ok) throw new Error('expected validation to fail')
+    expect(result.errors[0]?.field).toContain('deviceId')
   })
 
   it('rejects a step with an invalid recipeId', () => {
