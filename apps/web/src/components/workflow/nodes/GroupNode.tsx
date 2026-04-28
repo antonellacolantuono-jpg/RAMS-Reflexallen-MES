@@ -5,6 +5,7 @@ export type GroupNodeData = {
   label: string
   category: string
   order: number
+  parentId?: string
 }
 
 export type GroupNodeType = Node<GroupNodeData, 'groupNode'>
