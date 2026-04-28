@@ -1,14 +1,14 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: April 28, 2026, afternoon (post PROMPT_2 merge)
-> **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
+> **Last update**: April 28, 2026, afternoon (post PROMPT_2 merge + test verification)
+> **Repository**: https://github.com/antonellacolantuono-jpg/REFLEXALLEN-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
 
 ---
 
 ## 📜 Project history (April 28)
 
-This project went through a confusing morning where a previous Claude Code session claimed PROMPT_2 was complete, but `git log` on `main` showed only the foundation commit. After investigation, the work was found uncommitted in a worktree (`claude/silly-keller-6e625c`). It was recovered, verified end-to-end, and merged into `main` in the afternoon. Lessons captured at the bottom of this document.
+This project went through a confusing morning where a previous Claude Code session claimed PROMPT_2 was complete, but `git log` on `main` showed only the foundation commit. After investigation, the work was found uncommitted in a worktree (`claude/silly-keller-6e625c`). It was recovered, verified end-to-end, and merged into `main` in the afternoon. Tests run after the merge confirm **127 passing tests across 14 test files**, exceeding the original aspirational claim of 90. Lessons captured at the bottom of this document.
 
 ---
 
@@ -20,9 +20,9 @@ This project went through a confusing morning where a previous Claude Code sessi
 - ✅ Apps boot: `apps/api` (NestJS, port 3000), `apps/web` (Next.js 14, port 3001), `apps/hmi` (Next.js 14, port 3002)
 - ✅ `packages/types`: 11 enum files
 - ✅ `packages/ui`: 16 base primitives (Badge, Button, Card, Dot, Drawer, Field, Input, KPI, Modal, PhaseBadge, Progress, Select, Skeleton, StatusBadge, Tabs, Toast)
-- ✅ `packages/domain`: 3 XState v5 machines (Box, Equipment, WorkOrder) + 3 rule files + tests
+- ✅ `packages/domain`: 3 XState v5 machines (Box, Equipment, WorkOrder) + 3 rule files
 - ✅ `packages/prisma`: 63 models including v1.2 modules (Equipment Mgmt, Maintenance, Tool Wear, Multi-output, Sample, FAI, WIP, Subassembly, Quality Hold, CFRP, Safety Devices), `AuditLog`, `DomainEvent`
-- ✅ Placeholder packages: `@mes/cache` (8 ✓), `@mes/queue` (5 ✓), `@mes/storage` (6 ✓)
+- ✅ Placeholder packages: `@mes/cache`, `@mes/queue`, `@mes/storage` (all with passing tests)
 
 ### PROMPT_2 — Registries (merged April 28 afternoon, commit b376142)
 
@@ -46,6 +46,7 @@ This project went through a confusing morning where a previous Claude Code sessi
 **HMI (apps/hmi)**:
 
 - Login mockup screen (`/`) with operator badge field
+- Brand assets and Avenir Next Cyr fonts in `public/`
 
 **Design system (packages/ui)** — 8 new Tier-2 primitives:
 
@@ -55,7 +56,8 @@ This project went through a confusing morning where a previous Claude Code sessi
 **Schemas (packages/schemas)** — Zod schemas under `registries/`:
 
 - 13 schemas: `attention-point`, `auto-gen-rule`, `bom`, `box-type`, `box`, `cause-code`, `equipment`, `item`, `operator`, `recipe`, `skill`, `tool`, plus `common.ts`
-- 1 test file (`item.schema.test.ts`)
+- 1 test file in `registries/` (`item.schema.test.ts`)
+- Plus 2 legacy schema test files (`item.schema.test.ts`, `plant.schema.test.ts`)
 
 **SDK (packages/sdk)**:
 
@@ -81,22 +83,37 @@ This project went through a confusing morning where a previous Claude Code sessi
 - ✅ `GET http://localhost:3000/api/items` — returns `{"data":[...11 items...],"total":11,"page":1,"limit":25,"totalPages":1}` with full payload (itemType, trackingMode, uom, plantId, audit fields)
 - ✅ `http://localhost:3001/tools` — sidebar navigation works, design system applied, OKLCH tokens, Avenir Next Cyr font, accent violet
 - ✅ `http://localhost:3002` — HMI login mockup renders with operator badge field
+- ✅ `pnpm test` — 11 tasks successful, **127 tests passed across 14 test files**, 5.2s total
+
+### Test breakdown (measured April 28 afternoon)
+
+| Package | Test files | Tests passed |
+|---|---|---|
+| `@mes/api` | 5 | 50 |
+| `@mes/schemas` | 3 | 29 |
+| `@mes/domain` | 3 | 29 |
+| `@mes/cache` | 1 | 8 |
+| `@mes/storage` | 1 | 6 |
+| `@mes/queue` | 1 | 5 |
+| **Total** | **14** | **127** |
+
+API test files: `pagination.test.ts` (11), `items.service.test.ts` (13), `operators.service.test.ts` (12), `audit-log.service.test.ts` (7), `auto-gen-rules.service.test.ts` (7).
+
+Domain test files: `box.machine.test.ts` (9), `work-order.machine.test.ts` (8), `equipment.machine.test.ts` (12).
 
 ---
 
-## 🟡 Known issues to address post-merge
+## 🟡 Known issues (non-blocking, deferred)
 
-1. **Seed creates ~35 soft-deleted records as side effect.** Tools/Recipes/BOM/Equipment nodes appear empty in their list pages but visible in `/trash`. The seed script seems to insert some records with a non-null `deletedAt`. Cosmetic but confusing. **Owner**: small fix patch (PROMPT_2.5).
+1. **Seed creates ~35 soft-deleted records as side effect.** Tools/Recipes/BOM/Equipment nodes appear empty in their list pages but visible in `/trash`. The seed script seems to insert some records with a non-null `deletedAt`. Cosmetic but confusing. **Owner**: small fix patch.
 
-2. **Test count not yet verified against STATUS.md original claim of 90.** Real `pnpm test` execution post-merge to be measured, with real numbers replacing aspirational ones.
+2. **HMI logo image is a broken link** in browser (alt text "Reflexallen" visible). Asset path mismatch in `apps/hmi/app/page.tsx`: the SVG files exist in `apps/hmi/public/brand/` but the page references a different (or wrong) path. Trivial fix once the offending line is identified.
 
-3. **HMI logo image is a broken link** (alt text "Reflexallen" visible). Asset path mismatch in `apps/hmi/app/page.tsx`. Trivial fix.
+3. **3 turbo warnings** for `@mes/cache`, `@mes/queue`, `@mes/storage` packages: "no output files found for task". Missing `outputs` key in `turbo.json` for these placeholder packages. Cosmetic.
 
-4. **3 turbo warnings** for `@mes/cache`, `@mes/queue`, `@mes/storage` packages: "no output files found for task". Missing `outputs` key in `turbo.json` for these placeholder packages. Cosmetic.
+4. **Argon2id PIN hashing for operators is declared but not yet exercised** at integration level. Operator PINs in seed are likely placeholder strings. Verify on first real auth flow (PROMPT_5 HMI execution).
 
-5. **Argon2id PIN hashing for operators is declared but not yet exercised** at integration level. Operator PINs in seed are likely placeholder strings. Verify on first real auth flow (PROMPT_5 HMI execution).
-
-6. **prompts/PROMPT_1B.md is now obsolete.** It was created in the morning to "rebuild PROMPT_2 from scratch" before the worktree work was discovered. To be archived or repurposed as a reference for future foundation patches.
+5. **prompts/PROMPT_1B.md is now obsolete.** It was created in the morning to "rebuild PROMPT_2 from scratch" before the worktree work was discovered. To be archived or repurposed as a reference for future foundation patches.
 
 ---
 
@@ -106,7 +123,7 @@ This project went through a confusing morning where a previous Claude Code sessi
 |---|---|---|---|
 | PROMPT_1 | Foundation | ✅ Done | — |
 | PROMPT_2 | Registries (13 + audit + events + UI shell) | ✅ Done (April 28 afternoon) | — |
-| PROMPT_2.5 | Cleanup: fix seed soft-delete bug, HMI logo, turbo warnings, real test count | ⏭️ Next | 1-2h |
+| PROMPT_2.5 | Cleanup: fix seed soft-delete bug, HMI logo, turbo warnings, archive PROMPT_1B | ⏭️ Optional | 1-2h |
 | PROMPT_3 | Workflow Designer (visual editor drag&drop) | ⏭️ Planned | 4-6h |
 | PROMPT_4 | Auto-Gen Engine (rules → concrete steps) | ⏭️ Planned | 3-4h |
 | PROMPT_5 | Execution HMI (timer-driven steps, PIN auth, parallel ops) | ⏭️ Planned | 4-5h |
@@ -158,6 +175,16 @@ This project went through a confusing morning where a previous Claude Code sessi
 
 6. **`.env` is project-local secret.** Both root `.env` and `packages/prisma/.env` are required (Prisma CLI looks for `.env` next to `schema.prisma`). Both are gitignored. `.env.example` is committed as template.
 
+7. **Pre-flight check before every Claude Code session** (added April 28 evening):
+   ```powershell
+   git status                                           # working tree clean?
+   git log --oneline | Select-Object -First 5           # ultimi commit attesi?
+   git worktree list                                    # worktree aperti?
+   git branch -a                                        # branch in giro?
+   netstat -ano | findstr ":3000 :3001 :3002"           # server zombi?
+   ```
+   If any of these shows something unexpected, **stop and investigate** before launching new prompts.
+
 ---
 
 ## 🗂️ Repo structure (verified post-merge)
@@ -167,18 +194,18 @@ RAMS-Reflexallen-MES/
 ├── apps/
 │   ├── api/          ✅ NestJS, 13 registry modules + audit-log + events
 │   ├── web/          ✅ Next.js 14, 18 routes, sidebar shell, hooks, SDK wrapper
-│   └── hmi/          ✅ Next.js 14, login mockup
+│   └── hmi/          ✅ Next.js 14, login mockup with brand assets
 ├── packages/
-│   ├── domain/       ✅ 3 XState machines + rules + tests
+│   ├── domain/       ✅ 3 XState machines + rules + tests (29)
 │   ├── prisma/       ✅ 63 models, migration applied, dev.db seeded
-│   ├── schemas/      ✅ 13 registry schemas + common
+│   ├── schemas/      ✅ 13 registry schemas + common + tests (29)
 │   ├── sdk/          ✅ base-registry client + 13 registry clients
 │   ├── types/        ✅ 11 enum files
 │   ├── ui/           ✅ 16 base + 8 Tier-2 primitives
 │   ├── cache/        ✅ in-memory placeholder + 8 tests
 │   ├── queue/        ✅ sync placeholder + 5 tests
 │   └── storage/      ✅ local fs placeholder + 6 tests
-├── design-system/    (Reflexallen handoff bundle)
+├── design-system/    (Reflexallen handoff bundle, with brand SVGs and font woff2)
 ├── docs/             (specs + extensions)
 ├── prompts/          (PROMPT_1-6 + patches + PROMPT_1B (obsolete) + DOD_TEMPLATE)
 └── scripts/          (PowerShell setup)
@@ -188,4 +215,4 @@ RAMS-Reflexallen-MES/
 
 ## 🎯 Next concrete action
 
-PROMPT_2.5 (cleanup) or directly PROMPT_3 (Workflow Designer). To be decided in next session.
+PROMPT_2.5 (cleanup, optional) or directly PROMPT_3 (Workflow Designer). To be decided in next session.
