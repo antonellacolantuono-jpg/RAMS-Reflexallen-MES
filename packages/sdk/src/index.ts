@@ -17,6 +17,7 @@ export {
   BoxTypesClient,
   BoxesClient,
   AutoGenRulesClient,
+  WorkflowsClient,
 } from './clients/registry-clients.js'
 
 export type {
@@ -35,4 +36,9 @@ export type {
   BoxTypeModel,
   BoxModel,
   AutoGenRuleModel,
+  WorkflowModel,
+  WorkflowVersionModel,
+  WorkflowPhaseModel,
+  WorkflowGroupModel,
+  WorkflowStepModel,
 } from './clients/registry-clients.js'
