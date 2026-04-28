@@ -97,7 +97,7 @@ function makeService() {
   )
 
   // Patch delegate so base class findById works via mock
-  ;(service as never)['delegate'] = prisma.workflow
+  ;(service as unknown as Record<string, unknown>)['delegate'] = prisma.workflow
 
   return { service, repo, prisma, auditLog, gateway }
 }
