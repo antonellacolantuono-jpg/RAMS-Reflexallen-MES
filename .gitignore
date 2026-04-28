@@ -49,3 +49,9 @@ uploads/
 
 # Claude Code session artifacts
 .claude/
+
+# Build/audit output files
+build-main.txt
+build-fresh.txt
+build-output.txt
+audit-output.txt
