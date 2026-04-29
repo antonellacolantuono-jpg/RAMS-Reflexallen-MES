@@ -26,6 +26,7 @@
     "react-hook-form": "^7.53.1",
     "react-resizable-panels": "^4.10.0",
     "socket.io-client": "^4.8.1",
+    "zod": "^3.23.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

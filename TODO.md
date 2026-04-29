@@ -2,7 +2,7 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-04-28
+> **Last updated**: 2026-04-29
 
 ---
 
@@ -46,6 +46,22 @@
 ---
 
 ## 🟡 Medium priority (good to have)
+
+### TODO-007 — Step configurator: thresholds & expectedPattern not persisted
+
+**Discovered**: 2026-04-29 (during D6 implementation)
+**File**: `packages/prisma/schema.prisma` (`WorkflowStep` model) + `packages/schemas/src/registries/workflow.schema.ts` + `apps/web/src/components/workflow/WorkflowCanvas.tsx` (`buildSavePayload`, `buildGraph`)
+**Symptom**: D6 step forms accept `qcThresholds` and `scanExpectedPattern` but persist them only in `node.data` session state. Prisma `WorkflowStep` model lacks a `config Json?` field. The values survive auto-save round-trips within a single session (because the Zustand store keeps them in node.data) but are lost on page reload because the backend has nowhere to store them.
+**Acceptance criterion**:
+- Add `config Json?` field to `WorkflowStep` Prisma model with a migration.
+- Extend `WorkflowStepInputSchema` with `config: z.record(z.unknown()).optional()`.
+- `buildSavePayload` in `WorkflowCanvas.tsx` emits `config: { thresholds, expectedPattern, ... }` for QC / Scan steps.
+- `buildGraph` reads `step.config` back into node.data for those fields.
+- Reload of `/workflows/[id]` restores previously edited thresholds and expected patterns.
+**Estimated effort**: 1-2 hours (schema + migration + payload wiring + tests)
+**Blocker for**: production-quality QC and Scan step configuration. Workaround for D6 demos: keep the same browser session.
+
+---
 
 ### TODO-003 — Turbo warnings for placeholder packages
 
