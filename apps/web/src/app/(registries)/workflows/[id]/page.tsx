@@ -7,6 +7,7 @@ import { PageHeader, StatusBadge } from '@mes/ui'
 import { sdk } from '../../../../lib/sdk'
 import { WorkflowCanvas } from '../../../../components/workflow/WorkflowCanvas'
 import { WorkflowPalette } from '../../../../components/workflow/WorkflowPalette'
+import { StepConfigurator } from '../../../../components/workflow/forms/StepConfigurator'
 
 export default function WorkflowEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -118,8 +119,8 @@ export default function WorkflowEditorPage() {
               <div className="px-3 py-2 hairline-b">
                 <span className="uppercase-label">Configuratore</span>
               </div>
-              <div className="flex-1 flex items-center justify-center text-neutral-400 text-xs p-4 text-center">
-                Seleziona uno step<br />per configurarlo<br />(disponibile in D6)
+              <div className="flex-1 flex flex-col">
+                <StepConfigurator />
               </div>
             </div>
           </Panel>
