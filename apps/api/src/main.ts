@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core'
 import { AppModule } from './app.module'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter'
+import cookieParser from 'cookie-parser'
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -10,6 +11,7 @@ async function bootstrap() {
   })
 
   app.setGlobalPrefix('api')
+  app.use(cookieParser())
   app.useGlobalFilters(new AllExceptionsFilter())
 
   app.enableCors({

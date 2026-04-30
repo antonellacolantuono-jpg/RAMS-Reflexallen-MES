@@ -1,6 +1,16 @@
+import * as argon2 from 'argon2'
 import { prisma } from './src/client'
 
 const SYSTEM = 'seed'
+
+async function hashPin(pin: string): Promise<string> {
+  return argon2.hash(pin, {
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 1,
+  })
+}
 
 async function main(): Promise<void> {
   console.log('🌱 Seeding MOCK_DATA_PNEUMATIC_AIR...')
@@ -45,33 +55,40 @@ async function main(): Promise<void> {
   const operatorDefs = [
     {
       badge: 'OP-001', firstName: 'Marco', lastName: 'Rossi',
+      pin: '1234',
       skillCodes: ['EXT', 'ASSY', 'QC'],
     },
     {
       badge: 'OP-002', firstName: 'Laura', lastName: 'Ferrari',
+      pin: '2222',
       skillCodes: ['QC', 'TEST', 'PACK'],
     },
     {
       badge: 'OP-003', firstName: 'Giovanni', lastName: 'Bianchi',
+      pin: '3333',
       skillCodes: ['FORKLIFT', 'WAREHOUSE', 'PACK'],
     },
     {
       badge: 'OP-004', firstName: 'Sara', lastName: 'Conti',
+      pin: '4444',
       skillCodes: ['EXT', 'TEST'],
     },
   ]
 
   const operators: Record<string, { id: string }> = {}
   for (const op of operatorDefs) {
+    const existing = await prisma.operator.findUnique({ where: { badge: op.badge } })
+    const pinHash = existing?.pinHash ?? (await hashPin(op.pin))
     const operator = await prisma.operator.upsert({
       where: { badge: op.badge },
-      update: {},
+      update: { pinHash },
       create: {
         badge: op.badge,
         firstName: op.firstName,
         lastName: op.lastName,
         status: 'active',
         plantId: plant.id,
+        pinHash,
         createdBy: SYSTEM,
         updatedBy: SYSTEM,
       },

@@ -6,6 +6,7 @@ import { RegistryGateway } from '../events/registry.gateway'
 import { OperatorsRepository, type OperatorModel } from './operators.repository'
 import type { PaginatedResult } from '../../common/types/paginated'
 import type { CreateOperatorDto, UpdateOperatorDto } from '@mes/schemas'
+import { hashPin } from './pin-hash.util'
 
 export type OperatorFiltersExtended = BaseFilters & { status?: string | undefined }
 
@@ -30,19 +31,48 @@ export class OperatorsService extends BaseRegistryService<OperatorModel> {
     return this.repo.findAll(filters)
   }
 
+  override async findById(id: string): Promise<OperatorModel> {
+    const entity = await super.findById(id)
+    return stripPinHash(entity)
+  }
+
+  override async findByIdIncludingDeleted(id: string): Promise<OperatorModel> {
+    const entity = await super.findByIdIncludingDeleted(id)
+    return stripPinHash(entity)
+  }
+
+  override async restore(id: string, actorId: string): Promise<OperatorModel> {
+    const restored = await super.restore(id, actorId)
+    return stripPinHash(restored)
+  }
+
   async create(dto: CreateOperatorDto, actorId: string): Promise<OperatorModel> {
-    // Exclude `pin` — not stored in DB at this level
-    const { pin: _pin, ...rest } = dto
-    const entity = await this.repo.create({ ...rest, createdBy: actorId })
+    const { pin, ...rest } = dto
+    const pinHash = pin ? await hashPin(pin) : undefined
+    const entity = await this.repo.create({
+      ...rest,
+      ...(pinHash !== undefined ? { pinHash } : {}),
+      createdBy: actorId,
+    })
     await this.recordCreate(entity, actorId)
     return entity
   }
 
   async update(id: string, dto: UpdateOperatorDto, actorId: string): Promise<OperatorModel> {
-    const { pin: _pin, ...rest } = dto
+    const { pin, ...rest } = dto
+    const pinHash = pin ? await hashPin(pin) : undefined
     const before = await this.findById(id)
-    const after = await this.repo.update(id, { ...rest, updatedBy: actorId })
+    const after = await this.repo.update(id, {
+      ...rest,
+      ...(pinHash !== undefined ? { pinHash } : {}),
+      updatedBy: actorId,
+    })
     await this.recordUpdate(before, after, actorId)
     return after
   }
+}
+
+function stripPinHash(record: OperatorModel): OperatorModel {
+  const { pinHash: _pinHash, ...rest } = record as OperatorModel & { pinHash?: string | null }
+  return rest as OperatorModel
 }
