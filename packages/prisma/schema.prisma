@@ -762,6 +762,7 @@ model Step {
   isRequired      Boolean @default(true) @map("is_required")
   partReference   String? @map("part_reference") // PartReference enum value
   noTargetPolicy  String? @map("no_target_policy") // NoTargetPolicy enum value
+  deviceCategory  String? @map("device_category") // StepDeviceCategory: pre | device_main | parallel | post
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

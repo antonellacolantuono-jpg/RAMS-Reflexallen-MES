@@ -13,6 +13,13 @@ export interface StepTransitionPayload {
   changedAt: string
 }
 
+export interface ParallelSyncPayload {
+  workOrderId: string
+  groupId: string
+  triggeredByStepExecutionId: string
+  triggeredAt: string
+}
+
 @Injectable()
 @WebSocketGateway({
   cors: { origin: ['http://localhost:3001', 'http://localhost:3002'] },
@@ -25,5 +32,10 @@ export class WorkOrderEventsGateway {
   emitStepTransition(payload: StepTransitionPayload): void {
     if (!this.server) return
     this.server.to(`wo:${payload.workOrderId}`).emit('step:transition', payload)
+  }
+
+  emitParallelSync(payload: ParallelSyncPayload): void {
+    if (!this.server) return
+    this.server.to(`wo:${payload.workOrderId}`).emit('step:parallel-sync', payload)
   }
 }

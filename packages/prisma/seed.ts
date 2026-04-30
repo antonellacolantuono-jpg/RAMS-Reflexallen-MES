@@ -494,6 +494,189 @@ async function main(): Promise<void> {
   }
   console.log('✓ WorkOrders + WorkOrderAssignments:', woDefs.length, 'each')
 
+  // ── 15. Demo workflow: parallel Device Execution Group (D4 of PROMPT_5_FULL) ─
+  const demoWoCode = 'WO-2026-0101'
+  const demoItemCode = 'FG-PNEU-5M-8MM'
+  const demoItem = items[demoItemCode]
+  const demoWo = await prisma.workOrder.findFirst({
+    where: { plantId: plant.id, code: demoWoCode },
+  })
+
+  if (demoItem && demoWo) {
+    const wfCode = 'WF-PNEU-CURE-DEMO'
+    let workflow = await prisma.workflow.findFirst({
+      where: { plantId: plant.id, code: wfCode },
+    })
+    if (!workflow) {
+      workflow = await prisma.workflow.create({
+        data: {
+          code: wfCode,
+          name: 'Demo cura autoclave (parallel ops)',
+          itemId: demoItem.id,
+          plantId: plant.id,
+          description: 'Workflow di demo per swimlane Device Execution Group',
+          createdBy: SYSTEM,
+          updatedBy: SYSTEM,
+        },
+      })
+    }
+
+    let version = await prisma.workflowVersion.findFirst({
+      where: { workflowId: workflow.id, version: 1 },
+    })
+    if (!version) {
+      version = await prisma.workflowVersion.create({
+        data: {
+          workflowId: workflow.id,
+          version: 1,
+          status: 'effective',
+          createdBy: SYSTEM,
+          updatedBy: SYSTEM,
+        },
+      })
+    }
+
+    if (workflow.currentVersionId !== version.id) {
+      await prisma.workflow.update({
+        where: { id: workflow.id },
+        data: { currentVersionId: version.id, updatedBy: SYSTEM },
+      })
+    }
+
+    let phase = await prisma.phase.findFirst({
+      where: { workflowVersionId: version.id, order: 1 },
+    })
+    if (!phase) {
+      phase = await prisma.phase.create({
+        data: {
+          workflowVersionId: version.id,
+          order: 1,
+          category: 'production',
+          name: 'Produzione cura',
+          createdBy: SYSTEM,
+          updatedBy: SYSTEM,
+        },
+      })
+    }
+
+    let group = await prisma.group.findFirst({
+      where: { phaseId: phase.id, order: 1 },
+    })
+    if (!group) {
+      group = await prisma.group.create({
+        data: {
+          phaseId: phase.id,
+          order: 1,
+          category: 'device_execution',
+          name: 'Cura autoclave',
+          supportsParallel: true,
+          description: 'Gruppo Device Execution con operazioni parallele',
+          createdBy: SYSTEM,
+          updatedBy: SYSTEM,
+        },
+      })
+    }
+
+    const stepDefs: Array<{
+      order: number
+      name: string
+      category: string
+      actionType: string
+      deviceCategory: string
+      instructions: string
+    }> = [
+      {
+        order: 1,
+        name: 'Setup attrezzatura autoclave',
+        category: 'setup',
+        actionType: 'verify_workstation',
+        deviceCategory: 'pre',
+        instructions: 'Verifica che attrezzatura e ricetta siano pronti',
+      },
+      {
+        order: 2,
+        name: 'Avvio ciclo cura',
+        category: 'production',
+        actionType: 'device_run',
+        deviceCategory: 'device_main',
+        instructions: 'Avvia ciclo cura autoclave secondo ricetta',
+      },
+      {
+        order: 3,
+        name: 'Controllo qualità campione',
+        category: 'quality_control',
+        actionType: 'visual_check',
+        deviceCategory: 'parallel',
+        instructions: 'Esegui ispezione visiva del campione di riferimento',
+      },
+      {
+        order: 4,
+        name: 'Etichettatura batch successivo',
+        category: 'logistics',
+        actionType: 'apply_label',
+        deviceCategory: 'parallel',
+        instructions: 'Prepara etichette per il batch successivo durante la cura',
+      },
+      {
+        order: 5,
+        name: 'Pulizia postazione',
+        category: 'teardown',
+        actionType: 'cleanup',
+        deviceCategory: 'post',
+        instructions: 'Pulizia finale dopo cura completata',
+      },
+    ]
+
+    const seedStartedAt = demoWo.actualStart ?? new Date('2026-04-30T06:30:00Z')
+
+    for (const def of stepDefs) {
+      let step = await prisma.step.findFirst({
+        where: { groupId: group.id, order: def.order },
+      })
+      if (!step) {
+        step = await prisma.step.create({
+          data: {
+            groupId: group.id,
+            order: def.order,
+            category: def.category,
+            actionType: def.actionType,
+            deviceCategory: def.deviceCategory,
+            name: def.name,
+            instructions: def.instructions,
+            createdBy: SYSTEM,
+            updatedBy: SYSTEM,
+          },
+        })
+      } else if (step.deviceCategory !== def.deviceCategory) {
+        await prisma.step.update({
+          where: { id: step.id },
+          data: { deviceCategory: def.deviceCategory, updatedBy: SYSTEM },
+        })
+      }
+
+      const existingExec = await prisma.stepExecution.findFirst({
+        where: { workOrderId: demoWo.id, stepId: step.id },
+      })
+      if (!existingExec) {
+        await prisma.stepExecution.create({
+          data: {
+            workOrderId: demoWo.id,
+            stepId: step.id,
+            status: 'pending',
+            startedAt: seedStartedAt,
+          },
+        })
+      }
+    }
+    console.log(
+      '✓ Demo parallel group:',
+      group.name,
+      `(5 steps: 1 pre + 1 main + 2 parallel + 1 post → ${demoWoCode})`,
+    )
+  } else {
+    console.log('⚠ Skipped demo parallel group (item or WO missing)')
+  }
+
   console.log('\n✅ Seed complete — MOCK_DATA_PNEUMATIC_AIR loaded successfully')
 }
 
