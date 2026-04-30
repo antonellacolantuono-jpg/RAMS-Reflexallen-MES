@@ -13,3 +13,11 @@ export type {
   WorkflowVersionEvent,
   WorkflowVersionStatus,
 } from './workflow.machine'
+
+export { stepExecutionMachine } from './step-execution.machine'
+export type {
+  StepExecutionContext,
+  StepExecutionEvent,
+  StepExecutionStatus,
+  StepExecutionInput,
+} from './step-execution.machine'

@@ -897,6 +897,7 @@ model StepExecution {
   workOrderId String  @map("work_order_id")
   stepId      String  @map("step_id")
   operatorId  String? @map("operator_id")
+  status      String  @default("pending") // 11-state machine: pending|running|paused|blocked|qc_hold|scrapped|done|skipped|cancelled|recovered|error
   result      String? // ok | nok | rework | skipped
   durationSec Int?    @map("duration_sec")
   notes       String?
@@ -911,6 +912,7 @@ model StepExecution {
 
   @@index([workOrderId, stepId])
   @@index([operatorId])
+  @@index([status])
   @@map("step_executions")
 }
 
