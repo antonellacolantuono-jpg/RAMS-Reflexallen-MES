@@ -2,6 +2,46 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPost, ApiError } from './api-client'
 
+export type StepExecutionStatus =
+  | 'pending'
+  | 'running'
+  | 'paused'
+  | 'blocked'
+  | 'qc_hold'
+  | 'scrapped'
+  | 'done'
+  | 'skipped'
+  | 'cancelled'
+  | 'recovered'
+  | 'error'
+
+export type WorkOrderStep = {
+  stepExecutionId: string
+  workOrderId: string
+  stepId: string
+  status: StepExecutionStatus
+  result: string | null
+  durationSec: number | null
+  startedAt: string | null
+  completedAt: string | null
+  stepName: string
+  stepCategory: string
+  stepOrder: number
+  actionType: string
+  instructions: string | null
+}
+
+export type StepTransitionResult = {
+  stepExecutionId: string
+  workOrderId: string
+  fromStatus: StepExecutionStatus
+  toStatus: StepExecutionStatus
+  event: string
+  changedAt: string
+  notes: string[]
+  causeCode: string | null
+}
+
 export type AuthOperator = {
   id: string
   badge: string
@@ -80,5 +120,44 @@ export function useMyWorkOrders(options: { enabled?: boolean } = {}) {
     },
     enabled: options.enabled ?? true,
     staleTime: 15_000,
+  })
+}
+
+export const workOrderStepsQueryKey = (workOrderId: string) =>
+  ['work-order-steps', workOrderId] as const
+
+export function useWorkOrderSteps(
+  workOrderId: string,
+  options: { enabled?: boolean } = {},
+) {
+  return useQuery({
+    queryKey: workOrderStepsQueryKey(workOrderId),
+    queryFn: async () => {
+      const res = await apiGet<{ steps: WorkOrderStep[] }>(
+        `/api/work-orders/${encodeURIComponent(workOrderId)}/steps`,
+      )
+      return res.steps
+    },
+    enabled: options.enabled ?? true,
+    staleTime: 5_000,
+  })
+}
+
+export function useTransitionStep(workOrderId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      stepExecutionId: string
+      event: { type: string; [k: string]: unknown }
+    }) => {
+      const res = await apiPost<{ result: StepTransitionResult }>(
+        `/api/work-orders/${encodeURIComponent(workOrderId)}/steps/${encodeURIComponent(input.stepExecutionId)}/transitions`,
+        { event: input.event },
+      )
+      return res.result
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: workOrderStepsQueryKey(workOrderId) })
+    },
   })
 }

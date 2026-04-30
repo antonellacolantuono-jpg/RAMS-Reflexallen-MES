@@ -1,90 +1,42 @@
 'use client'
 import * as React from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useMachine } from '@xstate/react'
+import {
+  stepExecutionMachine,
+  type StepExecutionEvent,
+} from '@mes/domain'
 import { Button, Modal, Progress } from '@mes/ui'
 import { useOperatorStore } from '../../../lib/operator-store'
 import {
-  getMockSteps,
-  getWorkOrder,
-  type MockStep,
-} from '../../../lib/mock-data'
+  useMyWorkOrders,
+  useTransitionStep,
+  useWorkOrderSteps,
+  type StepExecutionStatus,
+  type WorkOrderStep,
+} from '../../../lib/queries'
 import { StepCard } from '../../../components/StepCard'
 
-interface ExecState {
-  steps: MockStep[]
-  notes: Record<string, string>
-  nokOpen: boolean
-  nokTargetId: string | null
-  nokDraft: string
-}
+const TERMINAL_STATUSES: StepExecutionStatus[] = [
+  'done',
+  'skipped',
+  'cancelled',
+]
+const PAST_STATUSES: StepExecutionStatus[] = [
+  ...TERMINAL_STATUSES,
+  'blocked',
+  'scrapped',
+]
 
-type ExecAction =
-  | { type: 'COMPLETE_OK' }
-  | { type: 'OPEN_NOK'; stepId: string }
-  | { type: 'CANCEL_NOK' }
-  | { type: 'UPDATE_NOK_DRAFT'; draft: string }
-  | { type: 'CONFIRM_NOK' }
-
-function advanceAfter(steps: MockStep[]): MockStep[] {
-  // After completing/blocking the running step, promote the next pending one.
-  const nextPendingIdx = steps.findIndex((s) => s.status === 'pending')
-  if (nextPendingIdx === -1) return steps
-  const next = [...steps]
-  const target = next[nextPendingIdx]
-  if (!target) return next
-  next[nextPendingIdx] = { ...target, status: 'running' }
-  return next
-}
-
-function execReducer(state: ExecState, action: ExecAction): ExecState {
-  switch (action.type) {
-    case 'COMPLETE_OK': {
-      const runningIdx = state.steps.findIndex((s) => s.status === 'running')
-      if (runningIdx === -1) return state
-      const running = state.steps[runningIdx]
-      if (!running) return state
-      const updated = [...state.steps]
-      updated[runningIdx] = { ...running, status: 'done' }
-      return { ...state, steps: advanceAfter(updated) }
-    }
-    case 'OPEN_NOK':
-      return { ...state, nokOpen: true, nokTargetId: action.stepId, nokDraft: '' }
-    case 'CANCEL_NOK':
-      return { ...state, nokOpen: false, nokTargetId: null, nokDraft: '' }
-    case 'UPDATE_NOK_DRAFT':
-      return { ...state, nokDraft: action.draft }
-    case 'CONFIRM_NOK': {
-      if (!state.nokTargetId) return state
-      const targetIdx = state.steps.findIndex(
-        (s) => s.id === state.nokTargetId,
-      )
-      if (targetIdx === -1) return state
-      const target = state.steps[targetIdx]
-      if (!target) return state
-      const updated = [...state.steps]
-      updated[targetIdx] = { ...target, status: 'blocked' }
-      return {
-        ...state,
-        steps: advanceAfter(updated),
-        notes: { ...state.notes, [state.nokTargetId]: state.nokDraft.trim() },
-        nokOpen: false,
-        nokTargetId: null,
-        nokDraft: '',
-      }
-    }
-    default:
-      return state
-  }
-}
-
-function initState(woId: string): ExecState {
-  return {
-    steps: getMockSteps(woId),
-    notes: {},
-    nokOpen: false,
-    nokTargetId: null,
-    nokDraft: '',
-  }
+function pickActiveStep(
+  steps: WorkOrderStep[] | undefined,
+): WorkOrderStep | undefined {
+  if (!steps || steps.length === 0) return undefined
+  return (
+    steps.find(
+      (s) => s.status === 'running' || s.status === 'paused' || s.status === 'qc_hold' || s.status === 'recovered',
+    ) ?? steps.find((s) => s.status === 'pending')
+  )
 }
 
 export default function WorkOrderExecutionPage() {
@@ -94,11 +46,9 @@ export default function WorkOrderExecutionPage() {
   const operator = useOperatorStore((s) => s.operator)
   const [hydrated, setHydrated] = React.useState(false)
   const startedAtRef = React.useRef<number>(Date.now())
-  const [state, dispatch] = React.useReducer(
-    execReducer,
-    woId,
-    initState,
-  )
+  const [nokOpen, setNokOpen] = React.useState(false)
+  const [nokTargetId, setNokTargetId] = React.useState<string | null>(null)
+  const [nokDraft, setNokDraft] = React.useState('')
 
   React.useEffect(() => {
     setHydrated(true)
@@ -110,20 +60,35 @@ export default function WorkOrderExecutionPage() {
     }
   }, [hydrated, operator, router])
 
-  const wo = getWorkOrder(woId)
+  const stepsQuery = useWorkOrderSteps(woId, {
+    enabled: !!operator,
+  })
+  const myWorkOrdersQuery = useMyWorkOrders({ enabled: !!operator })
+  const transition = useTransitionStep(woId)
 
-  // Auto-redirect to done screen when no steps remain pending or running.
+  const wo = React.useMemo(
+    () => myWorkOrdersQuery.data?.find((w) => w.id === woId),
+    [myWorkOrdersQuery.data, woId],
+  )
+
+  const steps = React.useMemo(
+    () => stepsQuery.data ?? [],
+    [stepsQuery.data],
+  )
+  const activeStep = pickActiveStep(steps)
+
   const allTerminal = React.useMemo(
     () =>
-      state.steps.length > 0 &&
-      state.steps.every((s) => s.status === 'done' || s.status === 'blocked'),
-    [state.steps],
+      steps.length > 0 && steps.every((s) => PAST_STATUSES.includes(s.status)),
+    [steps],
   )
 
   React.useEffect(() => {
-    if (allTerminal) {
-      const okCount = state.steps.filter((s) => s.status === 'done').length
-      const nokCount = state.steps.filter((s) => s.status === 'blocked').length
+    if (allTerminal && hydrated) {
+      const okCount = steps.filter((s) => s.status === 'done').length
+      const nokCount = steps.filter(
+        (s) => s.status === 'blocked' || s.status === 'scrapped',
+      ).length
       const elapsedSec = Math.max(
         1,
         Math.floor((Date.now() - startedAtRef.current) / 1000),
@@ -132,7 +97,102 @@ export default function WorkOrderExecutionPage() {
         `/wo/${woId}/done?ok=${okCount}&nok=${nokCount}&time=${elapsedSec}`,
       )
     }
-  }, [allTerminal, state.steps, router, woId])
+  }, [allTerminal, steps, router, woId, hydrated])
+
+  const machineInput = React.useMemo(
+    () => ({
+      stepExecutionId: activeStep?.stepExecutionId ?? 'pending',
+      workOrderId: woId,
+      stepId: activeStep?.stepId ?? 'pending',
+      stepCategory: activeStep?.stepCategory ?? 'production',
+      operatorId: operator?.id ?? null,
+      by: operator?.id ?? 'anonymous',
+    }),
+    [activeStep, operator?.id, woId],
+  )
+
+  const [, sendMachine] = useMachine(stepExecutionMachine, {
+    input: machineInput,
+  })
+
+  const sendEvent = React.useCallback(
+    (stepExecutionId: string, event: StepExecutionEvent) => {
+      sendMachine(event)
+      transition.mutate({
+        stepExecutionId,
+        event: event as unknown as { type: string; [k: string]: unknown },
+      })
+    },
+    [transition, sendMachine],
+  )
+
+  const handleStart = React.useCallback(
+    (step: WorkOrderStep) => {
+      sendEvent(step.stepExecutionId, {
+        type: 'START',
+        by: operator?.id ?? 'anonymous',
+      })
+    },
+    [sendEvent, operator?.id],
+  )
+
+  const handleComplete = React.useCallback(
+    (step: WorkOrderStep) => {
+      sendEvent(step.stepExecutionId, {
+        type: 'COMPLETE_OK',
+        by: operator?.id ?? 'anonymous',
+      })
+    },
+    [sendEvent, operator?.id],
+  )
+
+  const openNok = React.useCallback((stepExecutionId: string) => {
+    setNokOpen(true)
+    setNokTargetId(stepExecutionId)
+    setNokDraft('')
+  }, [])
+
+  const closeNok = React.useCallback(() => {
+    setNokOpen(false)
+    setNokTargetId(null)
+    setNokDraft('')
+  }, [])
+
+  const confirmNok = React.useCallback(() => {
+    if (!nokTargetId) return
+    const trimmed = nokDraft.trim()
+    sendEvent(nokTargetId, {
+      type: 'COMPLETE_NOK',
+      by: operator?.id ?? 'anonymous',
+      causeCode: 'manual_nok',
+      ...(trimmed ? { notes: trimmed } : {}),
+    })
+    closeNok()
+  }, [nokTargetId, nokDraft, sendEvent, closeNok, operator?.id])
+
+  const handlePause = React.useCallback(
+    (step: WorkOrderStep) =>
+      sendEvent(step.stepExecutionId, {
+        type: 'PAUSE',
+        by: operator?.id ?? 'anonymous',
+      }),
+    [sendEvent, operator?.id],
+  )
+  const handleResume = React.useCallback(
+    (step: WorkOrderStep) =>
+      sendEvent(step.stepExecutionId, {
+        type: 'RESUME',
+        by: operator?.id ?? 'anonymous',
+      }),
+    [sendEvent, operator?.id],
+  )
+
+  React.useEffect(() => {
+    if (!activeStep) return
+    if (activeStep.status === 'pending' && !transition.isPending) {
+      handleStart(activeStep)
+    }
+  }, [activeStep, handleStart, transition.isPending])
 
   if (!hydrated || !operator) {
     return (
@@ -142,7 +202,15 @@ export default function WorkOrderExecutionPage() {
     )
   }
 
-  if (!wo) {
+  if (stepsQuery.isLoading) {
+    return (
+      <div className="min-h-screen bg-paper flex items-center justify-center">
+        <p className="text-ink-3">Caricamento step…</p>
+      </div>
+    )
+  }
+
+  if (stepsQuery.error || !wo) {
     return (
       <div className="min-h-screen bg-paper flex flex-col items-center justify-center gap-4 p-6">
         <p className="text-lg text-ink">Ordine di lavoro non trovato</p>
@@ -153,12 +221,12 @@ export default function WorkOrderExecutionPage() {
     )
   }
 
-  const doneCount = state.steps.filter((s) => s.status === 'done').length
-  const blockedCount = state.steps.filter((s) => s.status === 'blocked').length
-  const total = state.steps.length
+  const total = steps.length
+  const doneCount = steps.filter((s) => s.status === 'done').length
+  const blockedCount = steps.filter(
+    (s) => s.status === 'blocked' || s.status === 'scrapped',
+  ).length
   const completedSteps = doneCount + blockedCount
-
-  const runningStep = state.steps.find((s) => s.status === 'running')
 
   return (
     <div className="min-h-screen bg-paper">
@@ -184,7 +252,7 @@ export default function WorkOrderExecutionPage() {
           <div className="flex items-center gap-3">
             <Progress
               value={completedSteps}
-              max={total}
+              max={Math.max(1, total)}
               tone="accent"
               className="flex-1"
             />
@@ -196,42 +264,42 @@ export default function WorkOrderExecutionPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-3">
-        {state.steps.map((step, i) => (
+        {steps.map((step, i) => (
           <StepCard
-            key={step.id}
+            key={step.stepExecutionId}
             step={step}
             index={i}
             totalSteps={total}
-            blockedNote={state.notes[step.id]}
-            onComplete={() => dispatch({ type: 'COMPLETE_OK' })}
-            onMarkBlocked={() =>
-              dispatch({ type: 'OPEN_NOK', stepId: step.id })
-            }
+            isPending={transition.isPending}
+            onComplete={() => handleComplete(step)}
+            onMarkBlocked={() => openNok(step.stepExecutionId)}
+            onPause={() => handlePause(step)}
+            onResume={() => handleResume(step)}
           />
         ))}
+        {steps.length === 0 && (
+          <p className="text-ink-3 text-center py-8">
+            Nessuno step disponibile per questo ordine.
+          </p>
+        )}
       </main>
 
       <Modal
-        open={state.nokOpen}
-        onClose={() => dispatch({ type: 'CANCEL_NOK' })}
+        open={nokOpen}
+        onClose={closeNok}
         title="Cosa è andato storto?"
-        description={
-          runningStep ? `Step: ${runningStep.name}` : undefined
-        }
+        description={activeStep ? `Step: ${activeStep.stepName}` : undefined}
         width={520}
         footer={
           <>
-            <Button
-              size="md"
-              variant="ghost"
-              onClick={() => dispatch({ type: 'CANCEL_NOK' })}
-            >
+            <Button size="md" variant="ghost" onClick={closeNok}>
               Annulla
             </Button>
             <Button
               size="md"
               variant="danger"
-              onClick={() => dispatch({ type: 'CONFIRM_NOK' })}
+              onClick={confirmNok}
+              disabled={transition.isPending}
             >
               Conferma NOK
             </Button>
@@ -240,10 +308,8 @@ export default function WorkOrderExecutionPage() {
       >
         <textarea
           autoFocus
-          value={state.nokDraft}
-          onChange={(e) =>
-            dispatch({ type: 'UPDATE_NOK_DRAFT', draft: e.target.value })
-          }
+          value={nokDraft}
+          onChange={(e) => setNokDraft(e.target.value)}
           placeholder="Descrivi brevemente il problema riscontrato…"
           className="w-full min-h-[140px] rounded-2 border border-line px-3 py-2 text-base text-ink focus:outline-none focus:ring-2 focus:ring-accent"
         />
