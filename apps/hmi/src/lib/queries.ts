@@ -29,6 +29,11 @@ export type WorkOrderStep = {
   stepOrder: number
   actionType: string
   instructions: string | null
+  deviceCategory: string | null
+  groupId: string
+  groupName: string
+  groupCategory: string
+  groupSupportsParallel: boolean
 }
 
 export type StepTransitionResult = {

@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common'
 import { createActor } from 'xstate'
 import {
+  isParallelSyncTrigger,
   stepExecutionMachine,
+  type ParallelStepWithStatus,
   type StepExecutionContext,
   type StepExecutionEvent,
   type StepExecutionStatus,
@@ -55,6 +57,11 @@ export interface WorkOrderStepDto extends StepStateDto {
   stepOrder: number
   actionType: string
   instructions: string | null
+  deviceCategory: string | null
+  groupId: string
+  groupName: string
+  groupCategory: string
+  groupSupportsParallel: boolean
 }
 
 @Injectable()
@@ -78,7 +85,7 @@ export class StepExecutionService {
     }
     const rows = await this.prisma.stepExecution.findMany({
       where: { workOrderId },
-      include: { step: true },
+      include: { step: { include: { group: true } } },
       orderBy: { step: { order: 'asc' } },
     })
     return rows.map((r) => ({
@@ -95,6 +102,11 @@ export class StepExecutionService {
       stepOrder: r.step.order,
       actionType: r.step.actionType,
       instructions: r.step.instructions ?? null,
+      deviceCategory: r.step.deviceCategory ?? null,
+      groupId: r.step.groupId,
+      groupName: r.step.group.name,
+      groupCategory: r.step.group.category,
+      groupSupportsParallel: r.step.group.supportsParallel,
     }))
   }
 
@@ -212,6 +224,17 @@ export class StepExecutionService {
       changedAt,
     })
 
+    await this.maybeEmitParallelSync({
+      stepExecutionId: row.id,
+      stepId: row.stepId,
+      groupId: row.step.groupId,
+      groupSupportsParallel: row.step.group.supportsParallel,
+      deviceCategory: row.step.deviceCategory ?? null,
+      toStatus,
+      workOrderId: row.workOrderId,
+      changedAt,
+    })
+
     return {
       stepExecutionId: row.id,
       workOrderId: row.workOrderId,
@@ -222,6 +245,51 @@ export class StepExecutionService {
       notes: newCtx.notes,
       causeCode: newCtx.causeCode,
     }
+  }
+
+  private async maybeEmitParallelSync(input: {
+    stepExecutionId: string
+    stepId: string
+    groupId: string
+    groupSupportsParallel: boolean
+    deviceCategory: string | null
+    toStatus: StepExecutionStatus
+    workOrderId: string
+    changedAt: string
+  }): Promise<void> {
+    if (!input.groupSupportsParallel) return
+    if (input.deviceCategory !== 'parallel') return
+
+    const siblings = await this.prisma.stepExecution.findMany({
+      where: { workOrderId: input.workOrderId, step: { groupId: input.groupId } },
+      include: { step: { select: { order: true, deviceCategory: true } } },
+    })
+
+    const groupSteps: ParallelStepWithStatus[] = siblings.map((s) => ({
+      id: s.id === input.stepExecutionId ? input.stepExecutionId : s.id,
+      order: s.step.order,
+      deviceCategory: (s.step.deviceCategory ?? null) as ParallelStepWithStatus['deviceCategory'],
+      status:
+        s.id === input.stepExecutionId
+          ? input.toStatus
+          : ((s.status as StepExecutionStatus) ?? 'pending'),
+    }))
+
+    const transitioned: ParallelStepWithStatus = {
+      id: input.stepExecutionId,
+      order: 0,
+      deviceCategory: 'parallel',
+      status: input.toStatus,
+    }
+
+    if (!isParallelSyncTrigger(transitioned, groupSteps)) return
+
+    this.events.emitParallelSync({
+      workOrderId: input.workOrderId,
+      groupId: input.groupId,
+      triggeredByStepExecutionId: input.stepExecutionId,
+      triggeredAt: input.changedAt,
+    })
   }
 
   private applyDefaultBy(
@@ -316,7 +384,7 @@ export class StepExecutionService {
     const row = await this.prisma.stepExecution.findUnique({
       where: { id: stepExecutionId },
       include: {
-        step: true,
+        step: { include: { group: true } },
         workOrder: { select: { plantId: true, deletedAt: true } },
       },
     })

@@ -16,6 +16,32 @@ import {
   type WorkOrderStep,
 } from '../../../lib/queries'
 import { StepCard } from '../../../components/StepCard'
+import { ParallelStepLane } from '../../../components/ParallelStepLane'
+
+interface StepGroup {
+  groupId: string
+  groupName: string
+  groupSupportsParallel: boolean
+  steps: WorkOrderStep[]
+}
+
+function groupSteps(steps: WorkOrderStep[]): StepGroup[] {
+  const groups: StepGroup[] = []
+  for (const step of steps) {
+    const last = groups[groups.length - 1]
+    if (last && last.groupId === step.groupId) {
+      last.steps.push(step)
+    } else {
+      groups.push({
+        groupId: step.groupId,
+        groupName: step.groupName,
+        groupSupportsParallel: step.groupSupportsParallel,
+        steps: [step],
+      })
+    }
+  }
+  return groups
+}
 
 const TERMINAL_STATUSES: StepExecutionStatus[] = [
   'done',
@@ -194,6 +220,36 @@ export default function WorkOrderExecutionPage() {
     }
   }, [activeStep, handleStart, transition.isPending])
 
+  const autoStartedRef = React.useRef<Set<string>>(new Set())
+
+  React.useEffect(() => {
+    if (!steps.length) return
+    if (transition.isPending) return
+    const groups = groupSteps(steps)
+    for (const group of groups) {
+      if (!group.groupSupportsParallel) continue
+      const preDone = group.steps
+        .filter((s) => s.deviceCategory === 'pre')
+        .every((s) => PAST_STATUSES.includes(s.status))
+      if (!preDone) continue
+      const mainOrParallel = group.steps.filter(
+        (s) =>
+          s.deviceCategory === 'device_main' ||
+          s.deviceCategory === 'parallel',
+      )
+      const anyActive = mainOrParallel.some(
+        (s) => s.status === 'running' || s.status === 'paused',
+      )
+      if (!anyActive) continue
+      for (const s of mainOrParallel) {
+        if (s.status !== 'pending') continue
+        if (autoStartedRef.current.has(s.stepExecutionId)) continue
+        autoStartedRef.current.add(s.stepExecutionId)
+        handleStart(s)
+      }
+    }
+  }, [steps, transition.isPending, handleStart])
+
   if (!hydrated || !operator) {
     return (
       <div className="min-h-screen bg-paper flex items-center justify-center">
@@ -263,20 +319,41 @@ export default function WorkOrderExecutionPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-3">
-        {steps.map((step, i) => (
-          <StepCard
-            key={step.stepExecutionId}
-            step={step}
-            index={i}
-            totalSteps={total}
-            isPending={transition.isPending}
-            onComplete={() => handleComplete(step)}
-            onMarkBlocked={() => openNok(step.stepExecutionId)}
-            onPause={() => handlePause(step)}
-            onResume={() => handleResume(step)}
-          />
-        ))}
+      <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-4">
+        {groupSteps(steps).map((group) => {
+          if (group.groupSupportsParallel) {
+            return (
+              <ParallelStepLane
+                key={group.groupId}
+                groupId={group.groupId}
+                groupName={group.groupName}
+                steps={group.steps}
+                isPending={transition.isPending}
+                onComplete={(step) => handleComplete(step)}
+                onMarkBlocked={(step) => openNok(step.stepExecutionId)}
+                onPause={(step) => handlePause(step)}
+                onResume={(step) => handleResume(step)}
+              />
+            )
+          }
+          return (
+            <div key={group.groupId} className="flex flex-col gap-3">
+              {group.steps.map((step, i) => (
+                <StepCard
+                  key={step.stepExecutionId}
+                  step={step}
+                  index={i}
+                  totalSteps={total}
+                  isPending={transition.isPending}
+                  onComplete={() => handleComplete(step)}
+                  onMarkBlocked={() => openNok(step.stepExecutionId)}
+                  onPause={() => handlePause(step)}
+                  onResume={() => handleResume(step)}
+                />
+              ))}
+            </div>
+          )
+        })}
         {steps.length === 0 && (
           <p className="text-ink-3 text-center py-8">
             Nessuno step disponibile per questo ordine.

@@ -6,6 +6,22 @@ import {
 } from '@nestjs/common'
 import { StepExecutionService } from './step-execution.service'
 
+type FakeStep = {
+  groupId: string
+  category: string
+  name: string
+  order: number
+  actionType: string
+  instructions: string | null
+  deviceCategory: string | null
+  group: {
+    id: string
+    name: string
+    category: string
+    supportsParallel: boolean
+  }
+}
+
 type FakeRow = {
   id: string
   workOrderId: string
@@ -17,9 +33,26 @@ type FakeRow = {
   notes: string | null
   startedAt: Date | null
   completedAt: Date | null
-  step: { category: string; name: string; order: number; actionType: string; instructions: string | null }
+  step: FakeStep
   workOrder: { plantId: string; deletedAt: Date | null }
 }
+
+const makeStep = (over: Partial<FakeStep> = {}): FakeStep => ({
+  groupId: 'g-1',
+  category: 'production',
+  name: 'Crimping',
+  order: 3,
+  actionType: 'process',
+  instructions: 'Crimp connector to spec',
+  deviceCategory: null,
+  group: {
+    id: 'g-1',
+    name: 'Crimping group',
+    category: 'assembly',
+    supportsParallel: false,
+  },
+  ...over,
+})
 
 const baseRow = (over: Partial<FakeRow> = {}): FakeRow => ({
   id: 'se-1',
@@ -32,22 +65,29 @@ const baseRow = (over: Partial<FakeRow> = {}): FakeRow => ({
   notes: null,
   startedAt: null,
   completedAt: null,
-  step: {
-    category: 'production',
-    name: 'Crimping',
-    order: 3,
-    actionType: 'process',
-    instructions: 'Crimp connector to spec',
-  },
+  step: over.step ?? makeStep(),
   workOrder: { plantId: 'plant-1', deletedAt: null },
   ...over,
 })
 
-function makeService(row: FakeRow | null) {
+function makeService(
+  row: FakeRow | null,
+  options: { siblings?: FakeRow[] } = {},
+) {
   const updateMock = vi.fn().mockResolvedValue({})
   const findUniqueMock = vi.fn().mockResolvedValue(row)
   const findFirstMock = vi.fn().mockResolvedValue(row ? { id: row.workOrderId } : null)
-  const findManyMock = vi.fn().mockResolvedValue(row ? [row] : [])
+  const findManyMock = vi
+    .fn()
+    .mockImplementation(async (args: { include?: { step?: { include?: { group?: boolean } } } }) => {
+      if (!row) return []
+      // findStepsForWorkOrder calls with include.step.include.group → return single row by default
+      if (args?.include?.step?.include?.group) {
+        return [row]
+      }
+      // Sibling lookup in maybeEmitParallelSync uses include.step.select
+      return options.siblings ?? [row]
+    })
   const prisma = {
     stepExecution: {
       findUnique: findUniqueMock,
@@ -65,12 +105,22 @@ function makeService(row: FakeRow | null) {
   } as unknown as ConstructorParameters<typeof StepExecutionService>[1]
 
   const emitMock = vi.fn()
+  const emitParallelSyncMock = vi.fn()
   const events = {
     emitStepTransition: emitMock,
+    emitParallelSync: emitParallelSyncMock,
   } as unknown as ConstructorParameters<typeof StepExecutionService>[2]
 
   const service = new StepExecutionService(prisma, auditLog, events)
-  return { service, updateMock, recordMock, emitMock, findManyMock, findFirstMock }
+  return {
+    service,
+    updateMock,
+    recordMock,
+    emitMock,
+    emitParallelSyncMock,
+    findManyMock,
+    findFirstMock,
+  }
 }
 
 describe('StepExecutionService.applyTransition', () => {
@@ -156,13 +206,13 @@ describe('StepExecutionService.applyTransition', () => {
     const { service, updateMock } = makeService(
       baseRow({
         status: 'running',
-        step: {
+        step: makeStep({
           category: 'quality_control',
           name: 'Visual check',
           order: 5,
           actionType: 'visual_check',
           instructions: null,
-        },
+        }),
       }),
     )
     const result = await service.applyTransition({
@@ -251,13 +301,13 @@ describe('StepExecutionService.applyTransition', () => {
     const { service, updateMock } = makeService(
       baseRow({
         status: 'qc_hold',
-        step: {
+        step: makeStep({
           category: 'quality_control',
           name: 'Reflectance test',
           order: 7,
           actionType: 'functional_test',
           instructions: null,
-        },
+        }),
       }),
     )
     const result = await service.applyTransition({
@@ -307,11 +357,173 @@ describe('StepExecutionService.findStepsForWorkOrder', () => {
     })
   })
 
+  it('exposes group + deviceCategory fields on the DTO for swimlane rendering', async () => {
+    const { service } = makeService(
+      baseRow({
+        step: makeStep({
+          groupId: 'g-dx',
+          deviceCategory: 'parallel',
+          group: {
+            id: 'g-dx',
+            name: 'Cura autoclave',
+            category: 'device_execution',
+            supportsParallel: true,
+          },
+        }),
+      }),
+    )
+    const result = await service.findStepsForWorkOrder('wo-1', 'plant-1')
+    expect(result[0]).toMatchObject({
+      deviceCategory: 'parallel',
+      groupId: 'g-dx',
+      groupName: 'Cura autoclave',
+      groupCategory: 'device_execution',
+      groupSupportsParallel: true,
+    })
+  })
+
   it('throws NotFound when WO is not in caller plant', async () => {
     const { service } = makeService(null)
     await expect(
       service.findStepsForWorkOrder('wo-1', 'plant-1'),
     ).rejects.toBeInstanceOf(NotFoundException)
+  })
+})
+
+describe('StepExecutionService.applyTransition — parallel sync', () => {
+  const parallelStep = (over: Partial<FakeStep> = {}) =>
+    makeStep({
+      groupId: 'g-dx',
+      group: {
+        id: 'g-dx',
+        name: 'Cura',
+        category: 'device_execution',
+        supportsParallel: true,
+      },
+      deviceCategory: 'parallel',
+      ...over,
+    })
+
+  it('does not emit parallel-sync when the group is not parallel', async () => {
+    const { service, emitParallelSyncMock } = makeService(
+      baseRow({ status: 'running' }),
+    )
+    await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'COMPLETE_OK', by: 'op-1' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(emitParallelSyncMock).not.toHaveBeenCalled()
+  })
+
+  it('does not emit parallel-sync when transitioned step is not on a parallel lane', async () => {
+    const mainRow = baseRow({
+      status: 'running',
+      step: parallelStep({ deviceCategory: 'device_main' }),
+    })
+    const siblings: FakeRow[] = [
+      mainRow,
+      baseRow({ id: 'se-p1', status: 'done', step: parallelStep() }),
+    ]
+    const { service, emitParallelSyncMock } = makeService(mainRow, { siblings })
+    await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'COMPLETE_OK', by: 'op-1' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(emitParallelSyncMock).not.toHaveBeenCalled()
+  })
+
+  it('does not emit parallel-sync while at least one parallel sibling is still running', async () => {
+    const target = baseRow({
+      id: 'se-p1',
+      status: 'running',
+      step: parallelStep({ order: 2 }),
+    })
+    const siblings: FakeRow[] = [
+      target,
+      baseRow({ id: 'se-p2', status: 'running', step: parallelStep({ order: 3 }) }),
+      baseRow({
+        id: 'se-main',
+        status: 'running',
+        step: parallelStep({ order: 1, deviceCategory: 'device_main' }),
+      }),
+    ]
+    const { service, emitParallelSyncMock } = makeService(target, { siblings })
+    await service.applyTransition({
+      stepExecutionId: 'se-p1',
+      workOrderId: 'wo-1',
+      event: { type: 'COMPLETE_OK', by: 'op-1' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(emitParallelSyncMock).not.toHaveBeenCalled()
+  })
+
+  it('emits parallel-sync when the last parallel lane transitions to done', async () => {
+    const target = baseRow({
+      id: 'se-p2',
+      status: 'running',
+      step: parallelStep({ order: 3 }),
+    })
+    const siblings: FakeRow[] = [
+      baseRow({ id: 'se-p1', status: 'done', step: parallelStep({ order: 2 }) }),
+      target,
+      baseRow({
+        id: 'se-main',
+        status: 'running',
+        step: parallelStep({ order: 1, deviceCategory: 'device_main' }),
+      }),
+    ]
+    const { service, emitParallelSyncMock } = makeService(target, { siblings })
+    await service.applyTransition({
+      stepExecutionId: 'se-p2',
+      workOrderId: 'wo-1',
+      event: { type: 'COMPLETE_OK', by: 'op-1' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(emitParallelSyncMock).toHaveBeenCalledOnce()
+    const payload = emitParallelSyncMock.mock.calls[0]?.[0]
+    expect(payload).toMatchObject({
+      workOrderId: 'wo-1',
+      groupId: 'g-dx',
+      triggeredByStepExecutionId: 'se-p2',
+    })
+    expect(typeof payload?.triggeredAt).toBe('string')
+  })
+
+  it('emits parallel-sync when a parallel step is skipped and that closes the lane', async () => {
+    const target = baseRow({
+      id: 'se-p1',
+      status: 'blocked',
+      step: parallelStep({ order: 2 }),
+    })
+    const siblings: FakeRow[] = [
+      target,
+      baseRow({
+        id: 'se-p2',
+        status: 'done',
+        step: parallelStep({ order: 3 }),
+      }),
+    ]
+    const { service, emitParallelSyncMock } = makeService(target, { siblings })
+    await service.applyTransition({
+      stepExecutionId: 'se-p1',
+      workOrderId: 'wo-1',
+      event: { type: 'SKIP', by: 'sup-1', reason: 'redo elsewhere' },
+      changedBy: 'sup-1',
+      plantId: 'plant-1',
+    })
+    expect(emitParallelSyncMock).toHaveBeenCalledOnce()
+    expect(emitParallelSyncMock.mock.calls[0]?.[0]).toMatchObject({
+      groupId: 'g-dx',
+      triggeredByStepExecutionId: 'se-p1',
+    })
   })
 })
 

@@ -44,3 +44,20 @@ export type {
   WorkflowStructure,
   AvailableRefs,
 } from './rules/workflow.rules'
+
+// parallel-ops rules
+export {
+  splitGroupIntoLanes,
+  areAllParallelLanesTerminal,
+  isParallelSyncTrigger,
+} from './rules/parallel-ops.rules'
+export type {
+  Lane,
+  LaneKind,
+  DeviceCategory,
+  ParallelStep,
+  ParallelGroup,
+  ParallelStepWithStatus,
+  ParallelLayout,
+  SyncPoint,
+} from './rules/parallel-ops.rules'
