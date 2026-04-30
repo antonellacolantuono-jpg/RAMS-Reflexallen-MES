@@ -3,15 +3,17 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Input, Field } from '@mes/ui'
 import { PinKeypad } from '../components/PinKeypad'
-import { validateOperatorPin, getOperatorByBadge } from '../lib/mock-data'
-import { useOperatorStore } from '../lib/operator-store'
+import { useLogin, useMe } from '../lib/queries'
+import { ApiError } from '../lib/api-client'
 
 type Step = 'badge' | 'pin'
 
+const SHOW_DEMO_HINT = process.env['NEXT_PUBLIC_DEMO_HINT'] !== 'false'
+
 export default function HMILoginPage() {
   const router = useRouter()
-  const setOperator = useOperatorStore((s) => s.setOperator)
-  const operator = useOperatorStore((s) => s.operator)
+  const me = useMe()
+  const login = useLogin()
 
   const [step, setStep] = React.useState<Step>('badge')
   const [badge, setBadge] = React.useState('')
@@ -19,19 +21,15 @@ export default function HMILoginPage() {
   const [error, setError] = React.useState('')
 
   React.useEffect(() => {
-    if (operator) {
+    if (me.data) {
       router.replace('/dashboard')
     }
-  }, [operator, router])
+  }, [me.data, router])
 
   function handleBadgeContinue() {
     const trimmed = badge.trim().toUpperCase()
     if (!trimmed) {
       setError('Inserire il numero badge')
-      return
-    }
-    if (!getOperatorByBadge(trimmed)) {
-      setError('Badge non riconosciuto')
       return
     }
     setBadge(trimmed)
@@ -40,20 +38,23 @@ export default function HMILoginPage() {
     setStep('pin')
   }
 
-  function handlePinConfirm() {
+  async function handlePinConfirm() {
     if (pin.length < 4) {
       setError('Il PIN deve essere di 4 cifre')
       return
     }
-    const op = validateOperatorPin(badge, pin)
-    if (!op) {
-      setError('Badge o PIN errato')
-      setPin('')
-      return
-    }
     setError('')
-    setOperator(op)
-    router.push('/dashboard')
+    try {
+      await login.mutateAsync({ badge, pin })
+      router.replace('/dashboard')
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setError('Badge o PIN errato')
+      } else {
+        setError('Errore di connessione. Riprovare.')
+      }
+      setPin('')
+    }
   }
 
   return (
@@ -85,9 +86,11 @@ export default function HMILoginPage() {
             <Button size="hmi" className="w-full" onClick={handleBadgeContinue}>
               Continua
             </Button>
-            <p className="text-xs text-ink-3 text-center">
-              Demo: OP-001..OP-004 · PIN 1234 / 2222 / 3333 / 4444
-            </p>
+            {SHOW_DEMO_HINT && (
+              <p className="text-xs text-ink-3 text-center">
+                Demo: OP-001..OP-004 · PIN 1234 / 2222 / 3333 / 4444
+              </p>
+            )}
           </>
         )}
 
@@ -116,6 +119,7 @@ export default function HMILoginPage() {
                 setPin('')
                 setError('')
               }}
+              disabled={login.isPending}
             >
               Cambia badge
             </Button>

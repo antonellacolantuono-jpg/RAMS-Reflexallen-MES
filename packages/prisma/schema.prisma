@@ -132,6 +132,7 @@ model Operator {
   firstName String  @map("first_name")
   lastName  String  @map("last_name")
   photoUrl  String? @map("photo_url")
+  pinHash   String? @map("pin_hash")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")

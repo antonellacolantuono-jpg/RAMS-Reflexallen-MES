@@ -10,6 +10,8 @@ import { EquipmentModule } from './modules/equipment/equipment.module'
 import { RecipesModule } from './modules/recipes/recipes.module'
 import { SkillsModule } from './modules/skills/skills.module'
 import { OperatorsModule } from './modules/operators/operators.module'
+import { AuthModule } from './modules/auth/auth.module'
+import { WorkOrdersModule } from './modules/work-orders/work-orders.module'
 import { CauseCodesModule } from './modules/cause-codes/cause-codes.module'
 import { AttentionPointsModule } from './modules/attention-points/attention-points.module'
 import { ToolsModule } from './modules/tools/tools.module'
@@ -32,6 +34,8 @@ import { AppController } from './app.controller'
     RecipesModule,
     SkillsModule,
     OperatorsModule,
+    AuthModule,
+    WorkOrdersModule,
     CauseCodesModule,
     AttentionPointsModule,
     ToolsModule,

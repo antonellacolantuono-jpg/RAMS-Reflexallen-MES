@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { ThemeProvider } from 'next-themes'
+import { Providers } from './providers'
 import '../styles/globals.css'
 
 export const metadata: Metadata = {
@@ -12,7 +13,7 @@ export default function HMILayout({ children }: { children: React.ReactNode }) {
     <html lang="it" data-mode="hmi" suppressHydrationWarning>
       <body>
         <ThemeProvider attribute="data-theme" defaultTheme="light" enableSystem={false}>
-          {children}
+          <Providers>{children}</Providers>
         </ThemeProvider>
       </body>
     </html>

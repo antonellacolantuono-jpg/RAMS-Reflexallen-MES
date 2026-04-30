@@ -1,6 +1,16 @@
+import * as argon2 from 'argon2'
 import { prisma } from './src/client'
 
 const SYSTEM = 'seed'
+
+async function hashPin(pin: string): Promise<string> {
+  return argon2.hash(pin, {
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 1,
+  })
+}
 
 async function main(): Promise<void> {
   console.log('🌱 Seeding MOCK_DATA_PNEUMATIC_AIR...')
@@ -45,33 +55,40 @@ async function main(): Promise<void> {
   const operatorDefs = [
     {
       badge: 'OP-001', firstName: 'Marco', lastName: 'Rossi',
+      pin: '1234',
       skillCodes: ['EXT', 'ASSY', 'QC'],
     },
     {
       badge: 'OP-002', firstName: 'Laura', lastName: 'Ferrari',
+      pin: '2222',
       skillCodes: ['QC', 'TEST', 'PACK'],
     },
     {
       badge: 'OP-003', firstName: 'Giovanni', lastName: 'Bianchi',
+      pin: '3333',
       skillCodes: ['FORKLIFT', 'WAREHOUSE', 'PACK'],
     },
     {
       badge: 'OP-004', firstName: 'Sara', lastName: 'Conti',
+      pin: '4444',
       skillCodes: ['EXT', 'TEST'],
     },
   ]
 
   const operators: Record<string, { id: string }> = {}
   for (const op of operatorDefs) {
+    const existing = await prisma.operator.findUnique({ where: { badge: op.badge } })
+    const pinHash = existing?.pinHash ?? (await hashPin(op.pin))
     const operator = await prisma.operator.upsert({
       where: { badge: op.badge },
-      update: {},
+      update: { pinHash },
       create: {
         badge: op.badge,
         firstName: op.firstName,
         lastName: op.lastName,
         status: 'active',
         plantId: plant.id,
+        pinHash,
         createdBy: SYSTEM,
         updatedBy: SYSTEM,
       },
@@ -379,6 +396,103 @@ async function main(): Promise<void> {
     }
   }
   console.log('✓ CauseCodes:', ccDefs.length, 'records')
+
+  // ── 12. Shifts ────────────────────────────────────────────────────────────
+  const shiftA = await prisma.shift.upsert({
+    where: { plantId_code: { plantId: plant.id, code: 'A' } },
+    update: {},
+    create: {
+      code: 'A',
+      name: 'Turno A — Mattina',
+      startTime: '06:00',
+      endTime: '14:00',
+      plantId: plant.id,
+      createdBy: SYSTEM,
+      updatedBy: SYSTEM,
+    },
+  })
+  console.log('✓ Shift:', shiftA.code)
+
+  // ── 13. ShiftAssignments (today, all 4 operators on shift A) ──────────────
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  for (const badge of ['OP-001', 'OP-002', 'OP-003', 'OP-004']) {
+    const op = operators[badge]
+    if (!op) continue
+    await prisma.shiftAssignment.upsert({
+      where: {
+        shiftId_operatorId_date: {
+          shiftId: shiftA.id,
+          operatorId: op.id,
+          date: today,
+        },
+      },
+      update: {},
+      create: {
+        shiftId: shiftA.id,
+        operatorId: op.id,
+        date: today,
+        createdBy: SYSTEM,
+      },
+    })
+  }
+  console.log('✓ ShiftAssignments: 4 records (today, shift A)')
+
+  // ── 14. WorkOrders + WorkOrderAssignments ─────────────────────────────────
+  const woDefs: Array<{
+    code: string
+    itemCode: string
+    qtyTarget: number
+    qtyProduced: number
+    status: string
+    priority: string
+    actualStart: Date | null
+    operatorBadge: string
+    assignmentStatus: 'accepted' | 'active'
+  }> = [
+    { code: 'WO-2026-0101', itemCode: 'FG-PNEU-5M-8MM', qtyTarget: 50, qtyProduced: 12, status: 'in_progress', priority: 'high', actualStart: new Date('2026-04-30T06:30:00Z'), operatorBadge: 'OP-001', assignmentStatus: 'active' },
+    { code: 'WO-2026-0102', itemCode: 'FG-PNEU-10M-8MM', qtyTarget: 30, qtyProduced: 0, status: 'released', priority: 'normal', actualStart: null, operatorBadge: 'OP-001', assignmentStatus: 'accepted' },
+    { code: 'WO-2026-0103', itemCode: 'FG-PNEU-5M-10MM', qtyTarget: 100, qtyProduced: 25, status: 'in_progress', priority: 'normal', actualStart: new Date('2026-04-30T07:00:00Z'), operatorBadge: 'OP-002', assignmentStatus: 'active' },
+    { code: 'WO-2026-0104', itemCode: 'FG-PNEU-5M-8MM', qtyTarget: 80, qtyProduced: 0, status: 'released', priority: 'low', actualStart: null, operatorBadge: 'OP-003', assignmentStatus: 'accepted' },
+    { code: 'WO-2026-0105', itemCode: 'FG-PNEU-5M-10MM', qtyTarget: 25, qtyProduced: 5, status: 'in_progress', priority: 'normal', actualStart: new Date('2026-04-30T06:45:00Z'), operatorBadge: 'OP-004', assignmentStatus: 'active' },
+  ]
+
+  for (const wo of woDefs) {
+    const item = items[wo.itemCode]
+    const op = operators[wo.operatorBadge]
+    if (!item || !op) continue
+
+    const workOrder = await prisma.workOrder.upsert({
+      where: { plantId_code: { plantId: plant.id, code: wo.code } },
+      update: {},
+      create: {
+        code: wo.code,
+        itemId: item.id,
+        plantId: plant.id,
+        qtyTarget: wo.qtyTarget,
+        qtyProduced: wo.qtyProduced,
+        status: wo.status,
+        priority: wo.priority,
+        actualStart: wo.actualStart,
+        createdBy: SYSTEM,
+        updatedBy: SYSTEM,
+      },
+    })
+
+    await prisma.workOrderAssignment.upsert({
+      where: { workOrderId_operatorId: { workOrderId: workOrder.id, operatorId: op.id } },
+      update: {},
+      create: {
+        workOrderId: workOrder.id,
+        operatorId: op.id,
+        status: wo.assignmentStatus,
+        acceptedAt: new Date(),
+        createdBy: SYSTEM,
+        updatedBy: SYSTEM,
+      },
+    })
+  }
+  console.log('✓ WorkOrders + WorkOrderAssignments:', woDefs.length, 'each')
 
   console.log('\n✅ Seed complete — MOCK_DATA_PNEUMATIC_AIR loaded successfully')
 }

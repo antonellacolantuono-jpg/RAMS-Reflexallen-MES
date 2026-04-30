@@ -20,16 +20,18 @@
 ### TODO-017 — PROMPT_5_FULL: real Argon2id PIN auth + JWT cookies + /api/auth endpoints
 
 **Discovered**: 2026-04-30 (during PROMPT_5_LITE)
+**Status**: 🟡 PARTIAL — D1+D2 of PROMPT_5_FULL closed the core auth flow on 2026-04-30. Refresh-token rotation deferred (8h sliding window via re-login is acceptable for demo).
 **File**: `apps/api/src/modules/auth/` (new module) + `apps/hmi/src/app/page.tsx` + new HMI auth client
 **Symptom**: HMI login validates the operator badge + PIN against a hardcoded `MOCK_OPERATORS` map in `apps/hmi/src/lib/mock-data.ts`. There is no real authentication: PINs are stored in plaintext, no hashing, no session, no /api/auth endpoint, no token, no refresh. The Zustand store persists the "logged-in operator" to `sessionStorage` only — anyone can write to that store from devtools.
 **Acceptance criterion**:
-- Operators are seeded with Argon2id-hashed PINs (replaces TODO-004).
-- `POST /api/auth/login` accepts `{ badge, pin }` and returns a short-lived JWT (httpOnly secure cookie) + refresh token.
-- `POST /api/auth/refresh` rotates the access token.
-- `POST /api/auth/logout` revokes the refresh token.
-- HMI guards every protected route via the cookie (or via a `useSession` hook on top of `/api/auth/me`).
-- Bcrypt is forbidden — Argon2id only (per CLAUDE.md).
-**Estimated effort**: 4-6 hours
+- ✅ Operators are seeded with Argon2id-hashed PINs (replaces TODO-004) — done in D1.
+- ✅ `POST /api/auth/login` accepts `{ badge, pin }` and returns a short-lived JWT (httpOnly secure cookie) — done in D1.
+- ❌ `POST /api/auth/refresh` rotates the access token — DEFERRED (relogin every 8h acceptable for demo; revisit before prod).
+- ✅ `POST /api/auth/logout` clears the cookie — done in D1.
+- ✅ HMI guards every protected route via the cookie (`useMe` on top of `/api/auth/me`) — done in D2.
+- ✅ Bcrypt is forbidden — Argon2id only (per CLAUDE.md) — done in D1.
+**Remaining effort for refresh-token rotation**: ~1-2 hours. Add `RefreshToken` model + `/api/auth/refresh` endpoint that rotates the access cookie + revokes the old refresh token.
+**Estimated effort**: 4-6 hours (4h delivered in D1+D2; 1-2h remaining for refresh rotation)
 **Blocker for**: any non-demo HMI deployment. Supersedes TODO-004.
 
 ---

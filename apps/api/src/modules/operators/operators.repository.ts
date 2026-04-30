@@ -54,7 +54,7 @@ export class OperatorsRepository {
       this.prisma.operator.count({ where }),
     ])
 
-    return buildPaginatedResult(data as OperatorModel[], total, filters)
+    return buildPaginatedResult(data.map(stripPinHash), total, filters)
   }
 
   async create(data: {
@@ -63,19 +63,22 @@ export class OperatorsRepository {
     lastName: string
     status: string
     plantId: string
+    pinHash?: string | null | undefined
     createdBy: string
   }): Promise<OperatorModel> {
-    return this.prisma.operator.create({
+    const created = await this.prisma.operator.create({
       data: {
         badge: data.badge,
         firstName: data.firstName,
         lastName: data.lastName,
         status: data.status,
         plantId: data.plantId,
+        pinHash: data.pinHash ?? null,
         createdBy: data.createdBy,
         updatedBy: data.createdBy,
       },
-    }) as Promise<OperatorModel>
+    })
+    return stripPinHash(created)
   }
 
   async update(
@@ -84,18 +87,26 @@ export class OperatorsRepository {
       firstName?: string | undefined
       lastName?: string | undefined
       status?: string | undefined
+      pinHash?: string | undefined
       updatedBy: string
     },
   ): Promise<OperatorModel> {
-    return this.prisma.operator.update({
+    const updated = await this.prisma.operator.update({
       where: { id },
       data: {
         ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
         ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.pinHash !== undefined ? { pinHash: data.pinHash } : {}),
         updatedBy: data.updatedBy,
         version: { increment: 1 },
       },
-    }) as Promise<OperatorModel>
+    })
+    return stripPinHash(updated)
   }
+}
+
+function stripPinHash<T extends { pinHash?: string | null }>(record: T): OperatorModel {
+  const { pinHash: _pinHash, ...rest } = record
+  return rest as unknown as OperatorModel
 }
