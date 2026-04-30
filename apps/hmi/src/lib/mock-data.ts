@@ -1,7 +1,8 @@
 /**
- * Hardcoded mock data for HMI LITE demo.
- * Real persistence + auth lands in PROMPT_5_FULL (see TODO-017..025).
- * Names align to packages/prisma/seed.ts so the registry matches the HMI.
+ * Hardcoded mock data for HMI step-execution demo.
+ * MOCK_OPERATORS removed in PROMPT_5_FULL D2 (auth is now real, see /api/auth).
+ * MOCK_WORK_ORDERS + step templates kept until PROMPT_5_FULL D3 wires real
+ * step execution via XState + persisted StepExecution records.
  */
 
 export type StepStatus = 'pending' | 'running' | 'done' | 'blocked'
@@ -11,15 +12,6 @@ export type StepCategory =
   | 'identification'
   | 'quality_control'
   | 'logistics'
-
-export interface MockOperator {
-  id: string
-  badge: string
-  firstName: string
-  lastName: string
-  pin: string
-  currentShift: 'A' | 'B' | 'C'
-}
 
 export interface MockWorkOrder {
   id: string
@@ -45,41 +37,6 @@ export interface MockStep {
   status: StepStatus
   skillCode?: string
   deviceCode?: string
-}
-
-export const MOCK_OPERATORS: Record<string, MockOperator> = {
-  'OP-001': {
-    id: 'op-001-marco',
-    badge: 'OP-001',
-    firstName: 'Marco',
-    lastName: 'Rossi',
-    pin: '1234',
-    currentShift: 'A',
-  },
-  'OP-002': {
-    id: 'op-002-laura',
-    badge: 'OP-002',
-    firstName: 'Laura',
-    lastName: 'Ferrari',
-    pin: '2222',
-    currentShift: 'A',
-  },
-  'OP-003': {
-    id: 'op-003-giovanni',
-    badge: 'OP-003',
-    firstName: 'Giovanni',
-    lastName: 'Bianchi',
-    pin: '3333',
-    currentShift: 'B',
-  },
-  'OP-004': {
-    id: 'op-004-sara',
-    badge: 'OP-004',
-    firstName: 'Sara',
-    lastName: 'Conti',
-    pin: '4444',
-    currentShift: 'B',
-  },
 }
 
 export const MOCK_WORK_ORDERS: MockWorkOrder[] = [
@@ -427,21 +384,6 @@ export function getMockSteps(woId: string): MockStep[] {
     order: i + 1,
     status: i === 0 ? 'running' : 'pending',
   }))
-}
-
-export function getOperatorByBadge(badge: string): MockOperator | null {
-  return MOCK_OPERATORS[badge] ?? null
-}
-
-export function validateOperatorPin(badge: string, pin: string): MockOperator | null {
-  const op = MOCK_OPERATORS[badge]
-  if (!op) return null
-  if (op.pin !== pin) return null
-  return op
-}
-
-export function getWorkOrdersForOperator(badge: string): MockWorkOrder[] {
-  return MOCK_WORK_ORDERS.filter((wo) => wo.assignedTo === badge)
 }
 
 export function getWorkOrder(id: string): MockWorkOrder | null {

@@ -2,27 +2,32 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@mes/ui'
+import { useLogout, useMe, useMyWorkOrders } from '../../lib/queries'
+import { ApiError } from '../../lib/api-client'
 import { useOperatorStore } from '../../lib/operator-store'
-import { getWorkOrdersForOperator } from '../../lib/mock-data'
 import { WorkOrderCard } from '../../components/WorkOrderCard'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const operator = useOperatorStore((s) => s.operator)
-  const logout = useOperatorStore((s) => s.logout)
-  const [hydrated, setHydrated] = React.useState(false)
+  const me = useMe()
+  const workOrders = useMyWorkOrders({ enabled: !!me.data })
+  const logout = useLogout()
+  const setStoredOperator = useOperatorStore((s) => s.setOperator)
+
+  const isUnauthorized =
+    me.error instanceof ApiError && me.error.status === 401
 
   React.useEffect(() => {
-    setHydrated(true)
-  }, [])
-
-  React.useEffect(() => {
-    if (hydrated && !operator) {
+    if (isUnauthorized) {
       router.replace('/')
     }
-  }, [hydrated, operator, router])
+  }, [isUnauthorized, router])
 
-  if (!hydrated || !operator) {
+  React.useEffect(() => {
+    if (me.data) setStoredOperator(me.data)
+  }, [me.data, setStoredOperator])
+
+  if (me.isLoading || !me.data) {
     return (
       <div className="min-h-screen bg-paper flex items-center justify-center">
         <p className="text-ink-3">Caricamento…</p>
@@ -30,10 +35,17 @@ export default function DashboardPage() {
     )
   }
 
-  const workOrders = getWorkOrdersForOperator(operator.badge)
+  const operator = me.data
+  const woList = workOrders.data ?? []
+  const shiftCode = woList[0]?.shiftCode ?? null
 
-  function handleLogout() {
-    logout()
+  async function handleLogout() {
+    try {
+      await logout.mutateAsync()
+    } catch {
+      // Even if the call fails, navigate away — the cookie may already be cleared.
+    }
+    setStoredOperator(null)
     router.replace('/')
   }
 
@@ -66,10 +78,15 @@ export default function DashboardPage() {
                 Turno
               </span>
               <span className="text-sm font-medium text-ink">
-                {operator.currentShift} · Badge {operator.badge}
+                {shiftCode ? `${shiftCode} · ` : ''}Badge {operator.badge}
               </span>
             </div>
-            <Button size="hmi" variant="secondary" onClick={handleLogout}>
+            <Button
+              size="hmi"
+              variant="secondary"
+              onClick={handleLogout}
+              disabled={logout.isPending}
+            >
               Esci
             </Button>
           </div>
@@ -82,12 +99,25 @@ export default function DashboardPage() {
             Ordini di lavoro assegnati
           </h1>
           <span className="text-sm text-ink-3 tabular-nums">
-            {workOrders.length}{' '}
-            {workOrders.length === 1 ? 'ordine' : 'ordini'}
+            {woList.length} {woList.length === 1 ? 'ordine' : 'ordini'}
           </span>
         </div>
 
-        {workOrders.length === 0 ? (
+        {workOrders.isLoading ? (
+          <div className="glass rounded-3 p-12 flex flex-col items-center gap-3 text-center">
+            <p className="text-sm text-ink-3">Caricamento ordini…</p>
+          </div>
+        ) : workOrders.isError ? (
+          <div className="glass rounded-3 p-12 flex flex-col items-center gap-3 text-center">
+            <span className="text-4xl">⚠️</span>
+            <h2 className="text-lg font-semibold text-ink">
+              Impossibile caricare gli ordini
+            </h2>
+            <p className="text-sm text-ink-3 max-w-sm">
+              Verificare la connessione di rete e riprovare.
+            </p>
+          </div>
+        ) : woList.length === 0 ? (
           <div className="glass rounded-3 p-12 flex flex-col items-center gap-3 text-center">
             <span className="text-4xl">📋</span>
             <h2 className="text-lg font-semibold text-ink">
@@ -100,10 +130,21 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {workOrders.map((wo) => (
+            {woList.map((wo) => (
               <WorkOrderCard
                 key={wo.id}
-                workOrder={wo}
+                workOrder={{
+                  id: wo.id,
+                  code: wo.code,
+                  itemCode: wo.itemCode,
+                  itemName: wo.itemName,
+                  quantity: wo.quantity,
+                  completed: wo.completed,
+                  assignedTo: operator.badge,
+                  priority: wo.priority,
+                  status: wo.status,
+                  startedAt: wo.startedAt,
+                }}
                 onOpen={handleOpen}
               />
             ))}
