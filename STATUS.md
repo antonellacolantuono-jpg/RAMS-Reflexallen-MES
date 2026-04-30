@@ -1,135 +1,149 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: April 28, 2026, afternoon (post PROMPT_2 merge + test verification)
-> **Repository**: https://github.com/antonellacolantuono-jpg/REFLEXALLEN-MES
+> **Last update**: April 29, 2026, evening (PROMPT_3a complete)
+> **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
 
 ---
 
-## 📜 Project history (April 28)
+## 📜 Project history (timeline)
 
-This project went through a confusing morning where a previous Claude Code session claimed PROMPT_2 was complete, but `git log` on `main` showed only the foundation commit. After investigation, the work was found uncommitted in a worktree (`claude/silly-keller-6e625c`). It was recovered, verified end-to-end, and merged into `main` in the afternoon. Tests run after the merge confirm **127 passing tests across 14 test files**, exceeding the original aspirational claim of 90. Lessons captured at the bottom of this document.
+- **April 27** — PROMPT_1 (Foundation) drafted and partially executed
+- **April 28 morning** — Audit revealed PROMPT_2 was reported done but never committed; recovered from worktree, merged
+- **April 28 afternoon** — Started PROMPT_3a (Workflow Designer Core); D1, D2 merged
+- **April 28 evening** — D3 merged
+- **April 29 morning** — PC migration (new corporate laptop). Repo re-cloned, dev environment rebuilt from scratch. D4, D5 merged
+- **April 29 evening** — D6 merged. **PROMPT_3a complete.**
 
 ---
 
-## ✅ Current state (verified April 28 afternoon)
+## ✅ Current state (verified April 29 evening)
 
 ### PROMPT_1 — Foundation (1 commit on main)
 
-- ✅ Monorepo: pnpm workspaces + Turborepo, 13 packages in scope
+- ✅ Monorepo: pnpm workspaces + Turborepo, 14 packages in scope
 - ✅ Apps boot: `apps/api` (NestJS, port 3000), `apps/web` (Next.js 14, port 3001), `apps/hmi` (Next.js 14, port 3002)
 - ✅ `packages/types`: 11 enum files
-- ✅ `packages/ui`: 16 base primitives (Badge, Button, Card, Dot, Drawer, Field, Input, KPI, Modal, PhaseBadge, Progress, Select, Skeleton, StatusBadge, Tabs, Toast)
-- ✅ `packages/domain`: 3 XState v5 machines (Box, Equipment, WorkOrder) + 3 rule files
+- ✅ `packages/ui`: 16 base + 8 Tier-2 primitives (after PROMPT_2)
+- ✅ `packages/domain`: 4 XState v5 machines (Box, Equipment, WorkOrder, Workflow) + 4 rule files + 67 tests
 - ✅ `packages/prisma`: 63 models including v1.2 modules (Equipment Mgmt, Maintenance, Tool Wear, Multi-output, Sample, FAI, WIP, Subassembly, Quality Hold, CFRP, Safety Devices), `AuditLog`, `DomainEvent`
-- ✅ Placeholder packages: `@mes/cache`, `@mes/queue`, `@mes/storage` (all with passing tests)
+- ✅ Placeholder packages: `@mes/cache` (8 ✓), `@mes/queue` (5 ✓), `@mes/storage` (6 ✓)
 
-### PROMPT_2 — Registries (merged April 28 afternoon, commit b376142)
+### PROMPT_2 — Registries (merged April 28, commits b376142 + later fixes)
 
-**API (apps/api)** — 13 NestJS modules with full CRUD:
+- ✅ 13 NestJS modules with full CRUD
+- ✅ Pattern per registry: `GET / POST / PATCH / DELETE /:id /trash /:id/restore /:id/audit`
+- ✅ `BaseRegistryService` + `BaseRegistryController` (DRY)
+- ✅ 18 web admin routes under `(registries)` group
+- ✅ Sidebar navigation + FavoritesBar + RecentlyViewed + RegistrySyncProvider
+- ✅ Hooks + SDK wrapper
+- ✅ HMI login mockup
+- ✅ Seed `MOCK_DATA_PNEUMATIC_AIR` loaded (1 plant, 11 items, 8 equipment, 7 skills, 4 operators, 3 tools, 3 recipes, 1 box-type, 6 attention-points, 8 cause-codes)
 
-- `items`, `equipment`, `operators`, `recipes`, `skills`, `cause-codes`, `attention-points`, `tools`, `box-types`, `boxes`, `bom`, `auto-gen-rules`
-- Plus infrastructure modules: `audit-log`, `events` (Socket.IO gateway)
-- `base-registry.controller.ts` + `base-registry.service.ts` (DRY pattern)
-- Common pagination types + tests
-- Pattern per registry: `GET / POST / PATCH / DELETE /:id /trash /:id/restore /:id/audit`
+### PROMPT_3a — Workflow Designer Core (merged April 28-29, commits df41852..a836979)
 
-**Web admin (apps/web)** — 18 Next.js routes:
+**D1 — Domain logic** (commit `df41852`)
+- ✅ `packages/domain/src/machines/workflow.machine.ts` — XState v5 machine, 3 states matching schema (`draft → approved → deprecated`)
+- ✅ `packages/domain/src/rules/workflow.rules.ts` — `validateWorkflowStructure`, `canEdit`, `canTransition`
+- ✅ +38 tests (14 machine + 24 rules)
 
-- 13 list pages under route group `(registries)`
-- Items detail/edit/new sub-routes
-- Trash page
-- Sidebar navigation, FavoritesBar, RecentlyViewed, RegistrySyncProvider, QueryProvider
-- Hooks: `useFavorites`, `useRecentlyViewed`, `useRegistrySync`, `useSavedFilters`
-- SDK wrapper in `lib/sdk.ts`
+**D2 — Workflow API** (commit `599fe05`)
+- ✅ `apps/api/src/modules/workflows/` — module + repository + service + controller
+- ✅ 12 REST endpoints: `GET/POST /api/workflows`, version sub-resources, soft-delete, audit, restore
+- ✅ +17 service tests
 
-**HMI (apps/hmi)**:
+**D3 — Web pages shell** (commit `25b50d0`)
+- ✅ `apps/web/src/app/(registries)/workflows/page.tsx` — list page using RegistryListPage
+- ✅ `apps/web/src/app/(registries)/workflows/new/page.tsx` — creation form (currently has TODO-009: Salva button silently fails)
+- ✅ `apps/web/src/app/(registries)/workflows/[id]/page.tsx` — 4-pane editor shell with `react-resizable-panels`
+- ✅ Sidebar entry "Flussi di lavoro"
+- ✅ `WorkflowsClient` SDK + Zod schemas
 
-- Login mockup screen (`/`) with operator badge field
-- Brand assets and Avenir Next Cyr fonts in `public/`
+**D4 — React Flow canvas** (commit `5663a07`)
+- ✅ `@xyflow/react` + `@dagrejs/dagre` + `zustand` integrated
+- ✅ Custom node types: `PhaseNode`, `GroupNode`, `StepNode` (color-coded by category, lock icon for `auto_generated`)
+- ✅ Custom edge: `SequentialEdge`
+- ✅ `WorkflowCanvas` with pan/zoom/minimap/controls
+- ✅ Zustand store for nodes/edges/selectedNodeId
+- ✅ Dagre auto-layout
 
-**Design system (packages/ui)** — 8 new Tier-2 primitives:
+**D5 — Palette + drag-drop + auto-save** (commit `1fc272a`)
+- ✅ `WorkflowPalette` with draggable templates (6 Phase categories, Group, 3 Step categories)
+- ✅ HTML5 drag-and-drop, creates new node in store on drop
+- ✅ 30s debounced auto-save (`PATCH /api/workflows/:id/versions/:vid`)
+- ✅ Visual feedback "Saving..." / "Saved at HH:mm"
 
-- `DataTable`, `EntityForm`, `EntityDetail`, `PageHeader`, `SearchBar`, `ActivityFeed`, `BulkActionBar`, `TrashBannerBar`
-- Plus updates to existing primitives (Drawer, Modal, Field, Select, StatusBadge, Toast)
+**D6 — Step configurator forms** (commit `4f44f60`)
+- ✅ 4 form components in `apps/web/src/components/workflow/forms/`:
+  - `StepConfigurator.tsx` — router by step.category
+  - `ProductionStepForm.tsx` — name, instructions, skillId, deviceId, standardTimeSec, isRequired
+  - `QualityControlStepForm.tsx` — name, instructions, qcType (visual/dimensional/functional), thresholds
+  - `ScanStepForm.tsx` — name, instructions, scanType (qr/serial/id), expectedPattern
+- ✅ react-hook-form + Zod, inline validation
+- ✅ Auto-save wiring (OPTION B: store callbacks + setNodes sync)
+- ✅ Empty state for non-Step nodes
+- ✅ `zod` added as direct dep of `apps/web`
 
-**Schemas (packages/schemas)** — Zod schemas under `registries/`:
+### Verification evidence (April 29 evening)
 
-- 13 schemas: `attention-point`, `auto-gen-rule`, `bom`, `box-type`, `box`, `cause-code`, `equipment`, `item`, `operator`, `recipe`, `skill`, `tool`, plus `common.ts`
-- 1 test file in `registries/` (`item.schema.test.ts`)
-- Plus 2 legacy schema test files (`item.schema.test.ts`, `plant.schema.test.ts`)
+- ✅ `pnpm install` — 640 packages added, 0 errors
+- ✅ `pnpm build` (force, no cache) — 12 successful / 12 total
+- ✅ `pnpm test` — **182 tests passed across 17 test files**, 0 failed (was 127 in PROMPT_2; +55 net from PROMPT_3a)
+- ✅ `prisma migrate` — DB created, migration applied
+- ✅ `pnpm seed` — all expected counts loaded
+- ✅ `pnpm dev` — all 3 apps boot, web admin renders correctly
+- ✅ `GET /api/items` — returns 11 items with full payload
+- ✅ `localhost:3001/workflows` — list page renders
+- ✅ `localhost:3001/workflows/[id]` — 4-pane layout, canvas xyflow visible, palette working
+- ✅ `/workflows/[id]` bundle: **110 kB** (was 13.6 kB pre-canvas)
 
-**SDK (packages/sdk)**:
-
-- `base-registry.client.ts` + `registry-clients.ts` for type-safe API consumption from frontend
-
-**Seed (packages/prisma/seed.ts)** — `MOCK_DATA_PNEUMATIC_AIR` loaded:
-
-- 1 Plant (PLT-RFA-MO-001)
-- 7 Skills (EXT, ASSY, QC, TEST, PACK, FORKLIFT, WAREHOUSE)
-- 4 Operators (OP-001 to OP-004)
-- 11 Items (CONS-, COMP-, RM-, FG- prefixes per MOCK_DATA spec)
-- 1 BOM with 5 lines for FG-PNEU-5M-8MM
-- 8 Equipment nodes (AREA-PNEU, WC-EXT-01, WC-CRIMP-01, WC-LEAK-01, EQ-EXT-01A/B, EQ-CRIMP-01A, EQ-LEAK-01A)
-- 3 Tools, 3 Recipes, 1 BoxType, 6 AttentionPoints, 8 CauseCodes
-
-### Verification evidence (April 28 afternoon)
-
-- ✅ `pnpm install` — 294 packages added, 0 errors
-- ✅ `pnpm build` (force, no cache) — 12 successful / 12 total in 42.984s
-- ✅ `prisma migrate dev --name init` — DB created at `packages/prisma/dev.db`, migration `20260427203303_init` applied, Prisma Client generated
-- ✅ `pnpm --filter @mes/prisma run db:seed` — all expected counts loaded (1 Plant, 7 Skills, 4 Operators, 11 Items, ...)
-- ✅ `pnpm dev` — all 3 apps start without errors, API logs show all 13 controllers mounted with full CRUD routes
-- ✅ `GET http://localhost:3000/api/items` — returns `{"data":[...11 items...],"total":11,"page":1,"limit":25,"totalPages":1}` with full payload (itemType, trackingMode, uom, plantId, audit fields)
-- ✅ `http://localhost:3001/tools` — sidebar navigation works, design system applied, OKLCH tokens, Avenir Next Cyr font, accent violet
-- ✅ `http://localhost:3002` — HMI login mockup renders with operator badge field
-- ✅ `pnpm test` — 11 tasks successful, **127 tests passed across 14 test files**, 5.2s total
-
-### Test breakdown (measured April 28 afternoon)
+### Test breakdown (April 29)
 
 | Package | Test files | Tests passed |
 |---|---|---|
-| `@mes/api` | 5 | 50 |
+| `@mes/api` | 6 | 67 |
+| `@mes/domain` | 5 | 67 |
 | `@mes/schemas` | 3 | 29 |
-| `@mes/domain` | 3 | 29 |
 | `@mes/cache` | 1 | 8 |
 | `@mes/storage` | 1 | 6 |
 | `@mes/queue` | 1 | 5 |
-| **Total** | **14** | **127** |
+| **Total** | **17** | **182** |
 
-API test files: `pagination.test.ts` (11), `items.service.test.ts` (13), `operators.service.test.ts` (12), `audit-log.service.test.ts` (7), `auto-gen-rules.service.test.ts` (7).
+API test files: pagination, items.service, operators.service, audit-log.service, auto-gen-rules.service, workflows.service.
 
-Domain test files: `box.machine.test.ts` (9), `work-order.machine.test.ts` (8), `equipment.machine.test.ts` (12).
-
----
-
-## 🟡 Known issues (non-blocking, deferred)
-
-1. **Seed creates ~35 soft-deleted records as side effect.** Tools/Recipes/BOM/Equipment nodes appear empty in their list pages but visible in `/trash`. The seed script seems to insert some records with a non-null `deletedAt`. Cosmetic but confusing. **Owner**: small fix patch.
-
-2. **HMI logo image is a broken link** in browser (alt text "Reflexallen" visible). Asset path mismatch in `apps/hmi/app/page.tsx`: the SVG files exist in `apps/hmi/public/brand/` but the page references a different (or wrong) path. Trivial fix once the offending line is identified.
-
-3. **3 turbo warnings** for `@mes/cache`, `@mes/queue`, `@mes/storage` packages: "no output files found for task". Missing `outputs` key in `turbo.json` for these placeholder packages. Cosmetic.
-
-4. **Argon2id PIN hashing for operators is declared but not yet exercised** at integration level. Operator PINs in seed are likely placeholder strings. Verify on first real auth flow (PROMPT_5 HMI execution).
-
-5. **prompts/PROMPT_1B.md is now obsolete.** It was created in the morning to "rebuild PROMPT_2 from scratch" before the worktree work was discovered. To be archived or repurposed as a reference for future foundation patches.
+Domain test files: box.machine, equipment.machine, work-order.machine, workflow.machine, workflow.rules.
 
 ---
 
-## 🚀 Roadmap — re-baselined
+## 🟡 Known issues (TODO list current)
+
+See `TODO.md` for full details. Quick summary:
+
+- **TODO-001** — Seed creates ~35 soft-deleted records (cosmetic)
+- **TODO-002** — HMI logo broken in browser (cosmetic, asset path)
+- **TODO-003** — 3 turbo warnings for placeholder packages (now expected: `echo no-op` build)
+- **TODO-004** — Argon2id PIN hashing not exercised at integration level (deferred to PROMPT_5)
+- **TODO-005** — Add CFRP workflow templates (post-MVP)
+- **TODO-006** — Add Safety Devices workflow templates (post-MVP)
+- **TODO-007** — D6 step forms accept qcThresholds and scanExpectedPattern but persist them only in node.data session state (Prisma model lacks a `config Json?` field; future work)
+- **TODO-009** — `/workflows/new` Salva button silently fails (form submit not triggering mutation)
+
+---
+
+## 🚀 Roadmap — re-baselined April 29 evening
 
 | Phase | Scope | Status | Time estimate |
 |---|---|---|---|
 | PROMPT_1 | Foundation | ✅ Done | — |
-| PROMPT_2 | Registries (13 + audit + events + UI shell) | ✅ Done (April 28 afternoon) | — |
-| PROMPT_2.5 | Cleanup: fix seed soft-delete bug, HMI logo, turbo warnings, archive PROMPT_1B | ⏭️ Optional | 1-2h |
-| PROMPT_3 | Workflow Designer (visual editor drag&drop) | ⏭️ Planned | 4-6h |
-| PROMPT_4 | Auto-Gen Engine (rules → concrete steps) | ⏭️ Planned | 3-4h |
-| PROMPT_5 | Execution HMI (timer-driven steps, PIN auth, parallel ops) | ⏭️ Planned | 4-5h |
-| PROMPT_6 | Dashboard & Reporting | ⏭️ Planned | 3-4h |
+| PROMPT_2 | Registries (13 + audit + events + UI shell) | ✅ Done | — |
+| **PROMPT_3a** | **Workflow Designer Core (canvas + 4-pane + 3 step forms)** | **✅ Done (April 29)** | — |
+| PROMPT_3b | Advanced: 5 remaining step forms + validation panel + versioning UI + templates wizard + canvas polish | ⏭️ Next | 6-8h |
+| PROMPT_4 | Auto-Generation Engine (7 rules) | ⏭️ Planned | 3-4h |
+| PROMPT_5 | Execution HMI (PIN auth Argon2 + step renderer + parallel ops + recovery) | ⏭️ Planned | 4-5h |
+| PROMPT_3c | WorkflowSnapshot + Live Preview 11 states + performance + E2E | ⏭️ Planned (after PROMPT_5) | 8-10h |
+| PROMPT_6 | Dashboard & Reporting (OEE, Andon, KPI, export) | ⏭️ Planned | 3-4h |
 
-**Realistic MVP target**: end of next week (May 8-9). Every PROMPT from now on must use the Definition of Done checklist (`prompts/DOD_TEMPLATE.md`) and be verified end-to-end with literal command output before being declared complete.
+**Realistic MVP target**: end of next week (May 8-9). Every PROMPT from now on uses the Definition of Done checklist (`prompts/DOD_TEMPLATE.md`) and is verified end-to-end with literal command output before being declared complete.
 
 ---
 
@@ -142,7 +156,8 @@ Domain test files: `box.machine.test.ts` (9), `work-order.machine.test.ts` (8), 
 - **Auth**: Argon2id for PIN/password, **NEVER bcrypt**
 - **State machines**: XState v5
 - **Validation**: Zod (FE+BE shared schemas)
-- **Real-time**: Socket.IO (event gateway in `apps/api/src/modules/events/registry.gateway.ts`)
+- **Real-time**: Socket.IO (event gateway)
+- **Workflow Designer**: `@xyflow/react` + `@dagrejs/dagre` + Zustand + react-hook-form + Zod
 
 ### Compliance
 
@@ -161,53 +176,59 @@ Domain test files: `box.machine.test.ts` (9), `work-order.machine.test.ts` (8), 
 
 ---
 
-## ⚠️ Critical lessons learned (April 28)
+## ⚠️ Lessons learned (consolidated)
 
-1. **Trust the filesystem, not the agent's narrative.** A previous Claude Code session reported PROMPT_2 complete with 12 milestones, 90 passing tests, and 13 CRUD modules. Reality on `main` was 0 commits, 0 modules. The work existed in a worktree (`.claude/worktrees/silly-keller-6e625c/`) but was never committed. Always verify with: `git log --oneline | Measure-Object -Line`, `pnpm test` (capture real count), `curl /api/<endpoint>` (verify routes respond).
+### From April 28 (PROMPT_2 recovery)
 
-2. **No PROMPT is "done" without DoD compliance.** See `prompts/DOD_TEMPLATE.md`. Every claim must be paired with a literal command and its output. No paraphrasing. This rule is now active for PROMPT_3 and onward.
+1. **Trust the filesystem, not the agent's narrative.** Always verify with `git log`, `pnpm test`, `curl /api/<endpoint>`.
+2. **No PROMPT is "done" without DoD compliance.** Every claim paired with literal command output.
+3. **Worktrees must be inspected before each session.** `git status` from inside any worktree before declaring "nothing was done".
+4. **Server processes outlive sessions.** Pre-flight check `netstat -ano` mandatory.
+5. **`.env` is project-local secret.** Both root `.env` and `packages/prisma/.env` required.
 
-3. **Worktrees must be inspected before each session.** Claude Code Desktop creates `.claude/worktrees/*` and operates inside them. Work performed there does not appear on `main` unless explicitly committed and merged. Future audits should always check `git status` from inside any worktree before declaring "nothing was done".
+### From April 28-29 (PROMPT_3a fixes)
 
-4. **Server processes outlive sessions.** Always check `netstat -ano | findstr ":3000 :3001 :3002"` before starting `pnpm dev`. Stale processes were the original symptom that masked the bigger problem on April 28 morning.
+6. **`pnpm test` is not enough.** vitest tolerates patterns that `tsc` and `ts-node` reject. The DoD now requires `pnpm build` + `pnpm dev` smoke as mandatory gates (see DOD_TEMPLATE.md).
+7. **`prisma generate` is per-worktree.** Each pnpm worktree has its own `.pnpm` store; the Prisma client must be regenerated independently in each.
+8. **Internal workspace imports must NOT use `.js` extensions.** ts-node CommonJS does not rewrite `.js → .ts` at resolution time. Tooling that does (vitest+esbuild, tsc) tolerates; ts-node does not.
+9. **Workspace package consumers depend on built `dist/`.** When a package's `package.json` declares `"main": "./dist/index.js"`, the consumer (e.g., `apps/api`) requires that the package be built first. `pnpm build` from root usually handles this via Turbo dependency graph, but per-package builds may need explicit ordering.
 
-5. **Run the right shell from the right directory.** PowerShell prompt always shows the current path — confirm before every multi-command block. Approximately 15 minutes were wasted on April 28 morning because the audit was run from the home directory instead of the repo root.
+### From April 29 (PC migration)
 
-6. **`.env` is project-local secret.** Both root `.env` and `packages/prisma/.env` are required (Prisma CLI looks for `.env` next to `schema.prisma`). Both are gitignored. `.env.example` is committed as template.
-
-7. **Pre-flight check before every Claude Code session** (added April 28 evening):
+10. **PATH state is fragile on Windows.** Group policy / IT tools may reset PATH on login. Re-applying `$env:Path = ... User + Machine` is sometimes needed at session start.
+11. **`corepack` shipped with Node 20.18 has known signature verification bugs.** Bypass: `npm install -g pnpm@9.15.9` directly.
+12. **Pre-flight check** for every new session:
    ```powershell
-   git status                                           # working tree clean?
-   git log --oneline | Select-Object -First 5           # ultimi commit attesi?
-   git worktree list                                    # worktree aperti?
-   git branch -a                                        # branch in giro?
-   netstat -ano | findstr ":3000 :3001 :3002"           # server zombi?
+   git status
+   git log --oneline | Select-Object -First 5
+   git worktree list
+   git branch -a
+   netstat -ano | findstr ":3000 :3001 :3002"
    ```
-   If any of these shows something unexpected, **stop and investigate** before launching new prompts.
 
 ---
 
-## 🗂️ Repo structure (verified post-merge)
+## 🗂️ Repo structure (verified post-PROMPT_3a)
 
 ```
 RAMS-Reflexallen-MES/
 ├── apps/
-│   ├── api/          ✅ NestJS, 13 registry modules + audit-log + events
-│   ├── web/          ✅ Next.js 14, 18 routes, sidebar shell, hooks, SDK wrapper
-│   └── hmi/          ✅ Next.js 14, login mockup with brand assets
+│   ├── api/          ✅ 13 registry modules + audit-log + events + workflows
+│   ├── web/          ✅ 21 routes (13 registries + workflow editor + new + trash + home)
+│   └── hmi/          ✅ login mockup
 ├── packages/
-│   ├── domain/       ✅ 3 XState machines + rules + tests (29)
+│   ├── domain/       ✅ 4 XState machines + rules + 67 tests
 │   ├── prisma/       ✅ 63 models, migration applied, dev.db seeded
-│   ├── schemas/      ✅ 13 registry schemas + common + tests (29)
-│   ├── sdk/          ✅ base-registry client + 13 registry clients
+│   ├── schemas/      ✅ 13 registry schemas + workflow schema
+│   ├── sdk/          ✅ base-registry client + 13 registry clients + workflows client
 │   ├── types/        ✅ 11 enum files
 │   ├── ui/           ✅ 16 base + 8 Tier-2 primitives
-│   ├── cache/        ✅ in-memory placeholder + 8 tests
-│   ├── queue/        ✅ sync placeholder + 5 tests
-│   └── storage/      ✅ local fs placeholder + 6 tests
-├── design-system/    (Reflexallen handoff bundle, with brand SVGs and font woff2)
+│   ├── cache/        ✅ in-memory placeholder + 8 tests + echo no-op build
+│   ├── queue/        ✅ sync placeholder + 5 tests + echo no-op build
+│   └── storage/      ✅ local fs placeholder + 6 tests + echo no-op build
+├── design-system/    (Reflexallen handoff bundle, brand SVGs, fonts)
 ├── docs/             (specs + extensions)
-├── prompts/          (PROMPT_1-6 + patches + PROMPT_1B (obsolete) + DOD_TEMPLATE)
+├── prompts/          (PROMPT_1 + PROMPT_2 + PROMPT_3a + PROMPT_3b skeleton + PROMPT_3c skeleton + PROMPT_4-6 + DOD_TEMPLATE + archive)
 └── scripts/          (PowerShell setup)
 ```
 
@@ -215,4 +236,11 @@ RAMS-Reflexallen-MES/
 
 ## 🎯 Next concrete action
 
-PROMPT_2.5 (cleanup, optional) or directly PROMPT_3 (Workflow Designer). To be decided in next session.
+**PROMPT_3b (Workflow Designer Advanced)** — to be detailed and launched in next session. See `prompts/PROMPT_3b_ADVANCED.md` (currently a skeleton, needs detailing based on actual D6 implementation patterns).
+
+Scope outline:
+- 5 remaining step category forms (LOGISTICS, SETUP, TEARDOWN, PARALLEL, RECOVERY)
+- Validation panel with cross-step rules
+- Versioning UI lifecycle (submit/approve/reject/publish modals)
+- Templates wizard with Pneumatic Air seed
+- Canvas polish (right-click menu, keyboard shortcuts, drag-to-reorder)
