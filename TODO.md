@@ -2,7 +2,7 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-04-29
+> **Last updated**: 2026-04-30
 
 ---
 
@@ -16,6 +16,84 @@
 ---
 
 ## 🟠 High priority (should fix before MVP — May 8-9)
+
+### TODO-017 — PROMPT_5_FULL: real Argon2id PIN auth + JWT cookies + /api/auth endpoints
+
+**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
+**File**: `apps/api/src/modules/auth/` (new module) + `apps/hmi/src/app/page.tsx` + new HMI auth client
+**Symptom**: HMI login validates the operator badge + PIN against a hardcoded `MOCK_OPERATORS` map in `apps/hmi/src/lib/mock-data.ts`. There is no real authentication: PINs are stored in plaintext, no hashing, no session, no /api/auth endpoint, no token, no refresh. The Zustand store persists the "logged-in operator" to `sessionStorage` only — anyone can write to that store from devtools.
+**Acceptance criterion**:
+- Operators are seeded with Argon2id-hashed PINs (replaces TODO-004).
+- `POST /api/auth/login` accepts `{ badge, pin }` and returns a short-lived JWT (httpOnly secure cookie) + refresh token.
+- `POST /api/auth/refresh` rotates the access token.
+- `POST /api/auth/logout` revokes the refresh token.
+- HMI guards every protected route via the cookie (or via a `useSession` hook on top of `/api/auth/me`).
+- Bcrypt is forbidden — Argon2id only (per CLAUDE.md).
+**Estimated effort**: 4-6 hours
+**Blocker for**: any non-demo HMI deployment. Supersedes TODO-004.
+
+---
+
+### TODO-018 — PROMPT_5_FULL: full 11-state step execution machine
+
+**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
+**File**: `apps/hmi/src/app/wo/[id]/page.tsx` + new `packages/domain/src/machines/step-execution.machine.ts` + new `apps/api/src/modules/work-orders/step-executions/`
+**Symptom**: PROMPT_5_LITE collapses step status into 4 states (`pending`/`running`/`done`/`blocked`) using an inline `useReducer`. The MASTER_SPECIFICATION calls for an 11-state XState machine: `pending`, `running`, `paused`, `blocked`, `qc_hold`, `scrapped`, `recovered`, `done`, `skipped`, `cancelled`, `error`. None of the recovery / hold / scrap / skip transitions are wired.
+**Acceptance criterion**:
+- New XState v5 machine in `packages/domain` covering all 11 states with formal guards/actions.
+- Tests in `packages/domain` cover every transition (target ≥ 95% coverage per TESTING_STRATEGY.md).
+- HMI execution screen replaces the LITE `useReducer` with the machine via `@xstate/react`.
+- Status-bound UI variants for every state (paused = yellow border, qc_hold = warn icon, scrapped = bad icon + crossed-out, etc.).
+**Estimated effort**: 3-4 hours
+**Blocker for**: real production execution semantics; ties into recovery (TODO-020) and quality holds.
+
+---
+
+### TODO-019 — PROMPT_5_FULL: parallel operations (Device Execution Group)
+
+**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
+**File**: `apps/hmi/src/app/wo/[id]/page.tsx` (extend) + new `apps/hmi/src/components/SwimlaneTimeline.tsx`
+**Symptom**: HMI LITE renders steps as a **single vertical timeline** — only one step is `running` at a time. The MASTER_SPECIFICATION defines a Device Execution Group where a main step (e.g. autoclave run, leak test) runs **concurrently** with sub-steps (operator can perform setup of next batch while the device is running). LITE collapses these into sequential steps.
+**Acceptance criterion**:
+- Detect Device Execution Groups in the workflow snapshot and render them as a **horizontal swimlane** (main lane + parallel-step lanes).
+- Operator can transition steps in different lanes independently.
+- Buffer time between main and parallel steps is configurable (matches `Step.deviceCategory` enum: `pre`/`device_main`/`parallel`/`post`).
+- Stops the WO from completing until all lanes terminate.
+**Estimated effort**: 4-6 hours
+**Blocker for**: CFRP autoclave cure cycles (4-12h main step, multiple parallel ops); Pneumatic Air leak-test parallel batches.
+
+---
+
+### TODO-020 — PROMPT_5_FULL: 4-stage recovery flow with state machine
+
+**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
+**File**: extend step-execution machine (TODO-018) + `apps/hmi/src/app/wo/[id]/recovery/page.tsx` (new)
+**Symptom**: HMI LITE marks a NOK step as `blocked` with a free-text note in client memory, then continues to the next step. The MASTER_SPECIFICATION defines a 4-stage recovery flow: **diagnosis → attempt 1 → attempt 2 → scrap**, each as its own auto-generated step with cause-code linkage and operator decision points. None of this is wired.
+**Acceptance criterion**:
+- Recovery flow is auto-generated when a step transitions to `blocked` (overlaps with PROMPT_4 auto-gen rules).
+- Each recovery stage is its own `StepExecution` with cause code, attempted-by-operator, outcome.
+- After 2 failed attempts, the lot/piece is automatically marked for scrap (`scrapped` state, with audit log).
+- Recovery flow integrates with the 11-state machine (TODO-018) — `blocked → recovered` (success) or `blocked → scrapped` (terminal).
+- UI: a dedicated `/wo/[id]/recovery` screen guides the operator through diagnosis → attempt → scrap decision.
+**Estimated effort**: 4-5 hours
+**Blocker for**: full failure semantics; supersedes TODO-015.
+
+---
+
+### TODO-021 — PROMPT_5_FULL: WO release flow (Plant Manager)
+
+**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
+**File**: new `apps/web/src/app/(registries)/work-orders/` routes + new `apps/api/src/modules/work-orders/release/` controller
+**Symptom**: HMI LITE uses 10 hardcoded WOs in `apps/hmi/src/lib/mock-data.ts`. There is no UI for a Plant Manager to release a real WO from an approved workflow snapshot. The `WorkOrder` Prisma model exists, but no endpoints, no creation form, no release-from-snapshot logic.
+**Acceptance criterion**:
+- Web admin: `/work-orders` registry list + creation form (Item × qty × workflow × scheduled date × assignee).
+- "Release" action snapshots the approved workflow into `WorkflowSnapshot` (per ADR-001) and links it to the WO.
+- Released WO appears on the assigned operator's HMI dashboard (replaces hardcoded mocks).
+- Release requires the workflow to be in `approved` state with zero validation errors.
+**Estimated effort**: 5-6 hours
+**Blocker for**: end-to-end real production flow. Also unblocks PROMPT_3c (snapshot + live preview).
+
+---
 
 ### TODO-008 — PROMPT_3b_FULL: PARALLEL + TEARDOWN step configurator forms
 
@@ -78,6 +156,53 @@
 ---
 
 ## 🟡 Medium priority (good to have)
+
+### TODO-022 — PROMPT_5_FULL: real persistence — StepExecution writes via API
+
+**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
+**File**: `apps/hmi/src/app/wo/[id]/page.tsx` + new `apps/api/src/modules/work-orders/step-executions/` + new `packages/sdk/src/clients/step-executions.client.ts`
+**Symptom**: HMI LITE keeps the WO execution state (`steps`, `notes`, `nokDraft`) entirely in client memory via `useReducer`. Refreshing the browser **resets the WO to its initial state** — every step goes back to `pending` (or step 1 to `running`). No `StepExecution` records are written to the DB. There's no audit trail of what an operator did or how long each step took. The mock `getMockSteps(woId)` always returns a freshly-initialized array.
+**Acceptance criterion**:
+- New `StepExecution` Prisma model already exists (verify with `schema.prisma`); if missing, add fields: `stepId`, `workOrderId`, `operatorId`, `status`, `startedAt`, `completedAt`, `actualTimeSec`, `notes`.
+- `POST /api/work-orders/:woId/step-executions` creates a record on `START`.
+- `PATCH /api/work-orders/:woId/step-executions/:seId` updates on `COMPLETE_OK` / `COMPLETE_NOK`.
+- HMI replaces the `useReducer` mock with TanStack Query mutations that hit these endpoints.
+- Refreshing `/wo/[id]` rehydrates the timeline from server state (last `running` step is the resume point).
+- Audit log entry per transition (per ADR-014).
+**Estimated effort**: 4-5 hours
+**Blocker for**: any real demo where the operator may close the browser mid-WO. LITE workaround documented in code.
+
+---
+
+### TODO-023 — PROMPT_5_FULL: Socket.IO real-time updates
+
+**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
+**File**: `apps/api/src/gateways/` (new) + new `apps/hmi/src/lib/socket-client.ts` + extend dashboard to subscribe
+**Symptom**: HMI LITE is a pure CSR app — there is no WebSocket layer, no event subscription, no real-time updates. If operator A on station 1 progresses a WO, operator B on a manager dashboard does not see the update until they refresh. The MASTER_SPECIFICATION calls for Socket.IO event-driven updates so the manager Andon and KPI dashboards refresh live.
+**Acceptance criterion**:
+- API Socket.IO gateway emits events on every `StepExecution` transition (overlaps with TODO-022).
+- HMI dashboard + admin dashboard subscribe to `wo.updated` / `step.completed` events and update the UI without refresh.
+- Manager Andon screen (PROMPT_6) consumes the same channel.
+- Connection auth via the JWT cookie (TODO-017).
+**Estimated effort**: 3-4 hours
+**Blocker for**: live shop-floor visibility. Quality-of-life feature, not strictly required for MVP.
+
+---
+
+### TODO-024 — PROMPT_5_FULL: change-of-shift hand-off flow + paper printout
+
+**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
+**File**: new `apps/hmi/src/app/handoff/page.tsx` + new `apps/api/src/modules/shifts/handoff/` + paper template
+**Symptom**: HMI LITE has no concept of shift change. An operator simply logs out at end of shift; the next operator logs in and sees their own dashboard. There is no formal hand-off: in-progress WOs aren't transferred, no notes are passed, no paper printout is generated. Real production needs a structured hand-off (open WOs, blockers, attention points, signed printout).
+**Acceptance criterion**:
+- "End of shift" action on the dashboard opens a hand-off summary (in-progress WOs, blockers, last activity).
+- Operator can add notes to each WO and select the next-shift operator.
+- Submit generates a printable A4 hand-off sheet (PDF) signed electronically.
+- Incoming operator sees a "Hand-off pending — review" banner on first login of next shift.
+**Estimated effort**: 3-4 hours
+**Blocker for**: full shift-management compliance.
+
+---
 
 ### TODO-011 — PROMPT_3b_FULL: templates wizard ("Nuovo da template")
 
@@ -256,7 +381,17 @@ WARNING  no output files found for task @mes/storage#build. Please check your `o
 
 ## 🟢 Low priority (nice to have)
 
-_No entries yet._
+### TODO-025 — HMI logo follow-up after PROMPT_5_LITE
+
+**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
+**File**: `apps/hmi/src/app/page.tsx`, `apps/hmi/src/app/dashboard/page.tsx`, `apps/hmi/src/app/wo/[id]/page.tsx`
+**Symptom**: PROMPT_5_LITE introduced new HMI screens (dashboard, WO execution, done) that all reference `/brand/logo-light.svg`. TODO-002 is the canonical entry tracking the broken HMI logo (login screen). This entry is a **cross-reference note** so we don't lose the follow-up: re-verify TODO-002 is still relevant after the new screens land. If the asset path is fixed (per TODO-002 acceptance criterion), the dashboard + WO + done screens will benefit automatically; if not, all four screens show a broken image.
+**Acceptance criterion**:
+- See TODO-002 for the canonical fix (asset path mismatch).
+- After TODO-002 is closed, manually verify all 4 HMI screens (login, dashboard, /wo/[id], /wo/[id]/done) render the logo correctly.
+- This entry is closed automatically when TODO-002 is resolved (no separate work needed).
+**Estimated effort**: 0 (covered by TODO-002 fix; verification only)
+**Blocker for**: nothing (cosmetic). Demo polish.
 
 ---
 
