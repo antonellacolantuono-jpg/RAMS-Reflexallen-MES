@@ -4,7 +4,7 @@
   "private": true,
   "main": "./src/index.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "echo no-op",
     "test": "vitest run",
     "type-check": "tsc --noEmit"
   },
