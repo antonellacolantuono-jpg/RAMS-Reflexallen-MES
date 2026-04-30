@@ -7,6 +7,7 @@ export enum StepCategory {
   INFORMATION = 'information',
   SETUP = 'setup',
   TEARDOWN = 'teardown',
+  RECOVERY = 'recovery',
 }
 
 export enum StepActionType {

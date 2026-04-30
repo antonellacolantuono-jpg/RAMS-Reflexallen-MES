@@ -27,6 +27,9 @@ const STEP_ITEMS = [
   { category: 'production', label: 'Produzione' },
   { category: 'quality_control', label: 'Controllo Qualità' },
   { category: 'identification', label: 'Scansione' },
+  { category: 'logistics', label: 'Logistica' },
+  { category: 'setup', label: 'Setup' },
+  { category: 'recovery', label: 'Recupero' },
 ] as const
 
 function PaletteItem({

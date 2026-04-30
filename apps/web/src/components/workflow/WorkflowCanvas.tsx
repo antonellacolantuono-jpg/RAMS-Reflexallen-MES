@@ -179,7 +179,7 @@ function CanvasInner({
 }) {
   const { selectNode, markDirty, markClean, registerCanvasCallbacks, unregisterCanvasCallbacks } =
     useWorkflowStore()
-  const { screenToFlowPosition } = useReactFlow()
+  const { screenToFlowPosition, setCenter } = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
@@ -219,17 +219,27 @@ function CanvasInner({
     }
   }, [saveStatus])
 
+  const scrollToNode = useCallback(
+    (nodeId: string) => {
+      const target = nodesRef.current.find((n) => n.id === nodeId)
+      if (!target) return
+      setCenter(target.position.x, target.position.y, { zoom: 1.2, duration: 600 })
+    },
+    [setCenter],
+  )
+
   // Bridge between configurator forms (which live outside this component) and
   // the canvas's local React Flow state. Forms call store.updateNodeData;
   // the store invokes these registered callbacks to mutate local nodes and
-  // reset the auto-save debounce.
+  // reset the auto-save debounce. ValidationPanel uses scrollToNode.
   useEffect(() => {
     registerCanvasCallbacks({
       setNodes: (updater) => setNodes(updater),
       triggerAutoSave,
+      scrollToNode,
     })
     return () => unregisterCanvasCallbacks()
-  }, [registerCanvasCallbacks, unregisterCanvasCallbacks, setNodes, triggerAutoSave])
+  }, [registerCanvasCallbacks, unregisterCanvasCallbacks, setNodes, triggerAutoSave, scrollToNode])
 
   useEffect(() => {
     const { nodes: rawNodes, edges: rawEdges } = buildGraph(workflow)

@@ -20,6 +20,9 @@ interface WorkflowCanvasStore {
   // debounce without forms importing the canvas component.
   canvasSetNodes: NodeUpdater | null
   triggerAutoSave: (() => void) | null
+  // Optional callback registered by the canvas so external panels (e.g.
+  // ValidationPanel) can scroll the React Flow viewport to a given node.
+  scrollToNode: ((nodeId: string) => void) | null
   setNodes: (nodes: Node[]) => void
   setEdges: (edges: Edge[]) => void
   onNodesChange: (changes: NodeChange[]) => void
@@ -30,6 +33,7 @@ interface WorkflowCanvasStore {
   registerCanvasCallbacks: (cbs: {
     setNodes: NodeUpdater
     triggerAutoSave: () => void
+    scrollToNode: (nodeId: string) => void
   }) => void
   unregisterCanvasCallbacks: () => void
   // Used by configurator forms to patch a single node's data. Mutates both
@@ -46,6 +50,7 @@ export const useWorkflowStore = create<WorkflowCanvasStore>((set, get) => ({
   isDirty: false,
   canvasSetNodes: null,
   triggerAutoSave: null,
+  scrollToNode: null,
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
   onNodesChange: (changes) =>
@@ -57,9 +62,13 @@ export const useWorkflowStore = create<WorkflowCanvasStore>((set, get) => ({
   markDirty: () => set({ isDirty: true }),
   markClean: () => set({ isDirty: false }),
   registerCanvasCallbacks: (cbs) =>
-    set({ canvasSetNodes: cbs.setNodes, triggerAutoSave: cbs.triggerAutoSave }),
+    set({
+      canvasSetNodes: cbs.setNodes,
+      triggerAutoSave: cbs.triggerAutoSave,
+      scrollToNode: cbs.scrollToNode,
+    }),
   unregisterCanvasCallbacks: () =>
-    set({ canvasSetNodes: null, triggerAutoSave: null }),
+    set({ canvasSetNodes: null, triggerAutoSave: null, scrollToNode: null }),
   updateNodeData: (nodeId, partial) => {
     const updater = (nodes: Node[]) =>
       nodes.map((n) =>
