@@ -1,21 +1,40 @@
 'use client'
 import * as React from 'react'
+import { useRouter } from 'next/navigation'
 import { Button, Input, Field } from '@mes/ui'
 import { PinKeypad } from '../components/PinKeypad'
+import { validateOperatorPin, getOperatorByBadge } from '../lib/mock-data'
+import { useOperatorStore } from '../lib/operator-store'
 
 type Step = 'badge' | 'pin'
 
 export default function HMILoginPage() {
+  const router = useRouter()
+  const setOperator = useOperatorStore((s) => s.setOperator)
+  const operator = useOperatorStore((s) => s.operator)
+
   const [step, setStep] = React.useState<Step>('badge')
   const [badge, setBadge] = React.useState('')
   const [pin, setPin] = React.useState('')
   const [error, setError] = React.useState('')
 
+  React.useEffect(() => {
+    if (operator) {
+      router.replace('/dashboard')
+    }
+  }, [operator, router])
+
   function handleBadgeContinue() {
-    if (!badge.trim()) {
+    const trimmed = badge.trim().toUpperCase()
+    if (!trimmed) {
       setError('Inserire il numero badge')
       return
     }
+    if (!getOperatorByBadge(trimmed)) {
+      setError('Badge non riconosciuto')
+      return
+    }
+    setBadge(trimmed)
     setError('')
     setPin('')
     setStep('pin')
@@ -26,14 +45,19 @@ export default function HMILoginPage() {
       setError('Il PIN deve essere di 4 cifre')
       return
     }
+    const op = validateOperatorPin(badge, pin)
+    if (!op) {
+      setError('Badge o PIN errato')
+      setPin('')
+      return
+    }
     setError('')
-    // placeholder — real auth wired in PROMPT_2
-    alert(`Accesso con badge ${badge} e PIN ****`)
+    setOperator(op)
+    router.push('/dashboard')
   }
 
   return (
     <div className="min-h-screen bg-paper flex flex-col items-center justify-center p-6">
-      {/* Logo */}
       <div className="mb-8">
         <img src="/brand/logo-light.svg" alt="Reflexallen" className="h-10" />
       </div>
@@ -53,15 +77,17 @@ export default function HMILoginPage() {
                 placeholder="Scansiona o digita il badge…"
                 autoFocus
                 error={error}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleBadgeContinue()
+                }}
               />
             </Field>
-            <Button
-              size="hmi"
-              className="w-full"
-              onClick={handleBadgeContinue}
-            >
+            <Button size="hmi" className="w-full" onClick={handleBadgeContinue}>
               Continua
             </Button>
+            <p className="text-xs text-ink-3 text-center">
+              Demo: OP-001..OP-004 · PIN 1234 / 2222 / 3333 / 4444
+            </p>
           </>
         )}
 
@@ -71,9 +97,7 @@ export default function HMILoginPage() {
               Badge: <span className="font-semibold text-ink">{badge}</span>
             </p>
             <p className="text-sm text-center text-ink">Inserire PIN (4 cifre)</p>
-            {error && (
-              <p className="text-sm text-bad text-center">{error}</p>
-            )}
+            {error && <p className="text-sm text-bad text-center">{error}</p>}
             <PinKeypad
               value={pin}
               onChange={(v) => {
