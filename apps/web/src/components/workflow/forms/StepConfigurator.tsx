@@ -4,11 +4,17 @@ import { useWorkflowStore } from '../store'
 import { ProductionStepForm } from './ProductionStepForm'
 import { QualityControlStepForm } from './QualityControlStepForm'
 import { ScanStepForm } from './ScanStepForm'
+import { LogisticsStepForm } from './LogisticsStepForm'
+import { SetupStepForm } from './SetupStepForm'
+import { RecoveryStepForm } from './RecoveryStepForm'
 
 const STEP_CATEGORY = {
   PRODUCTION: 'production',
   QUALITY_CONTROL: 'quality_control',
   IDENTIFICATION: 'identification',
+  LOGISTICS: 'logistics',
+  SETUP: 'setup',
+  RECOVERY: 'recovery',
 } as const
 
 function EmptyState({ message }: { message: string }) {
@@ -47,10 +53,16 @@ export function StepConfigurator() {
       return <QualityControlStepForm nodeId={node.id} data={node.data} />
     case STEP_CATEGORY.IDENTIFICATION:
       return <ScanStepForm nodeId={node.id} data={node.data} />
+    case STEP_CATEGORY.LOGISTICS:
+      return <LogisticsStepForm nodeId={node.id} data={node.data} />
+    case STEP_CATEGORY.SETUP:
+      return <SetupStepForm nodeId={node.id} data={node.data} />
+    case STEP_CATEGORY.RECOVERY:
+      return <RecoveryStepForm nodeId={node.id} data={node.data} />
     default:
       return (
         <EmptyState
-          message={`Configuratore non disponibile per la categoria "${category ?? '—'}". D6 supporta production, quality_control, identification.`}
+          message={`Configuratore non disponibile per la categoria "${category ?? '—'}". Supportate: production, quality_control, identification, logistics, setup, recovery (PARALLEL/TEARDOWN in PROMPT_3b_FULL).`}
         />
       )
   }
