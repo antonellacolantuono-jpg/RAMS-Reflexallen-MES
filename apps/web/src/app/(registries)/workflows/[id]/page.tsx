@@ -55,19 +55,30 @@ export default function WorkflowEditorPage() {
               : 'Nessuna versione'
           }
         />
-        {versionStatus && (
-          <StatusBadge
-            tone={
-              versionStatus === 'approved'
-                ? 'ok'
-                : versionStatus === 'deprecated'
-                  ? 'warn'
-                  : 'neutral'
-            }
-          >
-            {versionStatus}
-          </StatusBadge>
-        )}
+        <div className="flex items-center gap-2">
+          {versionStatus && (
+            <StatusBadge
+              tone={
+                versionStatus === 'approved'
+                  ? 'ok'
+                  : versionStatus === 'deprecated'
+                    ? 'warn'
+                    : 'neutral'
+              }
+            >
+              {versionStatus}
+            </StatusBadge>
+          )}
+          {versionStatus === 'approved' && (
+            <button
+              type="button"
+              onClick={() => router.push(`/workflows/${id}/release`)}
+              className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700"
+            >
+              Rilascia WO
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-hidden">

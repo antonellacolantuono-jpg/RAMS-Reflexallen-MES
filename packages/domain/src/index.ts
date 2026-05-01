@@ -71,3 +71,25 @@ export {
   QC_CATEGORY,
   QC_SKILL_CODE,
 } from './rules/quality-hold.rules'
+
+// manager rules (D6 of PROMPT_5_FULL)
+export {
+  canReleaseWorkOrder,
+  MANAGER_SKILL_CODE,
+} from './rules/manager.rules'
+
+// workflow-snapshot rules (D6 of PROMPT_5_FULL)
+export {
+  cloneWorkflowTree,
+  listClonedStepIds,
+} from './rules/workflow-snapshot.rules'
+export type {
+  SourceStep,
+  SourceGroup,
+  SourcePhase,
+  SourceWorkflowVersion,
+  ClonedStep,
+  ClonedGroup,
+  ClonedPhase,
+  WorkflowSnapshotPayload,
+} from './rules/workflow-snapshot.rules'

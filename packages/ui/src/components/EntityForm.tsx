@@ -14,6 +14,8 @@ export interface EntityFormProps {
   actions?: React.ReactNode | undefined
   className?: string | undefined
   id?: string | undefined
+  submitLabel?: string | undefined
+  submittingLabel?: string | undefined
 }
 
 export function EntityForm({
@@ -27,6 +29,8 @@ export function EntityForm({
   actions,
   className,
   id,
+  submitLabel,
+  submittingLabel,
 }: EntityFormProps) {
   return (
     <form
@@ -67,7 +71,9 @@ export function EntityForm({
             disabled={isSubmitting}
             className="rounded-md bg-primary-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 transition-colors"
           >
-            {isSubmitting ? 'Salvataggio…' : 'Salva'}
+            {isSubmitting
+              ? (submittingLabel ?? 'Salvataggio…')
+              : (submitLabel ?? 'Salva')}
           </button>
         </div>
       </div>

@@ -1,6 +1,8 @@
 'use client'
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPost, ApiError } from './api-client'
+import { getSocket } from './socket'
 
 export type StepExecutionStatus =
   | 'pending'
@@ -246,4 +248,82 @@ export function useRejectQc() {
       })
     },
   })
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Socket.IO subscriptions (D6 of PROMPT_5_FULL).
+//
+// Live updates from the API gateway:
+//   - `wo:assigned` (room `op:{operatorId}`)  → invalidate myWorkOrders
+//   - `step:transition` (room `wo:{workOrderId}`) → invalidate workOrderSteps
+//
+// Each hook joins the relevant room on mount and leaves on unmount. Server
+// emits flow through to react-query invalidation, which triggers a refetch
+// of the affected queries — the UI updates without a manual refresh.
+// ─────────────────────────────────────────────────────────────────────────
+
+export type WoAssignedEvent = {
+  workOrderId: string
+  code: string
+  operatorId: string
+  assignedAt: string
+}
+
+export type StepTransitionEvent = {
+  workOrderId: string
+  stepExecutionId: string
+  stepId: string
+  fromStatus: StepExecutionStatus
+  toStatus: StepExecutionStatus
+  event: string
+  changedBy: string
+  changedAt: string
+}
+
+/**
+ * Subscribes the HMI to `wo:assigned` events for the given operator id.
+ * On every event, invalidates the dashboard's `my-work-orders` query so the
+ * newly released WO appears without a manual refresh.
+ */
+export function useWoAssignedSubscription(operatorId: string | undefined): void {
+  const qc = useQueryClient()
+  useEffect(() => {
+    if (!operatorId) return
+    const socket = getSocket()
+    socket.emit('subscribe:op', { operatorId })
+    const handler = (_payload: WoAssignedEvent) => {
+      void qc.invalidateQueries({ queryKey: myWorkOrdersQueryKey })
+    }
+    socket.on('wo:assigned', handler)
+    return () => {
+      socket.off('wo:assigned', handler)
+      socket.emit('unsubscribe:op', { operatorId })
+    }
+  }, [operatorId, qc])
+}
+
+/**
+ * Subscribes the HMI to `step:transition` events for the given work order id.
+ * Invalidates the WO step list so a transition triggered elsewhere
+ * (parallel lane, QC approval, auto-scrap chain) is reflected live.
+ */
+export function useStepTransitionSubscription(
+  workOrderId: string | undefined,
+): void {
+  const qc = useQueryClient()
+  useEffect(() => {
+    if (!workOrderId) return
+    const socket = getSocket()
+    socket.emit('subscribe:wo', { workOrderId })
+    const handler = (_payload: StepTransitionEvent) => {
+      void qc.invalidateQueries({
+        queryKey: workOrderStepsQueryKey(workOrderId),
+      })
+    }
+    socket.on('step:transition', handler)
+    return () => {
+      socket.off('step:transition', handler)
+      socket.emit('unsubscribe:wo', { workOrderId })
+    }
+  }, [workOrderId, qc])
 }

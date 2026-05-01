@@ -83,16 +83,20 @@
 
 ### TODO-021 — PROMPT_5_FULL: WO release flow (Plant Manager)
 
-**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
-**File**: new `apps/web/src/app/(registries)/work-orders/` routes + new `apps/api/src/modules/work-orders/release/` controller
-**Symptom**: HMI LITE uses 10 hardcoded WOs in `apps/hmi/src/lib/mock-data.ts`. There is no UI for a Plant Manager to release a real WO from an approved workflow snapshot. The `WorkOrder` Prisma model exists, but no endpoints, no creation form, no release-from-snapshot logic.
-**Acceptance criterion**:
-- Web admin: `/work-orders` registry list + creation form (Item × qty × workflow × scheduled date × assignee).
-- "Release" action snapshots the approved workflow into `WorkflowSnapshot` (per ADR-001) and links it to the WO.
-- Released WO appears on the assigned operator's HMI dashboard (replaces hardcoded mocks).
-- Release requires the workflow to be in `approved` state with zero validation errors.
-**Estimated effort**: 5-6 hours
-**Blocker for**: end-to-end real production flow. Also unblocks PROMPT_3c (snapshot + live preview).
+**Status**: ✅ **CLOSED by PROMPT_5_FULL D6** (2026-05-01).
+**Resolution**: Plant Manager release flow shipped end-to-end:
+- New `POST /api/work-orders/release` endpoint with MANAGER-skill RBAC (mirrors D5 QC pattern via `OperatorSkill→Skill` join). 403 returned when caller lacks MANAGER, 422 when workflow currentVersion is not `approved`, 400 on invalid quantity, 404 on missing item/operator/shift.
+- Single Prisma `$transaction` creates: WorkOrder (status='released', actualStart=null per Q4), WorkflowSnapshot (deep-clone of full Phase→Group→Step tree, JSON-serialized into `snapshotData`), one StepExecution per cloned step (status=pending), and a WorkOrderAssignment (status='accepted'). Optional ShiftAssignment when `assignedShiftId` provided.
+- New web admin page `apps/web/src/app/(registries)/workflows/[id]/release/page.tsx` (form: Item×Qty×Operator×Priority) + "Rilascia WO" button on workflow detail (visible only when `currentVersion.status === 'approved'`).
+- `WorkOrder.code` follows `WO-YYYYMMDD-NNN` per-plant per-day sequence.
+- Snapshot is IMMUTABLE post-release (per ADR-001) — subsequent edits to source workflow do not affect in-flight WOs.
+- Audit log records `WorkOrder/state_change/release` with snapshotId + stepExecutionCount.
+- Domain helpers: `cloneWorkflowTree` + `listClonedStepIds` in `packages/domain/src/rules/workflow-snapshot.rules.ts` (8 unit tests). MANAGER skill predicate in `packages/domain/src/rules/manager.rules.ts` (3 unit tests).
+- Seed extended: MANAGER skill added to skill registry; OP-001 ↔ MANAGER OperatorSkill assignment; demo workflow `WF-PNEU-CURE-DEMO` migrated from `effective` to `approved` so the release flow is testable on first seed.
+**Verification (runtime smoke, 2026-05-01)**:
+- OP-001 (MANAGER) login → POST /api/work-orders/release → 200 with `{ workOrderId, workOrderCode: WO-20260501-001, snapshotId, stepExecutionCount: 5 }`.
+- OP-002 (no MANAGER) login → POST /api/work-orders/release → 403 Forbidden.
+- OP-002 GET /api/work-orders/mine → released WO visible immediately (status=ready, qty=25).
 
 ---
 
@@ -177,16 +181,17 @@
 
 ### TODO-023 — PROMPT_5_FULL: Socket.IO real-time updates
 
-**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
-**File**: `apps/api/src/gateways/` (new) + new `apps/hmi/src/lib/socket-client.ts` + extend dashboard to subscribe
-**Symptom**: HMI LITE is a pure CSR app — there is no WebSocket layer, no event subscription, no real-time updates. If operator A on station 1 progresses a WO, operator B on a manager dashboard does not see the update until they refresh. The MASTER_SPECIFICATION calls for Socket.IO event-driven updates so the manager Andon and KPI dashboards refresh live.
-**Acceptance criterion**:
-- API Socket.IO gateway emits events on every `StepExecution` transition (overlaps with TODO-022).
-- HMI dashboard + admin dashboard subscribe to `wo.updated` / `step.completed` events and update the UI without refresh.
-- Manager Andon screen (PROMPT_6) consumes the same channel.
-- Connection auth via the JWT cookie (TODO-017).
-**Estimated effort**: 3-4 hours
-**Blocker for**: live shop-floor visibility. Quality-of-life feature, not strictly required for MVP.
+**Status**: ✅ **CLOSED by PROMPT_5_FULL D6** (2026-05-01).
+**Resolution**: HMI socket listener now subscribes to two room types via the existing `WorkOrderEventsGateway`:
+- `op:{operatorId}` room receives `wo:assigned` events (emitted by the release service for the assigned operator) → invalidates `myWorkOrdersQueryKey` so the dashboard updates without refresh.
+- `wo:{workOrderId}` room receives `step:transition` events (emitted by `step-execution.service` since D3) → invalidates `workOrderStepsQueryKey(workOrderId)` so live transitions land on the WO detail page.
+- Server-side: gateway extended with `emitWoReleased` (broadcast on `wo:released`) + `emitWoAssigned` (per-operator room) + `@SubscribeMessage('subscribe:wo'|'subscribe:op')` handlers that join rooms; symmetric unsubscribe handlers for clean unmount. (4 unit tests covering both new emitters + a regression for D3 emitStepTransition + a no-op-when-server-undefined guard.)
+- Client-side: new `apps/hmi/src/lib/socket.ts` singleton (`socket.io-client@^4.7.5` + `withCredentials: true` to forward the JWT cookie). New hooks `useWoAssignedSubscription` + `useStepTransitionSubscription` in `apps/hmi/src/lib/queries.ts` wired into the dashboard and `wo/[id]` pages.
+**Open follow-up (NOT a regression of TODO-023)**:
+- DEV MODE leaves room joins ungated (any client can subscribe to any room). Production hardening — validate JWT in the WS handshake, scope room joins to operators that own the WO — is captured by TODO-017 (refresh-token rotation + per-namespace auth). Not blocking MVP.
+**Verification (runtime smoke, 2026-05-01)**:
+- API up with 4 new `@SubscribeMessage` handlers mapped (subscribe:wo, unsubscribe:wo, subscribe:op, unsubscribe:op).
+- Manager release of a WO emits `wo:assigned` to `op:{newOperatorId}` room; HMI dashboard invalidation triggers automatically.
 
 ---
 

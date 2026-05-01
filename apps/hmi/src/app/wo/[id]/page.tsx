@@ -11,6 +11,7 @@ import { Button, Modal, Progress } from '@mes/ui'
 import { useOperatorStore } from '../../../lib/operator-store'
 import {
   useMyWorkOrders,
+  useStepTransitionSubscription,
   useTransitionStep,
   useWorkOrderSteps,
   type StepExecutionStatus,
@@ -94,6 +95,10 @@ export default function WorkOrderExecutionPage() {
   })
   const myWorkOrdersQuery = useMyWorkOrders({ enabled: !!operator })
   const transition = useTransitionStep(woId)
+
+  // D6: subscribe to live step:transition events for this WO. Mounts only
+  // when an operator is logged in; the hook short-circuits on undefined id.
+  useStepTransitionSubscription(operator ? woId : undefined)
 
   const wo = React.useMemo(
     () => myWorkOrdersQuery.data?.find((w) => w.id === woId),
