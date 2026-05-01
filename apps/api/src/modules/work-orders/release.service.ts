@@ -15,6 +15,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { WorkOrderEventsGateway } from '../events/work-order-events.gateway'
+import { AutoGenEngineService } from '../auto-gen-engine/auto-gen-engine.service'
+import { RULE_IDS } from '../auto-gen-engine/types'
 
 export interface ReleaseRequest {
   workflowId: string
@@ -48,6 +50,7 @@ export class ReleaseService {
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
     private readonly events: WorkOrderEventsGateway,
+    private readonly engine: AutoGenEngineService,
   ) {}
 
   /**
@@ -202,7 +205,10 @@ export class ReleaseService {
     const payload = cloneWorkflowTree(sourceVersion, releasedAt)
     const stepIds = listClonedStepIds(payload)
 
-    const code = await this.generateWoCode(req.plantId, releasedAt)
+    const code = await this.engine.resolve(RULE_IDS.WORK_ORDER_NUMBER, {
+      plantId: req.plantId,
+      releasedAt,
+    })
 
     const txResult = await this.prisma.$transaction(async (tx) => {
       const wo = await tx.workOrder.create({
@@ -348,33 +354,8 @@ export class ReleaseService {
     }
   }
 
-  /**
-   * Generates a WO code in the form `WO-YYYYMMDD-NNN`, scoped per-plant
-   * per-day. Sequence is computed from the existing count of WOs whose
-   * code starts with the same `WO-YYYYMMDD-` prefix in the same plant
-   * (including soft-deleted rows so the sequence never collides).
-   */
-  private async generateWoCode(
-    plantId: string,
-    releasedAt: Date,
-  ): Promise<string> {
-    const day = formatYYYYMMDD(releasedAt)
-    const prefix = `WO-${day}-`
-    const existing = await this.prisma.workOrder.count({
-      where: { plantId, code: { startsWith: prefix } },
-    })
-    const seq = (existing + 1).toString().padStart(3, '0')
-    return `${prefix}${seq}`
-  }
 }
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
-}
-
-function formatYYYYMMDD(d: Date): string {
-  const y = d.getFullYear()
-  const m = (d.getMonth() + 1).toString().padStart(2, '0')
-  const day = d.getDate().toString().padStart(2, '0')
-  return `${y}${m}${day}`
 }

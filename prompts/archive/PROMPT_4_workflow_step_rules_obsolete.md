@@ -1,4 +1,26 @@
-# PROMPT 4 — AUTO-GENERATION ENGINE v3
+# ⚠️ OBSOLETE — superseded by code-generation interpretation of PROMPT_4
+
+> **Status**: Archived 2026-05-01
+> **Reason**: This document described workflow-step enrichment rules
+> (Skills check, BOM check, Tooling verification) inserted automatically
+> when a Work Order is released. The actual PROMPT_4 implementation
+> took a different direction: it implements the 7 code-generation rules
+> already seeded in PROMPT_2 (Lot Number, WO Number, Box Code, Maintenance
+> Order, Recipe Version, Sample ID, Downtime Event ID).
+>
+> **Why archived not deleted**: the workflow-step rules concept may be
+> revisited in a future PROMPT_4b or PROMPT_3c extension when WorkflowSnapshot
+> mutability rules are defined. The §8.3 design ideas remain valid.
+>
+> **What's active instead**: see the AutoGenEngine module at
+> `apps/api/src/modules/auto-gen-engine/` (engine + 7 resolvers + dry-run
+> preview UI on `/auto-gen-rules`). Tracked by TODO-027 (PROMPT_4_PHASE_2
+> wires the engine into entity creation flows) and TODO-028 (revisit the
+> workflow-step rules described below).
+
+---
+
+# PROMPT 4 — AUTO-GENERATION ENGINE v3 (ORIGINAL, NOT IMPLEMENTED)
 
 > **Type**: Build prompt for Claude Code (Step 4 of 6)
 > **Pre-requisite**: PROMPT_1 + PROMPT_2 + PROMPT_3 completed; CLAUDE.md at repo root

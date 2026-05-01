@@ -21,7 +21,7 @@ const AUTO_GEN_RULES: AutoGenRule[] = [
     name: 'Work Order Number',
     trigger: 'work_order_created',
     scope: 'work_order',
-    description: 'Generates WO codes (format: WO-{YYYY}-{MM}-{SEQ})',
+    description: 'Generates WO codes (format: WO-{YYYYMMDD}-{NNN}, per-plant per-day sequence)',
   },
   {
     id: '3',
