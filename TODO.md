@@ -2,7 +2,7 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-01
+> **Last updated**: 2026-05-01 (PROMPT_3b_FULL Session A — closed TODO-008, TODO-013, TODO-014)
 
 ---
 
@@ -100,19 +100,15 @@
 
 ---
 
-### TODO-008 — PROMPT_3b_FULL: PARALLEL + TEARDOWN step configurator forms
+### TODO-008 — PROMPT_3b_FULL: missing step configurator forms
 
-**Discovered**: 2026-04-30 (during PROMPT_3b_REDUCED scope reduction)
-**File**: `apps/web/src/components/workflow/forms/`
-**Symptom**: PROMPT_3b_REDUCED ships 6/8 step categories (PRODUCTION, QUALITY_CONTROL, IDENTIFICATION, LOGISTICS, SETUP, RECOVERY). PARALLEL and TEARDOWN are deferred:
-- PARALLEL — Device Execution Group with parallel-steps swimlane (main step + concurrent sub-steps + buffer time). Most complex of the 8.
-- TEARDOWN — cleanup, reset, archive sub-types. Simpler but deferred for symmetry.
-**Acceptance criterion**:
-- `apps/web/src/components/workflow/forms/ParallelStepForm.tsx` and `TeardownStepForm.tsx` exist following the ProductionStepForm pattern.
-- `StepConfigurator.tsx` switch covers all 8 categories.
-- `WorkflowPalette.tsx` `STEP_ITEMS` includes parallel + teardown.
-**Estimated effort**: 3-4 hours
-**Blocker for**: full coverage of complex production lines (CFRP autoclave parallel runs, Pneumatic cleanup phases).
+**Status**: ✅ **CLOSED by PROMPT_3b_FULL Session A** (2026-05-01).
+**Resolution (with reinterpretation)**: original entry assumed PARALLEL was a top-level `StepCategory`. In reality `StepCategory` has 9 values (`production, logistics, identification, quality_control, decision, information, setup, teardown, recovery`) and PARALLEL is a `StepDeviceCategory` flag on the Step model (`pre|device_main|parallel|post`). Session A delivered:
+- 3 new step forms covering the truly missing categories: `DecisionStepForm`, `InformationStepForm`, `TeardownStepForm` (StepConfigurator now covers 9/9 categories).
+- `deviceCategory` selector added inside `ProductionStepForm` to capture the parallel-ops semantics on the data side (HMI swimlane rendering already shipped in PROMPT_5 D4).
+- `WorkflowPalette` `STEP_ITEMS` extended (decision, information, teardown).
+- `WorkflowCanvas` `DEFAULT_ACTION_TYPE` extended for the 3 new categories + recovery; `buildSavePayload` now reads `isCycleBased`, `supportsParallel`, `supportsRecovery` from `node.data` instead of hardcoding `false`.
+**Note**: form-internal type fields (`decisionType`, `informationType`, `teardownType`, `attachmentUrl`, `causeCodeId`, `deviceCategory`) remain session-only by design — consolidated under TODO-016.
 
 ---
 
@@ -276,29 +272,25 @@
 
 ### TODO-013 — PROMPT_3b_FULL: inline validation badges on canvas nodes
 
-**Discovered**: 2026-04-30 (during PROMPT_3b_REDUCED D2 implementation)
-**File**: `apps/web/src/components/workflow/nodes/StepNode.tsx`, `PhaseNode.tsx`, `GroupNode.tsx`
-**Symptom**: PROMPT_3b_REDUCED D2 ships ValidationPanel as a sidebar list. Errors are not visible inline on the canvas — engineers must scan the sidebar to find which node is wrong, then click to scroll. A red badge with a tooltip on each offending node would surface errors at the node itself.
-**Acceptance criterion**:
-- Each node type renders a small badge (red triangle) when its id appears in any `error.field` from `validateWorkflowStructure`.
-- Hover shows the error message(s) as a tooltip.
-- Badge updates reactively as the workflow tree changes.
-**Estimated effort**: 1-2 hours
-**Blocker for**: nothing (D2 sidebar is sufficient for current demo).
+**Status**: ✅ **CLOSED by PROMPT_3b_FULL Session A** (2026-05-01).
+**Resolution**:
+- New pure helpers `extractErrorNodeIds(result)` + `groupErrorsByNodeId(result)` in `packages/domain/src/rules/workflow.rules.ts` (8 unit tests added — 5 + 3 — bringing domain test count to 172).
+- New `useWorkflowValidation()` hook in `apps/web/src/components/workflow/useWorkflowValidation.ts` — single source of truth for the designer (memoized validation, errorNodeIds, errorsByNodeId).
+- New `WorkflowValidationProvider` + `useNodeBadge(nodeId)` React context in `validation-context.tsx`. ValidationPanel now reads from context instead of duplicating buildValidationStructure + 4 useQuery calls.
+- New `<NodeErrorBadge nodeId>` component renders a red ▲ on the top-right of every PhaseNode/GroupNode/StepNode when its id has errors. Native `<span title>` tooltip lists the messages.
+- Provider mounted in `apps/web/src/app/(registries)/workflows/[id]/page.tsx` so canvas + sidebar share the same memoized result.
 
 ---
 
 ### TODO-014 — PROMPT_3b_FULL: Phase and Group configurator forms
 
-**Discovered**: 2026-04-30 (during PROMPT_3b_REDUCED scope reduction)
-**File**: extend `apps/web/src/components/workflow/forms/StepConfigurator.tsx` OR new `PhaseConfigurator` / `GroupConfigurator`
-**Symptom**: Selecting a Phase or Group node currently shows the "Configuratore disponibile solo per gli step (D6)" placeholder. Cannot edit phase category/name or group `supportsParallel` / `supportsRecovery` flags from the UI.
-**Acceptance criterion**:
-- Selecting a Phase opens a form: name, category (6 phase categories), order.
-- Selecting a Group opens a form: name, category (9 group categories), supportsParallel, supportsRecovery, order.
-- Both forms follow the same blur-onChange + auto-save pattern as the step forms.
-**Estimated effort**: 1-2 hours
-**Blocker for**: in-place editing of workflow structure (current workaround: edit names directly via store mutations).
+**Status**: ✅ **CLOSED by PROMPT_3b_FULL Session A** (2026-05-01).
+**Resolution**:
+- New `PhaseConfigurator` form (`forms/PhaseConfigurator.tsx`): name, category (6 PhaseCategory values from palette), `isCycleBased` checkbox.
+- New `GroupConfigurator` form (`forms/GroupConfigurator.tsx`): name, category (9 GroupCategory values from palette), `supportsParallel` and `supportsRecovery` checkboxes.
+- `StepConfigurator.tsx` router extended: routes `phaseNode` → PhaseConfigurator, `groupNode` → GroupConfigurator, `stepNode` → 9-case category switch (the previous "Configuratore disponibile solo per gli step (D6)" placeholder is gone).
+- `WorkflowCanvas.buildGraph` now hydrates `phase.isCycleBased`, `group.supportsParallel`, `group.supportsRecovery` into `node.data` so reload restores the values.
+- `WorkflowCanvas.buildSavePayload` reads those fields back from `node.data` (replaces previous hardcoded `false` defaults), so changes survive auto-save.
 
 ---
 

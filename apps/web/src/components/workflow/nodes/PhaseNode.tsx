@@ -1,5 +1,6 @@
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps, Node } from '@xyflow/react'
+import { NodeErrorBadge } from './NodeErrorBadge'
 
 export type PhaseNodeData = {
   label: string
@@ -18,7 +19,7 @@ const PHASE_COLORS: Record<string, { bg: string; border: string; text: string }>
   teardown:        { bg: 'bg-gray-100',  border: 'border-gray-400',   text: 'text-gray-700' },
 }
 
-export function PhaseNode({ data }: NodeProps<PhaseNodeType>) {
+export function PhaseNode({ id, data }: NodeProps<PhaseNodeType>) {
   const colors = PHASE_COLORS[data.category] ?? {
     bg: 'bg-gray-50', border: 'border-gray-300', text: 'text-gray-700',
   }
@@ -26,8 +27,11 @@ export function PhaseNode({ data }: NodeProps<PhaseNodeType>) {
   return (
     <div className={`rounded-lg border-2 px-4 py-2 min-w-[160px] ${colors.bg} ${colors.border}`}>
       <Handle type="target" position={Position.Top} />
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-0.5">
-        Fase {data.order}
+      <div className="flex items-center justify-between mb-0.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+          Fase {data.order}
+        </span>
+        <NodeErrorBadge nodeId={id} />
       </div>
       <div className={`text-sm font-semibold ${colors.text}`}>{data.label}</div>
       <div className="text-[10px] text-gray-400 mt-0.5">

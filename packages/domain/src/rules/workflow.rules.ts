@@ -113,6 +113,62 @@ export function validateWorkflowStructure(
 }
 
 /**
+ * Field paths emitted by validateWorkflowStructure are of the form
+ * "phase.<id>.<...>", "group.<id>.<...>", "step.<id>.<...>" or "phases".
+ * This helper distils the affected node ids so callers can light up
+ * inline badges on canvas nodes without re-implementing the parse.
+ *
+ * Returns three Sets — one per node kind — so a node component can answer
+ * "do I have an error?" in O(1) without filtering the full error list.
+ */
+export interface ErrorNodeIds {
+  phaseIds: Set<string>
+  groupIds: Set<string>
+  stepIds: Set<string>
+}
+
+export function extractErrorNodeIds(result: ValidationResult): ErrorNodeIds {
+  const phaseIds = new Set<string>()
+  const groupIds = new Set<string>()
+  const stepIds = new Set<string>()
+  if (result.ok) return { phaseIds, groupIds, stepIds }
+
+  for (const err of result.errors) {
+    const match = /^(phase|group|step)\.([^.]+)/.exec(err.field)
+    if (!match) continue
+    const kind = match[1]
+    const id = match[2]
+    if (!id) continue
+    if (kind === 'phase') phaseIds.add(id)
+    else if (kind === 'group') groupIds.add(id)
+    else if (kind === 'step') stepIds.add(id)
+  }
+
+  return { phaseIds, groupIds, stepIds }
+}
+
+/**
+ * Returns the per-error messages indexed by the node id they refer to.
+ * Used by inline badges/tooltips on canvas nodes.
+ */
+export function groupErrorsByNodeId(result: ValidationResult): Map<string, string[]> {
+  const out = new Map<string, string[]>()
+  if (result.ok) return out
+
+  for (const err of result.errors) {
+    const match = /^(phase|group|step)\.([^.]+)/.exec(err.field)
+    if (!match) continue
+    const id = match[2]
+    if (!id) continue
+    const list = out.get(id) ?? []
+    list.push(err.message)
+    out.set(id, list)
+  }
+
+  return out
+}
+
+/**
  * Returns true only if a workflow version is editable (status is draft).
  */
 export function canEdit(versionStatus: WorkflowVersionStatus | string): boolean {

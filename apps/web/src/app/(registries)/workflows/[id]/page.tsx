@@ -9,6 +9,7 @@ import { WorkflowCanvas } from '../../../../components/workflow/WorkflowCanvas'
 import { WorkflowPalette } from '../../../../components/workflow/WorkflowPalette'
 import { StepConfigurator } from '../../../../components/workflow/forms/StepConfigurator'
 import { ValidationPanel } from '../../../../components/workflow/ValidationPanel'
+import { WorkflowValidationProvider } from '../../../../components/workflow/validation-context'
 
 export default function WorkflowEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -82,7 +83,8 @@ export default function WorkflowEditorPage() {
       </div>
 
       <div className="flex-1 overflow-hidden">
-        <PanelGroup orientation="horizontal" className="h-full">
+        <WorkflowValidationProvider>
+          <PanelGroup orientation="horizontal" className="h-full">
           {/* Wizard / Validation pane — 20% */}
           <Panel defaultSize={20} minSize={15}>
             <div className="h-full flex flex-col bg-[var(--paper-2)] hairline-r overflow-hidden">
@@ -134,7 +136,8 @@ export default function WorkflowEditorPage() {
               </div>
             </div>
           </Panel>
-        </PanelGroup>
+          </PanelGroup>
+        </WorkflowValidationProvider>
       </div>
     </div>
   )

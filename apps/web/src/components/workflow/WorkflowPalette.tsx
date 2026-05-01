@@ -29,6 +29,9 @@ const STEP_ITEMS = [
   { category: 'identification', label: 'Scansione' },
   { category: 'logistics', label: 'Logistica' },
   { category: 'setup', label: 'Setup' },
+  { category: 'teardown', label: 'Smontaggio' },
+  { category: 'decision', label: 'Decisione' },
+  { category: 'information', label: 'Informazione' },
   { category: 'recovery', label: 'Recupero' },
 ] as const
 
