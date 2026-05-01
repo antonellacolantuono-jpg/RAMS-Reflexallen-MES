@@ -7,6 +7,11 @@ import { ScanStepForm } from './ScanStepForm'
 import { LogisticsStepForm } from './LogisticsStepForm'
 import { SetupStepForm } from './SetupStepForm'
 import { RecoveryStepForm } from './RecoveryStepForm'
+import { DecisionStepForm } from './DecisionStepForm'
+import { InformationStepForm } from './InformationStepForm'
+import { TeardownStepForm } from './TeardownStepForm'
+import { PhaseConfigurator } from './PhaseConfigurator'
+import { GroupConfigurator } from './GroupConfigurator'
 
 const STEP_CATEGORY = {
   PRODUCTION: 'production',
@@ -14,6 +19,9 @@ const STEP_CATEGORY = {
   IDENTIFICATION: 'identification',
   LOGISTICS: 'logistics',
   SETUP: 'setup',
+  TEARDOWN: 'teardown',
+  DECISION: 'decision',
+  INFORMATION: 'information',
   RECOVERY: 'recovery',
 } as const
 
@@ -31,17 +39,24 @@ export function StepConfigurator() {
   const nodes = useWorkflowStore((s) => s.nodes)
 
   if (!selectedNodeId) {
-    return <EmptyState message="Seleziona uno step per configurarlo" />
-  }
-  if (selectedNodeType !== 'stepNode') {
-    return (
-      <EmptyState message="Configuratore disponibile solo per gli step (D6). Configurazione di fasi e gruppi disponibile in 3b." />
-    )
+    return <EmptyState message="Seleziona un nodo per configurarlo" />
   }
 
   const node = nodes.find((n) => n.id === selectedNodeId)
   if (!node) {
     return <EmptyState message="Nodo non trovato" />
+  }
+
+  if (selectedNodeType === 'phaseNode') {
+    return <PhaseConfigurator nodeId={node.id} data={node.data} />
+  }
+
+  if (selectedNodeType === 'groupNode') {
+    return <GroupConfigurator nodeId={node.id} data={node.data} />
+  }
+
+  if (selectedNodeType !== 'stepNode') {
+    return <EmptyState message="Tipo di nodo non supportato" />
   }
 
   const category = node.data['category'] as string | undefined
@@ -57,12 +72,18 @@ export function StepConfigurator() {
       return <LogisticsStepForm nodeId={node.id} data={node.data} />
     case STEP_CATEGORY.SETUP:
       return <SetupStepForm nodeId={node.id} data={node.data} />
+    case STEP_CATEGORY.TEARDOWN:
+      return <TeardownStepForm nodeId={node.id} data={node.data} />
+    case STEP_CATEGORY.DECISION:
+      return <DecisionStepForm nodeId={node.id} data={node.data} />
+    case STEP_CATEGORY.INFORMATION:
+      return <InformationStepForm nodeId={node.id} data={node.data} />
     case STEP_CATEGORY.RECOVERY:
       return <RecoveryStepForm nodeId={node.id} data={node.data} />
     default:
       return (
         <EmptyState
-          message={`Configuratore non disponibile per la categoria "${category ?? '—'}". Supportate: production, quality_control, identification, logistics, setup, recovery (PARALLEL/TEARDOWN in PROMPT_3b_FULL).`}
+          message={`Configuratore non disponibile per la categoria "${category ?? '—'}".`}
         />
       )
   }

@@ -34,6 +34,8 @@ export {
   validateWorkflowStructure,
   canEdit,
   canTransition,
+  extractErrorNodeIds,
+  groupErrorsByNodeId,
 } from './rules/workflow.rules'
 export type {
   ValidationError,
@@ -43,6 +45,7 @@ export type {
   WorkflowPhase,
   WorkflowStructure,
   AvailableRefs,
+  ErrorNodeIds,
 } from './rules/workflow.rules'
 
 // parallel-ops rules

@@ -10,6 +10,17 @@ import type { SelectProps } from '@mes/ui'
 import { sdk } from '../../../lib/sdk'
 import { useWorkflowStore } from '../store'
 
+// deviceCategory feeds the parallel-ops swimlane in HMI (PROMPT_5 D4).
+// Persisted in node.data only this session — backend write-through is gated under
+// TODO-016 (no Step.config column / WorkflowStepInputSchema does not yet accept it).
+const DEVICE_CATEGORIES = ['pre', 'device_main', 'parallel', 'post'] as const
+const DEVICE_CATEGORY_LABELS: Record<(typeof DEVICE_CATEGORIES)[number], string> = {
+  pre: 'Pre-dispositivo',
+  device_main: 'Dispositivo principale',
+  parallel: 'Parallelo',
+  post: 'Post-dispositivo',
+}
+
 const ProductionFormSchema = z.object({
   name: z.string().min(1, 'Nome richiesto').max(200, 'Massimo 200 caratteri'),
   instructions: z.string().max(2000).optional().or(z.literal('')),
@@ -19,9 +30,16 @@ const ProductionFormSchema = z.object({
     .union([z.string().length(0), z.coerce.number().int().positive('Deve essere > 0')])
     .optional(),
   isRequired: z.boolean(),
+  deviceCategory: z.enum(DEVICE_CATEGORIES, {
+    errorMap: () => ({ message: 'Categoria dispositivo richiesta' }),
+  }),
 })
 
 type ProductionFormValues = z.infer<typeof ProductionFormSchema>
+
+function isDeviceCategory(v: unknown): v is (typeof DEVICE_CATEGORIES)[number] {
+  return typeof v === 'string' && (DEVICE_CATEGORIES as readonly string[]).includes(v)
+}
 
 export function ProductionStepForm({
   nodeId,
@@ -43,6 +61,9 @@ export function ProductionStepForm({
         : undefined,
     isRequired:
       typeof data['isRequired'] === 'boolean' ? (data['isRequired'] as boolean) : true,
+    deviceCategory: isDeviceCategory(data['deviceCategory'])
+      ? (data['deviceCategory'] as (typeof DEVICE_CATEGORIES)[number])
+      : 'device_main',
   }
 
   const {
@@ -154,6 +175,26 @@ export function ProductionStepForm({
             },
           })}
           placeholder="Es. 45"
+        />
+      </Field>
+
+      <Field
+        label="Categoria dispositivo"
+        required
+        hint="Per Device Execution Group — sessione corrente, vedi TODO-016"
+        error={errors.deviceCategory?.message}
+      >
+        <Select
+          {...register('deviceCategory', {
+            onChange: (e) => {
+              const v = e.target.value as (typeof DEVICE_CATEGORIES)[number]
+              commit({ deviceCategory: v })
+            },
+          })}
+          options={DEVICE_CATEGORIES.map((c) => ({
+            value: c,
+            label: DEVICE_CATEGORY_LABELS[c],
+          }))}
         />
       </Field>
 
