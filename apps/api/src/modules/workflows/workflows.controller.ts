@@ -13,7 +13,13 @@ import {
 import { BaseRegistryController } from '../../common/base-registry.controller'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { WorkflowsService } from './workflows.service'
-import { CreateWorkflowSchema, UpdateWorkflowSchema, UpdateWorkflowVersionSchema } from '@mes/schemas'
+import {
+  CreateWorkflowSchema,
+  UpdateWorkflowSchema,
+  UpdateWorkflowVersionSchema,
+  DeprecateWorkflowVersionSchema,
+  CloneWorkflowSchema,
+} from '@mes/schemas'
 import type { WorkflowModel } from './workflows.repository'
 
 @Controller('workflows')
@@ -104,5 +110,33 @@ export class WorkflowsController extends BaseRegistryController<WorkflowModel> {
   ) {
     const dto = UpdateWorkflowVersionSchema.parse(body)
     return this.workflowsService.updateVersion(id, vid, dto, 'system')
+  }
+
+  // ── Lifecycle transitions ──────────────────────────────────────────────────
+
+  @Post(':id/versions/:vid/approve')
+  @HttpCode(HttpStatus.OK)
+  approveVersion(@Param('id') id: string, @Param('vid') vid: string) {
+    return this.workflowsService.approveVersion(id, vid, 'system')
+  }
+
+  @Post(':id/versions/:vid/deprecate')
+  @HttpCode(HttpStatus.OK)
+  deprecateVersion(
+    @Param('id') id: string,
+    @Param('vid') vid: string,
+    @Body() body: unknown,
+  ) {
+    const dto = DeprecateWorkflowVersionSchema.parse(body)
+    return this.workflowsService.deprecateVersion(id, vid, dto.reason, 'system')
+  }
+
+  // ── Templates / clone ──────────────────────────────────────────────────────
+
+  @Post(':id/clone')
+  @HttpCode(HttpStatus.CREATED)
+  clone(@Param('id') id: string, @Body() body: unknown) {
+    const dto = CloneWorkflowSchema.parse(body)
+    return this.workflowsService.cloneWorkflow(id, dto, 'system')
   }
 }

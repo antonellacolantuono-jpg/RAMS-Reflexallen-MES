@@ -123,12 +123,20 @@ export default function WorkflowsPage() {
         title="Flussi di lavoro"
         subtitle="Progettazione e gestione dei workflow di produzione"
         actions={
-          <Link
-            href="/workflows/new"
-            className="rounded-md bg-primary-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-primary-700"
-          >
-            + Nuovo flusso
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/workflows/from-template"
+              className="rounded-md border border-primary-300 bg-white px-3.5 py-2 text-sm font-medium text-primary-700 hover:bg-primary-50"
+            >
+              Nuovo da template
+            </Link>
+            <Link
+              href="/workflows/new"
+              className="rounded-md bg-primary-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-primary-700"
+            >
+              + Nuovo flusso
+            </Link>
+          </div>
         }
       />
 

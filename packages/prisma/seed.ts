@@ -695,6 +695,320 @@ async function main(): Promise<void> {
     console.log('⚠ Skipped demo parallel group (item or WO missing)')
   }
 
+  // ── 16. Workflow templates (Pneumatic Air, PROMPT_3b Session B) ───────────
+  // Three reference workflows usable as starting points via the Templates Wizard.
+  // Wizard filters by `code: { startsWith: 'TPL_' }`.
+  type TemplateStepDef = {
+    order: number
+    name: string
+    category: string
+    actionType: string
+    instructions?: string
+  }
+  type TemplateGroupDef = {
+    order: number
+    name: string
+    category: string
+    supportsParallel?: boolean
+    steps: TemplateStepDef[]
+  }
+  type TemplatePhaseDef = {
+    order: number
+    name: string
+    category: string
+    groups: TemplateGroupDef[]
+  }
+  type TemplateDef = {
+    code: string
+    name: string
+    description: string
+    phases: TemplatePhaseDef[]
+  }
+
+  const templates: TemplateDef[] = [
+    {
+      code: 'TPL_PNEU_EXTRUSION_V1',
+      name: 'Template — Estrusione tubo pneumatico',
+      description:
+        'Template di partenza per cicli estrusione PA12/EVOH (linee co-estrusione)',
+      phases: [
+        {
+          order: 1,
+          name: 'Setup linea',
+          category: 'setup',
+          groups: [
+            {
+              order: 1,
+              name: 'Preparazione',
+              category: 'manual',
+              steps: [
+                {
+                  order: 1,
+                  name: 'Verifica ricetta estrusore',
+                  category: 'setup',
+                  actionType: 'verify_workstation',
+                  instructions:
+                    'Controlla che la ricetta caricata corrisponda al codice articolo',
+                },
+                {
+                  order: 2,
+                  name: 'Carico granulato PA12',
+                  category: 'setup',
+                  actionType: 'manual_operation',
+                  instructions:
+                    'Versa la corretta quantità di PA12 nel silos primario',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          order: 2,
+          name: 'Estrusione continua',
+          category: 'production',
+          groups: [
+            {
+              order: 1,
+              name: 'Run estrusore',
+              category: 'device_execution',
+              steps: [
+                {
+                  order: 1,
+                  name: 'Avvio estrusore',
+                  category: 'production',
+                  actionType: 'device_run',
+                  instructions:
+                    'Avvia il programma di estrusione e verifica i parametri di processo',
+                },
+                {
+                  order: 2,
+                  name: 'Prelievo campione iniziale',
+                  category: 'quality_control',
+                  actionType: 'sample_take',
+                  instructions:
+                    'Preleva un campione dopo i primi 10 metri per misure dimensionali',
+                },
+                {
+                  order: 3,
+                  name: 'Stop ciclo',
+                  category: 'teardown',
+                  actionType: 'cleanup',
+                  instructions: 'Arresta linea e prepara estrusore al cambio',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: 'TPL_PNEU_CRIMPING_V1',
+      name: 'Template — Crimpatura raccordi',
+      description:
+        'Template per assemblaggio raccordi crimpati su tubo pneumatico estruso',
+      phases: [
+        {
+          order: 1,
+          name: 'Produzione',
+          category: 'production',
+          groups: [
+            {
+              order: 1,
+              name: 'Operazione crimp',
+              category: 'device_execution',
+              steps: [
+                {
+                  order: 1,
+                  name: 'Carico tubo nel banco',
+                  category: 'production',
+                  actionType: 'manual_operation',
+                  instructions: 'Posiziona il tubo nella sede di crimpatura',
+                },
+                {
+                  order: 2,
+                  name: 'Ciclo crimpatura',
+                  category: 'production',
+                  actionType: 'device_run',
+                  instructions: 'Avvia il ciclo crimp con la pinza idraulica',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          order: 2,
+          name: 'Controllo qualità',
+          category: 'quality_control',
+          groups: [
+            {
+              order: 1,
+              name: 'Verifica visiva',
+              category: 'quality_control',
+              steps: [
+                {
+                  order: 1,
+                  name: 'Ispezione visiva crimp',
+                  category: 'quality_control',
+                  actionType: 'visual_check',
+                  instructions:
+                    'Verifica assenza di difetti visivi sul colletto crimp',
+                },
+                {
+                  order: 2,
+                  name: 'Predisposizione leak test',
+                  category: 'logistics',
+                  actionType: 'apply_label',
+                  instructions: 'Applica etichetta lotto e prepara per leak test',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: 'TPL_PNEU_LEAK_TEST_V1',
+      name: 'Template — Leak test tubo crimpato',
+      description:
+        'Template per banco prove tenuta (collaudo finale tubo pneumatico)',
+      phases: [
+        {
+          order: 1,
+          name: 'Collaudo',
+          category: 'quality_control',
+          groups: [
+            {
+              order: 1,
+              name: 'Banco leak tester',
+              category: 'quality_control',
+              steps: [
+                {
+                  order: 1,
+                  name: 'Scansione lotto',
+                  category: 'logistics',
+                  actionType: 'scan_qr',
+                  instructions: 'Leggi il QR del lotto in collaudo',
+                },
+                {
+                  order: 2,
+                  name: 'Esecuzione leak test',
+                  category: 'quality_control',
+                  actionType: 'device_run',
+                  instructions:
+                    'Avvia il leak test alla pressione prescritta (vedi ricetta)',
+                },
+                {
+                  order: 3,
+                  name: 'Registra esito',
+                  category: 'quality_control',
+                  actionType: 'record_value',
+                  instructions: 'Memorizza il valore di tenuta misurato',
+                },
+                {
+                  order: 4,
+                  name: 'Decisione accettazione',
+                  category: 'decision',
+                  actionType: 'decision',
+                  instructions:
+                    'Accetta o rifiuta il lotto in base alla soglia di tenuta',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ]
+
+  for (const tpl of templates) {
+    let tplWorkflow = await prisma.workflow.findFirst({
+      where: { plantId: plant.id, code: tpl.code },
+    })
+    if (!tplWorkflow) {
+      tplWorkflow = await prisma.workflow.create({
+        data: {
+          code: tpl.code,
+          name: tpl.name,
+          description: tpl.description,
+          plantId: plant.id,
+          createdBy: SYSTEM,
+          updatedBy: SYSTEM,
+        },
+      })
+    }
+
+    let tplVersion = await prisma.workflowVersion.findFirst({
+      where: { workflowId: tplWorkflow.id, version: 1 },
+    })
+    if (!tplVersion) {
+      tplVersion = await prisma.workflowVersion.create({
+        data: {
+          workflowId: tplWorkflow.id,
+          version: 1,
+          status: 'approved',
+          approvedBy: SYSTEM,
+          approvedAt: new Date(),
+          notes: 'Template di riferimento — clonabile via wizard',
+          createdBy: SYSTEM,
+          updatedBy: SYSTEM,
+        },
+      })
+    }
+
+    if (tplWorkflow.currentVersionId !== tplVersion.id) {
+      await prisma.workflow.update({
+        where: { id: tplWorkflow.id },
+        data: { currentVersionId: tplVersion.id, updatedBy: SYSTEM },
+      })
+    }
+
+    const existingPhaseCount = await prisma.phase.count({
+      where: { workflowVersionId: tplVersion.id },
+    })
+    if (existingPhaseCount === 0) {
+      for (const phaseDef of tpl.phases) {
+        const tplPhase = await prisma.phase.create({
+          data: {
+            workflowVersionId: tplVersion.id,
+            order: phaseDef.order,
+            category: phaseDef.category,
+            name: phaseDef.name,
+            createdBy: SYSTEM,
+            updatedBy: SYSTEM,
+          },
+        })
+        for (const groupDef of phaseDef.groups) {
+          const tplGroup = await prisma.group.create({
+            data: {
+              phaseId: tplPhase.id,
+              order: groupDef.order,
+              category: groupDef.category,
+              name: groupDef.name,
+              supportsParallel: groupDef.supportsParallel ?? false,
+              createdBy: SYSTEM,
+              updatedBy: SYSTEM,
+            },
+          })
+          for (const stepDef of groupDef.steps) {
+            await prisma.step.create({
+              data: {
+                groupId: tplGroup.id,
+                order: stepDef.order,
+                category: stepDef.category,
+                actionType: stepDef.actionType,
+                name: stepDef.name,
+                instructions: stepDef.instructions ?? null,
+                createdBy: SYSTEM,
+                updatedBy: SYSTEM,
+              },
+            })
+          }
+        }
+      }
+    }
+  }
+  console.log('✓ Workflow templates:', templates.map((t) => t.code).join(', '))
+
   console.log('\n✅ Seed complete — MOCK_DATA_PNEUMATIC_AIR loaded successfully')
 }
 
