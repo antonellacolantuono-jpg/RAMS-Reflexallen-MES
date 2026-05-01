@@ -81,6 +81,15 @@ export default function DashboardPage() {
                 {shiftCode ? `${shiftCode} · ` : ''}Badge {operator.badge}
               </span>
             </div>
+            {(operator.skillCodes ?? []).includes('QC') && (
+              <Button
+                size="hmi"
+                variant="primary"
+                onClick={() => router.push('/qc-review')}
+              >
+                Revisione QC
+              </Button>
+            )}
             <Button
               size="hmi"
               variant="secondary"

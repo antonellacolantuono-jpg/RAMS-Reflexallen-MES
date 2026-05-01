@@ -8,7 +8,9 @@ import { createActor } from 'xstate'
 import {
   isParallelSyncTrigger,
   stepExecutionMachine,
+  MAX_RECOVERY_ATTEMPTS,
   type ParallelStepWithStatus,
+  type RecoveryStage,
   type StepExecutionContext,
   type StepExecutionEvent,
   type StepExecutionStatus,
@@ -38,6 +40,14 @@ export interface TransitionResult {
   changedAt: string
   notes: string[]
   causeCode: string | null
+  recoveryStage: RecoveryStage | null
+  attemptCount: number
+  autoScrapped: boolean
+}
+
+export interface RecoveryDataPayload {
+  recoveryStage: RecoveryStage | null
+  attemptCount: number
 }
 
 export interface StepStateDto {
@@ -49,6 +59,8 @@ export interface StepStateDto {
   durationSec: number | null
   startedAt: string | null
   completedAt: string | null
+  recoveryStage: RecoveryStage | null
+  attemptCount: number
 }
 
 export interface WorkOrderStepDto extends StepStateDto {
@@ -62,6 +74,8 @@ export interface WorkOrderStepDto extends StepStateDto {
   groupName: string
   groupCategory: string
   groupSupportsParallel: boolean
+  recoveryStage: RecoveryStage | null
+  attemptCount: number
 }
 
 @Injectable()
@@ -88,26 +102,31 @@ export class StepExecutionService {
       include: { step: { include: { group: true } } },
       orderBy: { step: { order: 'asc' } },
     })
-    return rows.map((r) => ({
-      stepExecutionId: r.id,
-      workOrderId: r.workOrderId,
-      stepId: r.stepId,
-      status: (r.status as StepExecutionStatus) ?? 'pending',
-      result: r.result ?? null,
-      durationSec: r.durationSec ?? null,
-      startedAt: r.startedAt?.toISOString() ?? null,
-      completedAt: r.completedAt?.toISOString() ?? null,
-      stepName: r.step.name,
-      stepCategory: r.step.category,
-      stepOrder: r.step.order,
-      actionType: r.step.actionType,
-      instructions: r.step.instructions ?? null,
-      deviceCategory: r.step.deviceCategory ?? null,
-      groupId: r.step.groupId,
-      groupName: r.step.group.name,
-      groupCategory: r.step.group.category,
-      groupSupportsParallel: r.step.group.supportsParallel,
-    }))
+    return rows.map((r) => {
+      const recovery = this.parseRecoveryData(r.data ?? null)
+      return {
+        stepExecutionId: r.id,
+        workOrderId: r.workOrderId,
+        stepId: r.stepId,
+        status: (r.status as StepExecutionStatus) ?? 'pending',
+        result: r.result ?? null,
+        durationSec: r.durationSec ?? null,
+        startedAt: r.startedAt?.toISOString() ?? null,
+        completedAt: r.completedAt?.toISOString() ?? null,
+        stepName: r.step.name,
+        stepCategory: r.step.category,
+        stepOrder: r.step.order,
+        actionType: r.step.actionType,
+        instructions: r.step.instructions ?? null,
+        deviceCategory: r.step.deviceCategory ?? null,
+        groupId: r.step.groupId,
+        groupName: r.step.group.name,
+        groupCategory: r.step.group.category,
+        groupSupportsParallel: r.step.group.supportsParallel,
+        recoveryStage: recovery.recoveryStage,
+        attemptCount: recovery.attemptCount,
+      }
+    })
   }
 
   async getState(
@@ -115,6 +134,7 @@ export class StepExecutionService {
     plantId: string,
   ): Promise<StepStateDto> {
     const row = await this.loadOrThrow(stepExecutionId, plantId)
+    const recovery = this.parseRecoveryData(row.data ?? null)
     return {
       stepExecutionId: row.id,
       workOrderId: row.workOrderId,
@@ -124,6 +144,8 @@ export class StepExecutionService {
       durationSec: row.durationSec ?? null,
       startedAt: row.startedAt?.toISOString() ?? null,
       completedAt: row.completedAt?.toISOString() ?? null,
+      recoveryStage: recovery.recoveryStage,
+      attemptCount: recovery.attemptCount,
     }
   }
 
@@ -184,6 +206,14 @@ export class StepExecutionService {
     const completedAt = this.deriveCompletedAt(toStatus)
     const startedAt = this.deriveStartedAt(fromStatus, toStatus, row.startedAt)
 
+    const priorRecovery = this.parseRecoveryData(row.data ?? null)
+    const updatedRecovery = this.deriveRecoveryState(
+      fromStatus,
+      toStatus,
+      event.type,
+      priorRecovery,
+    )
+
     await this.prisma.stepExecution.update({
       where: { id: row.id },
       data: {
@@ -191,6 +221,7 @@ export class StepExecutionService {
         result: result ?? row.result,
         durationSec: newCtx.elapsedSec || row.durationSec,
         notes: this.serializeNotes(newCtx.notes),
+        data: this.serializeRecoveryData(updatedRecovery),
         startedAt: startedAt,
         completedAt,
         operatorId: newCtx.operatorId ?? row.operatorId,
@@ -210,6 +241,8 @@ export class StepExecutionService {
         status: toStatus,
         event: event.type,
         payload: event,
+        recoveryStage: updatedRecovery.recoveryStage,
+        attemptCount: updatedRecovery.attemptCount,
       },
     })
 
@@ -235,6 +268,29 @@ export class StepExecutionService {
       changedAt,
     })
 
+    // Auto-scrap rule (D5): when COMPLETE_NOK lands on `blocked` AND the step
+    // has already exhausted MAX_RECOVERY_ATTEMPTS recovery cycles, chain a
+    // MARK_SCRAPPED transition. Audit + emit fire for both transitions so the
+    // operator sees the final scrapped state and the trail is preserved.
+    if (
+      toStatus === 'blocked' &&
+      event.type === 'COMPLETE_NOK' &&
+      priorRecovery.attemptCount >= MAX_RECOVERY_ATTEMPTS
+    ) {
+      const scrapResult = await this.applyTransition({
+        stepExecutionId: req.stepExecutionId,
+        workOrderId: req.workOrderId,
+        event: {
+          type: 'MARK_SCRAPPED',
+          by: req.changedBy,
+          reason: 'auto_scrap_max_attempts',
+        },
+        changedBy: req.changedBy,
+        plantId: req.plantId,
+      })
+      return { ...scrapResult, autoScrapped: true }
+    }
+
     return {
       stepExecutionId: row.id,
       workOrderId: row.workOrderId,
@@ -244,6 +300,9 @@ export class StepExecutionService {
       changedAt,
       notes: newCtx.notes,
       causeCode: newCtx.causeCode,
+      recoveryStage: updatedRecovery.recoveryStage,
+      attemptCount: updatedRecovery.attemptCount,
+      autoScrapped: false,
     }
   }
 
@@ -348,6 +407,89 @@ export class StepExecutionService {
 
   private serializeNotes(notes: string[]): string {
     return JSON.stringify(notes)
+  }
+
+  /**
+   * Reads `recoveryStage` and `attemptCount` from the StepExecution.data JSON
+   * column. Tolerant of missing fields and legacy form-data payloads (e.g.,
+   * scan results) by returning defaults when absent.
+   */
+  private parseRecoveryData(raw: string | null): RecoveryDataPayload {
+    if (!raw) return { recoveryStage: null, attemptCount: 0 }
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      const stage = parsed['recoveryStage']
+      const count = parsed['attemptCount']
+      return {
+        recoveryStage: this.coerceRecoveryStage(stage),
+        attemptCount: typeof count === 'number' && Number.isFinite(count) ? count : 0,
+      }
+    } catch {
+      return { recoveryStage: null, attemptCount: 0 }
+    }
+  }
+
+  private serializeRecoveryData(payload: RecoveryDataPayload): string {
+    return JSON.stringify(payload)
+  }
+
+  private coerceRecoveryStage(value: unknown): RecoveryStage | null {
+    if (
+      value === 'diagnosis' ||
+      value === 'attempt_1' ||
+      value === 'attempt_2' ||
+      value === 'scrap' ||
+      value === 'recovered'
+    ) {
+      return value
+    }
+    return null
+  }
+
+  /**
+   * Computes new recovery state given the transition just executed.
+   *
+   * Rules:
+   *   running → blocked (COMPLETE_NOK):
+   *     - If no prior recovery, mark stage = diagnosis (operator deciding).
+   *     - If a recovery cycle was in flight (attemptCount > 0), the failure
+   *       advances the stage to attempt_N (matching the count). Auto-scrap
+   *       is enforced by the caller when attemptCount >= MAX.
+   *   blocked → recovered (RECOVER):
+   *     - Increment attemptCount; stage tracks the upcoming retry slot.
+   *   * → scrapped (MARK_SCRAPPED): stage = scrap.
+   *   pending/* → running on RESET: clear recovery state.
+   */
+  private deriveRecoveryState(
+    from: StepExecutionStatus,
+    to: StepExecutionStatus,
+    eventType: string,
+    prior: RecoveryDataPayload,
+  ): RecoveryDataPayload {
+    if (to === 'scrapped') {
+      return { recoveryStage: 'scrap', attemptCount: prior.attemptCount }
+    }
+
+    if (to === 'blocked' && eventType === 'COMPLETE_NOK') {
+      if (prior.attemptCount === 0) {
+        return { recoveryStage: 'diagnosis', attemptCount: 0 }
+      }
+      const stage: RecoveryStage =
+        prior.attemptCount === 1 ? 'attempt_1' : 'attempt_2'
+      return { recoveryStage: stage, attemptCount: prior.attemptCount }
+    }
+
+    if (from === 'blocked' && to === 'recovered' && eventType === 'RECOVER') {
+      const next = prior.attemptCount + 1
+      const stage: RecoveryStage = next === 1 ? 'attempt_1' : 'attempt_2'
+      return { recoveryStage: stage, attemptCount: next }
+    }
+
+    if (eventType === 'RESET') {
+      return { recoveryStage: null, attemptCount: 0 }
+    }
+
+    return prior
   }
 
   private deriveResult(

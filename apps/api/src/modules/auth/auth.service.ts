@@ -10,6 +10,13 @@ export type AuthOperator = {
   lastName: string
   plantId: string
   status: string
+  /**
+   * Skill codes the operator currently holds (e.g. ['QC', 'EXT']).
+   * Added in D5 of PROMPT_5_FULL so the HMI can decide whether to expose
+   * QC review actions without a separate API roundtrip. Existing clients
+   * that ignore this field continue to work.
+   */
+  skillCodes: string[]
 }
 
 type RawOperator = {
@@ -20,6 +27,7 @@ type RawOperator = {
   plantId: string
   status: string
   pinHash: string | null
+  operatorSkills?: Array<{ skill: { code: string } }>
 }
 
 @Injectable()
@@ -32,6 +40,7 @@ export class AuthService {
   async login(badge: string, pin: string): Promise<{ token: string; operator: AuthOperator }> {
     const operator = (await this.prisma.operator.findFirst({
       where: { badge, deletedAt: null, status: 'active' },
+      include: { operatorSkills: { include: { skill: true } } },
     })) as RawOperator | null
 
     if (!operator || !operator.pinHash) {
@@ -52,6 +61,7 @@ export class AuthService {
   async me(operatorId: string): Promise<AuthOperator> {
     const operator = (await this.prisma.operator.findFirst({
       where: { id: operatorId, deletedAt: null, status: 'active' },
+      include: { operatorSkills: { include: { skill: true } } },
     })) as RawOperator | null
     if (!operator) throw new UnauthorizedException()
     return this.sanitize(operator)
@@ -65,6 +75,7 @@ export class AuthService {
       lastName: op.lastName,
       plantId: op.plantId,
       status: op.status,
+      skillCodes: (op.operatorSkills ?? []).map((s) => s.skill.code),
     }
   }
 }

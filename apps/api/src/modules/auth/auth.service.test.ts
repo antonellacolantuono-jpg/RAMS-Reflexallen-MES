@@ -12,6 +12,7 @@ type RawOperator = {
   status: string
   deletedAt: Date | null
   pinHash: string | null
+  operatorSkills?: Array<{ skill: { code: string } }>
 }
 
 function makePrisma(operator: RawOperator | null) {
@@ -59,8 +60,19 @@ describe('AuthService.login', () => {
       lastName: 'Rossi',
       plantId: 'plant-1',
       status: 'active',
+      skillCodes: [],
     })
     expect((result.operator as Record<string, unknown>)['pinHash']).toBeUndefined()
+  })
+
+  it('exposes operator skill codes on login (D5)', async () => {
+    const op = baseOperator({
+      pinHash,
+      operatorSkills: [{ skill: { code: 'EXT' } }, { skill: { code: 'QC' } }],
+    })
+    const service = new AuthService(makePrisma(op), makeJwt())
+    const result = await service.login('OP-001', '1234')
+    expect(result.operator.skillCodes).toEqual(['EXT', 'QC'])
   })
 
   it('throws UnauthorizedException for unknown badge', async () => {
@@ -94,7 +106,18 @@ describe('AuthService.me', () => {
     const service = new AuthService(makePrisma(op), makeJwt())
     const result = await service.me('op-1')
     expect(result.id).toBe('op-1')
+    expect(result.skillCodes).toEqual([])
     expect((result as Record<string, unknown>)['pinHash']).toBeUndefined()
+  })
+
+  it('exposes skill codes on me() for D5 QC review gating', async () => {
+    const op = baseOperator({
+      pinHash: 'irrelevant',
+      operatorSkills: [{ skill: { code: 'QC' } }, { skill: { code: 'TEST' } }],
+    })
+    const service = new AuthService(makePrisma(op), makeJwt())
+    const result = await service.me('op-1')
+    expect(result.skillCodes).toEqual(['QC', 'TEST'])
   })
 
   it('throws when operator not found', async () => {

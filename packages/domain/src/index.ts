@@ -61,3 +61,13 @@ export type {
   ParallelLayout,
   SyncPoint,
 } from './rules/parallel-ops.rules'
+
+// quality-hold rules (D5 of PROMPT_5_FULL)
+export {
+  requiresQcApproval,
+  canApproveQcHold,
+  triggersQualityHold,
+  pickNokEvent,
+  QC_CATEGORY,
+  QC_SKILL_CODE,
+} from './rules/quality-hold.rules'
