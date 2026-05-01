@@ -1,33 +1,19 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 1, 2026, evening (🎉 **PROMPT_5_FULL 100% COMPLETE**)
-> **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
+> **Last update**: May 1, 2026, late evening (🎉 **PROMPT_4 complete in 45 min**)
+> **Repository**: https://github.com/antonellacolantuono-jpg/MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
 
 ---
 
-## 🎉 Major milestone: PROMPT_5_FULL is 100% complete
-
-After 6 deliverables across 2 days, the **HMI Execution layer is production-grade**:
+## 🎉 Major milestones reached today
 
 ```
-✅ D1 — Argon2id PIN auth + JWT cookies
-✅ D2 — HMI auth integration (real /api/auth/login + useMe + useMyWorkOrders)
-✅ D3 — XState 11-state step execution machine + persistence + AuditLog
-✅ D4 — Device Execution Group parallel swimlane + Step.deviceCategory
-✅ D5 — 4-stage recovery flow + quality holds + qc-review RBAC
-✅ D6 — WO release flow + WorkflowSnapshot + Socket.IO HMI listener
+✅ PROMPT_5_FULL — 100% (May 1 evening)
+✅ PROMPT_4      — 100% (May 1 late evening, 45 min vs 3-4h budget)
 ```
 
-**End-to-end demo navigable**:
-1. Plant Manager (OP-001) opens web admin → `/workflows/<approved_id>/release` → creates WO
-2. Backend deep-clones the workflow → creates WorkflowSnapshot (immutable per ADR-001) → creates StepExecutions
-3. Within 1 second, OP-002's HMI dashboard sees the new WO appear (Socket.IO `wo:assigned` event, no refresh)
-4. OP-002 opens WO → executes steps via XState 11-state machine → transitions persist with AuditLog
-5. NOK on attempt 2 auto-scraps server-side; QC review approves/rejects via `/qc-review`; parallel device groups render in swimlane
-6. Manager sees real-time `step:transition` events on Socket.IO (HMI listener wired in D6)
-
-This is **the operational backbone of the MES**. Everything from PROMPT_3c onward (snapshot live preview, dashboard reporting, auto-gen rules) builds on top of this.
+**6 PROMPT su 8 completati al 100%.** Restano solo PROMPT_3b_FULL, PROMPT_3c, PROMPT_6.
 
 ---
 
@@ -37,131 +23,120 @@ This is **the operational backbone of the MES**. Everything from PROMPT_3c onwar
 - **April 28** — PROMPT_2 Registries audited + recovered. PROMPT_3a D1-D3 merged
 - **April 29** — PC migration. PROMPT_3a D4-D6 merged. PROMPT_3a complete
 - **April 30 morning** — PROMPT_3b_REDUCED merged
-- **April 30 afternoon** — PROMPT_5_LITE merged. `finalize-prompt.ps1` added
+- **April 30 afternoon** — PROMPT_5_LITE merged
 - **April 30 evening** — PROMPT_5_FULL D1+D2 merged
 - **April 30 late evening** — PROMPT_5_FULL D3 merged
 - **May 1 morning** — PROMPT_5_FULL D4 merged
 - **May 1 afternoon** — PROMPT_5_FULL D5 merged
-- **May 1 evening** — **PROMPT_5_FULL D6 merged. PROMPT_5_FULL 100% complete.**
+- **May 1 evening** — PROMPT_5_FULL D6 merged. **PROMPT_5_FULL 100% complete**
+- **May 1 late evening** — **PROMPT_4 merged. AutoGenEngine + 7 resolvers + dry-run preview** (45 min execution time)
 
 ---
 
-## ✅ Current state (verified May 1 evening)
+## ✅ Current state (verified May 1 late evening)
 
-### PROMPT_1 — Foundation
-Monorepo + 14 packages + 3 apps + 6 XState v5 machines + 64 Prisma models + Reflexallen design system.
+### PROMPT_1-3a-3b_REDUCED-5_LITE
+(All complete — see git log for details)
 
-### PROMPT_2 — 13 Registries CRUD
-13 NestJS modules with full CRUD + soft-delete + audit. 18 web admin routes. HMI login (real Argon2). Seed with auth + WO assignments + MANAGER skill (D6).
+### PROMPT_5_FULL — Production-grade HMI execution (✅ 100% complete)
+6 deliverable: D1 Argon2+JWT, D2 HMI auth, D3 11-state machine, D4 parallel swimlane, D5 recovery+QC review, D6 WO release+Socket.IO.
 
-### PROMPT_3a — Workflow Designer Core (D1-D6)
-4-pane editor with xyflow canvas + dagre + Zustand store. 3 step configurator forms (PRODUCTION, QC, IDENTIFICATION).
+### PROMPT_4 — Auto-Generation Engine (✅ 100% complete — NEW May 1 late evening)
 
-### PROMPT_3b_REDUCED — Workflow Designer Advanced
-3 additional step forms (LOGISTICS, SETUP, RECOVERY) → 6/8 categories. ValidationPanel sidebar.
+**Strategia A approved**: implement logic for the 7 code-generator rules already seeded in PROMPT_2 (visible at `/auto-gen-rules`).
 
-### PROMPT_5_LITE — HMI Execution (mock data)
-PIN keypad login (mock), operator dashboard, workflow execution (useReducer 4-state), done screen.
+**8 deliverable consolidated in single atomic commit `b9c7472`** (45 min Claude Code time):
 
-### PROMPT_5_FULL — Production-grade HMI execution (✅ 100% COMPLETE May 1 evening)
+**D0 — Schema verification (ZERO new migration)**
+- All 6 entity Prisma models verified to exist (Lot, Box, MaintenanceOrder, RecipeVersion, Sample, DowntimeEvent)
+- Schema realities discovered:
+  - `Lot` uses `lotNumber` (not `code`) with `(plantId, lotNumber)` unique
+  - `Box.code` is globally `@unique` (no plantId scope)
+  - `RecipeVersion.version Int` (not semver string)
+  - `Sample.sampleNumber Int` and `DowntimeEvent` have no `code` field
+- Conclusion: count-based pattern from D6 reusable for all 7 resolvers, no schema changes needed
 
-**D1+D2 — Argon2 + JWT + HMI integration**
-- `Operator.pinHash String?` + Argon2id (memoryCost 64MB, timeCost 3) — OWASP 2024 compliant
-- JWT in HttpOnly cookie `mes_jwt`, 8h expiry
-- `/api/auth/login`, `/logout`, `/me`
-- HMI rewired to real auth + `useMe()` + `useMyWorkOrders()`
-- `GET /api/work-orders/mine` via WorkOrderAssignment + ShiftAssignment join
+**D1 — Engine core**
+- ✅ `apps/api/src/modules/auto-gen-engine/auto-gen-engine.service.ts` — Strategy pattern with DI registry
+- ✅ `auto-gen-engine.module.ts` wires 7 resolvers + dry-run controller
+- ✅ `interfaces/auto-gen-resolver.interface.ts` defines `IAutoGenResolver<C>`
+- ✅ `types.ts` exports `RULE_IDS` enum
+- ✅ +7 service tests (registry lookup, missing rule, multi-resolver dispatch, exception propagation)
 
-**D3 — XState 11-state step machine + persistence**
-- 11 states + 20 events (pending, running, paused, blocked, qc_hold, scrapped, done, skipped, cancelled, recovered, error)
-- `StepExecution.status` migration + index
-- `POST /api/work-orders/:id/steps/:stepExecId/transitions` with JwtAuthGuard
-- AuditLog persistence + Socket.IO server emit `step:transition`
-- HMI rewired with `useMachine()` + 4 new visual states on StepCard
+**D2 — 7 resolvers**
+- ✅ `lot-code.resolver.ts` (LOT-{ITEM}-{YEAR}-{SEQ}, +7 tests)
+- ✅ `wo-code.resolver.ts` (WO-{YYYYMMDD}-{NNN}, +6 tests, byte-identical extraction from D6)
+- ✅ `box-code.resolver.ts` (BOX-{TYPE}-{SEQ}, +6 tests)
+- ✅ `maintenance-code.resolver.ts` (MAINT-{EQUIPMENT}-{SEQ}, +6 tests)
+- ✅ `recipe-version.resolver.ts` (vN.0.0 from `version Int` count, +6 tests)
+- ✅ `sample-id.resolver.ts` (SAMPLE-{WO}-{STEP}-{SEQ}, +7 tests)
+- ✅ `downtime-event-id.resolver.ts` (DOWN-{EQUIPMENT}-{YYYYMMDD}-{SEQ}, +7 tests)
+- Pattern: `prisma.<entity>.count({ where: { ...scope, code: { startsWith: prefix } } })` + padding
+- All resolvers independently unit-testable with mocked PrismaService
 
-**D4 — Device Execution Group parallel swimlane**
-- `Step.deviceCategory String?` migration (pre / device_main / parallel / post)
-- `parallel-ops.rules.ts` + ParallelStepLane component with shared timer
-- API sync logic: when all parallel siblings done, main step auto-completes
-- Seed: 1 demo group with 5 steps spanning all 4 lanes
+**D3 — D6 release flow integration (CRITICAL — 17 existing tests stay green)**
+- ✅ `release.service.generateWoCode` extracted byte-identically into `WoCodeResolver`
+- ✅ `release.service` now delegates: `engine.resolve('2', { plantId, releasedAt })`
+- ✅ +1 D3 regression test asserts `engine.resolve('2', ctx) === oldGenerateWoCode(ctx)`
+- ✅ WO format unchanged (WO-YYYYMMDD-NNN, per Q2 reconciliation)
 
-**D5 — 4-stage recovery + quality holds**
-- Recovery XState machine (5 states + 5 events): diagnosis → attempt_1 → attempt_2 → recovered/scrap
-- `quality-hold.rules.ts` predicates
-- `/api/qc-review` module (list + approve + reject) with QC skill RBAC
-- `/api/auth/login` and `/me` extended with `skillCodes: string[]`
-- Auto-scrap server-side: `COMPLETE_NOK` with `attemptCount >= 2` chains `MARK_SCRAPPED`
-- HMI: RecoveryFlow component (Italian stepper) + `/qc-review` routes
-- Zero schema change (recoveryStage + attemptCount in `StepExecution.data Json`)
+**D4 — Dry-run controller**
+- ✅ `POST /api/auto-gen-rules/:id/dry-run` with JwtAuthGuard
+- ✅ Per-rule Zod discriminated union schema in `packages/schemas/src/registries/auto-gen-rule.schema.ts`
+- ✅ Returns `{ code: string, contextEcho: object }` — never writes to DB
+- ✅ +8 controller tests (valid dry-run for representative rules, invalid context → 400, unknown ruleId → 404)
 
-**D6 — WO release flow + Socket.IO HMI listener (NEW May 1 evening)**
+**D5 — Web admin dry-run UI**
+- ✅ `apps/web/src/app/(registries)/auto-gen-rules/page.tsx` — added "Prova regola" button per card
+- ✅ `apps/web/src/app/(registries)/auto-gen-rules/[id]/dry-run/page.tsx` — Italian per-rule input form + result card
+- ✅ `AutoGenRulesClient.dryRun(ruleId, context)` added to SDK
+- ✅ Corrected `AutoGenRuleModel` SDK shape (removed phantom `code`/`isActive` fields)
 
-*Backend*:
-- ✅ `apps/api/src/modules/work-orders/release.service.ts` (380 lines) — transactional WO + WorkflowSnapshot + StepExecution[] + WorkOrderAssignment creation
-- ✅ `apps/api/src/modules/work-orders/release.controller.ts` (39 lines) — `POST /api/work-orders/release` with MANAGER skill RBAC
-- ✅ Deep-clone immutable: `WorkflowSnapshot.snapshotData String` (JSON-serialized full tree per ADR-001)
-- ✅ WO code format: `WO-YYYYMMDD-NNN` per-plant per-day sequence
-- ✅ Audit log entry `state_change` on release; `actualStart=null` (set by first START transition)
-- ✅ Events gateway extended: `wo:released` (broadcast), `wo:assigned` (per-operator room `op:${operatorId}`)
-- ✅ +27 API tests (release service 17 + controller 4 + events gateway 6)
+**D6 — Schema/service drift fix (opportunistic)**
+- ✅ `AUTO_GEN_TRIGGERS` enum in `@mes/schemas` aligned to actual seeded triggers (`lot_created`, `work_order_created`, `box_created`, `maintenance_created`, `recipe_version_created`, `sample_created`, `downtime_created`) — was outdated `work_order_released`, `lot_received`, etc.
+- ✅ `AUTO_GEN_SCOPES` aligned to the 7 actual scopes
+- ✅ Rule 2 description in `auto-gen-rules.service.ts` updated to `WO-{YYYYMMDD}-{NNN}` (matches D6 reality)
 
-*Domain*:
-- ✅ `packages/domain/src/rules/workflow-snapshot.rules.ts` (243 lines) — `cloneWorkflowTree(version)` + 12 rule tests for ordering, empty groups, parallel device categories
-- ✅ `packages/domain/src/rules/manager.rules.ts` — `MANAGER_SKILL_CODE` + `canRelease` helper
+**D7 — Archive obsolete spec**
+- ✅ `prompts/PROMPT_4_AUTO_GENERATION.md` (workflow-step enrichment spec — never implemented) moved to `prompts/archive/PROMPT_4_workflow_step_rules_obsolete.md` with deprecation note prepended
+- ✅ Pattern consistent with existing archive (`PROMPT_1B_obsolete.md`, `PROMPT_3_WORKFLOW_DESIGNER_obsolete.md`)
+- ✅ TODO-027 added: PROMPT_4_PHASE_2 wiring engine to entity creation flows for Lot/Box/Maint/Recipe/Sample/Downtime (~10-15h, post-MVP)
+- ✅ TODO-028 added: pointer to archived workflow-step rules spec for potential future PROMPT_4b
 
-*Web admin*:
-- ✅ `apps/web/src/app/(registries)/workflows/[id]/release/page.tsx` (281 lines) — react-hook-form + Zod release form
-- ✅ "Rilascia WO" button on workflow detail (visible only when `currentVersion.status === 'approved'`)
-- ✅ `EntityForm` extended with `submitLabel` prop (additive)
+**D8 — Final DoD**
+- ✅ `pnpm build`: 12/12 successful, 0 errors
+- ✅ `pnpm lint`: 3/3 clean
+- ✅ `pnpm test`: 431 tests passed across 40 files (was 370/31, +61/+9)
+- ✅ `prisma migrate status`: 4 migrations (no new — PROMPT_4 added zero)
+- ✅ Single atomic commit `b9c7472` on `claude/musing-lalande-20499e`, pushed and merged via finalize-prompt.ps1
 
-*HMI*:
-- ✅ `apps/hmi/src/lib/socket.ts` (49 lines) — singleton socket.io-client with JWT cookie credentials
-- ✅ `useWoAssignedSubscription(operatorId)` — joins `op:${operatorId}` room, invalidates `myWorkOrders` on event
-- ✅ `useStepTransitionSubscription(workOrderId)` — joins `wo:${workOrderId}` room, invalidates `workOrderSteps` on event
-- ✅ Wired into dashboard + wo/[id] pages
-- ✅ `socket.io-client@^4.7.5` added (matches v4 server)
+### Verification evidence (May 1 late evening — post-PROMPT_4)
 
-*Seed*:
-- ✅ MANAGER skill added (`leadership` category)
-- ✅ OP-001 assigned MANAGER skill (idempotent)
-- ✅ Demo workflow migrated to status `approved` for release smoke test
+- ✅ `pnpm install`: clean
+- ✅ `pnpm build`: 12 successful / 12 total, 0 errors (FULL TURBO cached)
+- ✅ `pnpm lint`: 3/3, 0 errors
+- ✅ `pnpm test`: **431 tests passed across 40 files**, 0 failed (was 370/31; +61 from PROMPT_4)
+- ✅ `prisma migrate status`: 4 migrations (init + pinHash D1 + status D3 + deviceCategory D4), schema in sync — **PROMPT_4 added zero migrations**
 
-**Runtime smoke verified end-to-end (Gate C)**:
-1. OP-001 (MANAGER) → POST `/api/work-orders/release` → 200 + `WO-20260501-001` + snapshot + 5 stepExec ✅
-2. OP-002 (no MANAGER) → POST `/api/work-orders/release` → 403 Forbidden ✅
-3. OP-002 GET `/api/work-orders/mine` → released WO appears (status=`ready`, qty=25) ✅
-4. Snapshot is immutable: `WorkflowSnapshot.snapshotData` JSON deep-cloned from version, FK back to WO ✅
-
-### Verification evidence (May 1 evening — post-D6)
-
-- ✅ `pnpm install`: deps consistent (socket.io-client@4.8.3 added)
-- ✅ `pnpm build`: 12 successful / 12 total, 0 errors
-- ✅ `pnpm lint`: 3/3, 0 errors (only pre-existing `<img>` warnings from D2 carry-over)
-- ✅ `pnpm test`: **370 tests passed across 28 files**, 0 failed (was 331 in D5; +39 from D6: 12 domain + 27 api)
-- ✅ `prisma migrate status`: 4 migrations applied (init + pinHash D1 + status D3 + deviceCategory D4), schema in sync — **D6 added zero migrations**
-- ✅ `pnpm dev`: API + Web + HMI all "ready"; new endpoints + socket events functioning end-to-end
-
-### Test breakdown (May 1 evening — post-D6)
+### Test breakdown (May 1 late evening — post-PROMPT_4)
 
 | Package | Test files | Tests passed |
 |---|---|---|
-| `@mes/api` | 14 | 158 |
+| `@mes/api` | 22 | 219 |
 | `@mes/domain` | 11 | 164 |
 | `@mes/schemas` | 3 | 29 |
 | `@mes/cache` | 1 | 8 |
 | `@mes/storage` | 1 | 6 |
 | `@mes/queue` | 1 | 5 |
-| **Total** | **31** | **370** |
+| **Total** | **40** | **431** |
 
-Domain (D6 additions): **workflow-snapshot.rules** (12) + **manager.rules** (2).
-
-API (D6 additions): **release.service** (17) + **release.controller** (4) + **work-order-events.gateway** (6).
+API additions PROMPT_4: auto-gen-engine.service (7) + 7 resolvers (45) + dry-run.controller (8) + release.service +1 regression = **+61 tests**.
 
 ---
 
 ## 🟡 Known issues (TODO list)
 
-21 entries currently tracked. PROMPT_5_FULL D6 closed TODO-021 + TODO-023. Quick summary:
+23 entries currently tracked. PROMPT_4 added TODO-027 + TODO-028. Quick summary:
 
 **HIGH severity (open)**:
 - TODO-008 — PARALLEL + TEARDOWN step forms (PROMPT_3b_FULL)
@@ -171,23 +146,25 @@ API (D6 additions): **release.service** (17) + **release.controller** (4) + **wo
 **MEDIUM severity (open)**:
 - TODO-001..016 (registry/cosmetic/scope-deferred items)
 - TODO-024 — Change-of-shift / hand-off flow (post-MVP)
-- TODO-026 — Per-stage StepExecution model (D5 deferral, may need for PROMPT_4)
+- TODO-026 — Per-stage StepExecution model (D5 deferral)
+- **TODO-027** (NEW) — PROMPT_4_PHASE_2: wire AutoGenEngine to entity creation flows for Lot/Box/Maint/Recipe/Sample/Downtime (~10-15h, post-MVP)
+- **TODO-028** (NEW) — Pointer to archived workflow-step rules spec for potential future PROMPT_4b
 
 **LOW severity**:
 - TODO-025 — HMI logo cross-reference to TODO-002
 
-**Closed by PROMPT_5_FULL**:
+**Closed by recent PROMPTs**:
 - TODO-004 (Argon2 PIN) — D1
 - TODO-018 (11-state machine) — D3
 - TODO-019 (parallel ops) — D4
 - TODO-020 (4-stage recovery) — D5
-- TODO-021 (WO release flow) — **D6** ✅
+- TODO-021 (WO release flow) — D6
 - TODO-022 (StepExecution persistence) — D3
-- TODO-023 (Socket.IO real-time) — **D6** ✅
+- TODO-023 (Socket.IO real-time) — D6
 
 ---
 
-## 🚀 Roadmap — re-baselined May 1 evening
+## 🚀 Roadmap — re-baselined May 1 late evening
 
 | Phase | Scope | Status | Time estimate |
 |---|---|---|---|
@@ -196,15 +173,13 @@ API (D6 additions): **release.service** (17) + **release.controller** (4) + **wo
 | PROMPT_3a | Workflow Designer Core | ✅ Done | — |
 | PROMPT_3b_REDUCED | Advanced (3 forms + Validation) | ✅ Done | — |
 | PROMPT_5_LITE | HMI Execution (mock) | ✅ Done | — |
-| **PROMPT_5_FULL** | **Production-grade HMI (D1-D6 all merged)** | **✅ 100% COMPLETE (May 1)** | — |
-| PROMPT_4 | Auto-Generation Engine (7 rules) | ⏭️ Next | 3-4h |
+| PROMPT_5_FULL | Production-grade HMI (D1-D6) | ✅ Done | — |
+| **PROMPT_4** | **Auto-Generation Engine (7 resolvers + dry-run)** | **✅ Done (May 1)** | — |
 | PROMPT_3b_FULL | PARALLEL/TEARDOWN forms + versioning UI + templates + canvas polish | ⏭️ Planned | 6-8h |
 | PROMPT_6 | Dashboard & Reporting (handoff Claude Design `index.html`) | ⏭️ Planned | 5-7h |
-| PROMPT_3c | WorkflowSnapshot live preview + 11-state preview + performance + E2E | ⏭️ UNBLOCKED | 8-10h |
+| PROMPT_3c | WorkflowSnapshot live preview + 11-state preview + performance + E2E | ⏭️ Planned | 8-10h |
 
-**Realistic MVP target**: end of week 2 (May 9-12).
-
-PROMPT_3c is now **unblocked** because PROMPT_5_FULL D6 ships the WO release + WorkflowSnapshot foundation. The live preview can simulate the full execution against a real snapshot.
+**Realistic MVP target**: end of week 2 (May 9-12). 3 PROMPT residui ~20-25h Claude Code.
 
 ---
 
@@ -212,92 +187,109 @@ PROMPT_3c is now **unblocked** because PROMPT_5_FULL D6 ships the WO release + W
 
 ### Technical
 - **Stack**: pnpm workspaces + Turborepo, React 18, Next.js 14, NestJS 10, TypeScript strict
-- **DB**: SQLite local (NOT PostgreSQL), in-memory cache, sync queue, local filesystem
-- **Auth**: ✅ Argon2id implemented for PIN. JWT in HttpOnly cookie. NEVER bcrypt.
-- **State machines**: XState v5. **6 machines**: Box, Equipment, WorkOrder, Workflow, StepExecution, Recovery
-- **Validation**: Zod (FE+BE shared schemas via `@mes/schemas`)
-- **Real-time**: ✅ Socket.IO (server emit + HMI listener both wired as of D6)
+- **DB**: SQLite local
+- **Auth**: ✅ Argon2id implemented for PIN. JWT in HttpOnly cookie
+- **State machines**: XState v5 — 6 machines (Box, Equipment, WorkOrder, Workflow, StepExecution, Recovery)
+- **Validation**: Zod (FE+BE shared via `@mes/schemas`)
+- **Real-time**: Socket.IO (server emit + HMI listener as of D6)
 - **Workflow Designer**: `@xyflow/react` + `@dagrejs/dagre` + Zustand + react-hook-form + Zod
-- **HMI**: Zustand UI state + `@tanstack/react-query` server state + `@xstate/react` step execution + `socket.io-client` for live updates
-- **RBAC**: skill-based via `OperatorSkill` join — pattern reusable for QC, MANAGER, future roles
+- **HMI**: Zustand + `@tanstack/react-query` + `@xstate/react` + `socket.io-client`
+- **RBAC**: skill-based via `OperatorSkill` join (QC, MANAGER, future roles)
+- **Code generation**: ✅ AutoGenEngine pattern (Strategy + DI registry) for all sequence/format generators
 
 ### Compliance
-- IATF 16949 → audit log 15+ years (every WO release + step transition + recovery + qc-review logged)
+- IATF 16949 → audit log 15+ years (every WO release + step transition + recovery + qc-review + auto-gen logged)
 - GDPR → operator data minimization
-- ECE-R104 (Safety Devices) → reflectance thresholds, homologation
-- 21 CFR Part 11 → electronic signatures (D5 quality holds capture approver identity in AuditLog; D6 release captures `releasedBy`)
+- ECE-R104 (Safety Devices) → reflectance thresholds
+- 21 CFR Part 11 → electronic signatures (D5 quality holds, D6 release captures `releasedBy`)
 - **PIN auth**: Argon2id — OWASP 2024 compliant
-- **WorkflowSnapshot immutability**: ADR-001 enforced (deep-clone JSON, never edited)
+- **WorkflowSnapshot immutability**: ADR-001 enforced (deep-clone JSON)
 
 ---
 
 ## ⚠️ Lessons learned (consolidated)
 
 ### Original (April 28-29) — 12 lessons
-Trust filesystem, DoD compliance, worktree inspection, server processes, `.env` paths, `pnpm test` ≠ `tsc`, `prisma generate` per-worktree, no `.js` extensions, dist consumers, Windows PATH, corepack bugs, pre-flight check.
+Trust filesystem, DoD compliance, worktree inspection, server processes, .env paths, pnpm test ≠ tsc, prisma generate per-worktree, no .js extensions, dist consumers, Windows PATH, corepack bugs, pre-flight check.
 
-### April 30 morning/afternoon (D1-D5) — 18 lessons
-Plan-mode + git push, worktree locks, useReducer vs XState, hydration-safe routes, primitive reuse, build gate, schema verification, canonical models, inline utils, `finalize-prompt.ps1`, generic 401, defense-in-depth, discovery-before-extension, zero schema change, RBAC OperatorSkill, server-side enforcement, `pickNokEvent` smart routing, additive API extensions.
+### April 30 (D1-D5) — 24 lessons
+Plan-mode + git push, worktree locks, useReducer vs XState, hydration-safe routes, primitive reuse, build gate, schema verification, canonical models, inline utils, finalize-prompt.ps1, generic 401, defense-in-depth, discovery-before-extension, zero schema change, RBAC OperatorSkill, server-side enforcement, pickNokEvent smart routing, additive API extensions.
 
-### May 1 evening (D6) — 6 new lessons
+### May 1 (D6 + PROMPT_4) — 12 new lessons
 
-37. **Schema verification can be PASS in one shot**: D6's plan check confirmed all needed fields exist on `WorkflowSnapshot`, `WorkOrder`, `StepExecution`, `WorkOrderAssignment` without proposing any migration. Pattern: when adding a flow that orchestrates existing entities, schema gap is rare.
+37-42. (D6 lessons preserved)
 
-38. **MANAGER skill follows QC skill pattern**: D5 added QC skill assignments to OP-002. D6 adds MANAGER skill to OP-001. Same shape, same idempotent seed pattern. Future roles (e.g., MAINTENANCE) follow this template.
+43. **Strategy pattern + DI registry for code generation**: 7 resolvers each implementing `IAutoGenResolver`, registered via NestJS DI tokens. Clean separation, easy to add 8th resolver later. Pattern reusable for any "rule engine" where N implementations share an interface.
 
-39. **Single transactional release is non-negotiable**: WO release creates 4-5 entity types (WorkOrder + WorkflowSnapshot + StepExecution[] + WorkOrderAssignment + optional ShiftAssignment). Wrapping in `prisma.$transaction` prevents partial state on failure. Pattern for any future "release"-style operation.
+44. **Byte-identical extraction = zero behavior change**: D6's `generateWoCode` was extracted into `WoCodeResolver` with the same query, same padding, same prefix. **17 existing tests stayed green** without modification. Pattern: when refactoring inline logic into a service, preserve the exact algorithm — assert via 1 regression test that old vs new return same output for same inputs.
 
-40. **WorkflowSnapshot as `String` JSON column (not separate tables)**: simplest pattern for immutable deep-clone. Pros: no FK cascade complexity, no orphan rows, fits ADR-001 immutability semantics. Cons: snapshot internals are not queryable via Prisma. Acceptable for MVP; may evolve in PROMPT_3c if live preview needs structured queries.
+45. **Schema/service drift opportunistic fix**: while implementing PROMPT_4, found `AUTO_GEN_TRIGGERS` enum in `@mes/schemas` had different values from actual seeded triggers in service. Fixed in same commit since touching the file anyway. Pattern: when working on a file, scan for related drift and fix opportunistically (no separate PR needed for trivial alignments).
 
-41. **Socket.IO subscription pattern via react-query `invalidateQueries`**: instead of mirroring server state in local Zustand or maintaining a separate live cache, the listener invalidates the relevant query key. React-query refetches. No duplicate state, no stale UI, no memory leak. Pattern for any future Socket.IO-driven real-time UI.
+46. **Count-based pattern is timeless for sequence generation**: `prisma.<entity>.count({ where: { ...scope, code: { startsWith: prefix } } })` works for any code generator without lock infrastructure or AutoGenSequence table. Limitation: not collision-safe under high concurrency. For MVP single-user scenarios, perfect. Production-grade may need Postgres `nextval()` or distributed lock.
 
-42. **Multi-room emit targeting**: D6 introduces room-targeted emits (`op:${operatorId}` and `wo:${workOrderId}`). Manager broadcasts to all (`wo:released`), but per-operator events go to specific rooms. Foundation for PROMPT_6 dashboard real-time KPIs (probably room `dashboard:plant:${plantId}`).
+47. **45 minutes vs 3-4h budget = 5× faster than estimate**: PROMPT_4 finished in <1h thanks to (a) zero schema migration, (b) reuse of D6 count-based pattern, (c) pure Strategy resolvers (no async/locks). Lesson: when a prompt's dependencies are already in place from prior work, the effort drops dramatically.
+
+48. **Discriminated union Zod for per-rule validation**: dry-run controller validates context with a discriminated union keyed on `ruleId`. Each rule has its own Zod schema in `packages/schemas/src/registries/auto-gen-rule.schema.ts`. Single source of truth, type-safe across stack.
 
 ---
 
-## 🗂️ Repo structure (verified post-D6)
+## 🗂️ Repo structure (verified post-PROMPT_4)
 
 ```
 RAMS-Reflexallen-MES/
 ├── apps/
-│   ├── api/          ✅ 13 registry modules + audit + events (4 emit types) + workflows + auth + work-orders (with release endpoint) + qc-review
-│   ├── web/          ✅ 22 routes (registries + workflow editor + workflow release + new + trash + home)
-│   └── hmi/          ✅ 6 routes (login + dashboard + wo + done + qc-review × 2) + Argon2 + 11-state + parallel + recovery + Socket.IO
+│   ├── api/          ✅ 14 modules including auto-gen-engine (7 resolvers + dry-run)
+│   ├── web/          ✅ 22 routes (registries + workflow editor + workflow release + dry-run preview)
+│   └── hmi/          ✅ 6 routes + Argon2 + 11-state + parallel + recovery + Socket.IO
 ├── packages/
-│   ├── domain/       ✅ 6 XState machines + 5 rule files + 164 tests (now includes workflow-snapshot.rules + manager.rules)
-│   ├── prisma/       ✅ 64 models + 4 migrations + seed with 8 skills (incl. MANAGER) + demo released WO
-│   ├── schemas/      ✅ 13 registry schemas + workflow + auth + step-execution + work-order-release
-│   ├── sdk/          ✅ base-registry + 13 registry clients + workflows
+│   ├── domain/       ✅ 6 XState machines + 5 rule files + 164 tests
+│   ├── prisma/       ✅ 64 models + 4 migrations + seed (8 skills incl. MANAGER)
+│   ├── schemas/      ✅ 13 registry schemas + workflow + auth + step-execution + work-order-release + auto-gen-rule (with dry-run)
+│   ├── sdk/          ✅ all clients including AutoGenRulesClient.dryRun
 │   ├── types/        ✅ 11 enum files
-│   ├── ui/           ✅ 16 base + 8 Tier-2 primitives (EntityForm now supports submitLabel)
+│   ├── ui/           ✅ 16 base + 8 Tier-2 primitives
 │   ├── cache/        ✅ in-memory placeholder
 │   ├── queue/        ✅ sync placeholder
 │   └── storage/      ✅ local fs placeholder
 ├── design-system/    (Reflexallen handoff bundle)
 ├── docs/             (specs)
-├── prompts/          (PROMPT_1..3a, 3b_REDUCED, 5_LITE, 5_FULL, DOD_TEMPLATE v1.1, archive)
-└── scripts/          ✅ finalize-prompt.ps1 (battle-tested for 6 PROMPT_5_FULL deliverables)
+├── prompts/          (PROMPT_1..3a, 3b_REDUCED, 5_LITE, 5_FULL, DOD_TEMPLATE v1.1)
+│   └── archive/      (PROMPT_1B_obsolete, PROMPT_3_obsolete, PROMPT_4_workflow_step_rules_obsolete)
+└── scripts/          ✅ finalize-prompt.ps1 (battle-tested 8 times today)
 ```
 
 ---
 
 ## 🎯 Next concrete action
 
-PROMPT_5_FULL is complete. The natural next step is **PROMPT_4 (Auto-Generation Engine)** to leverage the new release flow + StepExecution surface that D6 just shipped.
+3 PROMPT residui ordinati per priorità raccomandata:
 
-**PROMPT_4 — Auto-Generation Engine**:
-- Implements logic for the 7 rules already seeded in PROMPT_2 (visible at `/auto-gen-rules`):
-  - BOM Check on Setup start
-  - First piece sample (100% Production batch)
-  - Calibration interval check
-  - Tool wear projection
-  - Attention point auto-resolve
-  - Periodic QC sample (every N units)
-  - End-of-shift cleanup
-- Trigger: when a WO is released (D6 endpoint), auto-gen evaluates rules and inserts steps
-- UI: lists existing rules (read-only — already done) + dry-run preview "what would auto-gen do for this WO?"
+### Option A — PROMPT_3b_FULL (6-8h)
+Completa il Workflow Designer con:
+- 2 step forms residui (PARALLEL + TEARDOWN)
+- Versioning UI (submit-for-approval, approve/reject, publish-as-effective modali)
+- Templates wizard (3 template Pneumatic Air seedati)
+- Canvas polish (right-click context menu, keyboard shortcuts, drag-to-reorder)
+- Inline validation badges sui nodi del canvas (oltre ValidationPanel)
+- Phase + Group configurator forms
 
-Estimated time: 3-4h Claude Code. Same flow as D6: PHASE 0 → 1 → 2 → 3 → auto-push → finalize-prompt.ps1.
+### Option B — PROMPT_6 Dashboard (5-7h, con handoff Claude Design)
+Dashboard manager con:
+- Plant Overview (KPI cards: OEE, Throughput, Scrap, ecc.)
+- Active Work Orders list
+- Live Activity feed (Socket.IO)
+- Andon dashboard a parete (auto-refresh)
+- Reportistica (export Excel/PDF)
+- Detail page WO (la pagina dell'`index.html` di Claude Design)
+
+### Option C — PROMPT_3c (8-10h, è il più complesso)
+WorkflowSnapshot + Live Preview con:
+- Snapshot immutability tests
+- Live preview 11-state simulation nel workflow editor
+- Performance ottimizzazioni (canvas con 100+ nodi)
+- E2E Playwright tests
+
+**Mia raccomandazione**: Option B (PROMPT_6 Dashboard). È il più "visibile" e usa il handoff Claude Design già pronto. Aggiunge il "lato manager" che oggi manca.
 
 ---
 
@@ -307,15 +299,13 @@ Estimated time: 3-4h Claude Code. Same flow as D6: PHASE 0 → 1 → 2 → 3 →
 PROMPT_1   ████████████ 100% Foundation
 PROMPT_2   ████████████ 100% Registries
 PROMPT_3a  ████████████ 100% Workflow Core
-PROMPT_3b  ███████░░░░░  60% (REDUCED done; FULL deferred)
-PROMPT_4   ░░░░░░░░░░░░   0% Auto-gen (NEXT)
-PROMPT_5   ████████████ 100% 🎉 PRODUCTION-GRADE HMI
-PROMPT_3c  ░░░░░░░░░░░░   0% (unblocked by D6)
+PROMPT_3b  ███████░░░░░  60% (REDUCED)
+PROMPT_4   ████████████ 100% 🎉 AUTO-GEN ENGINE (45 min)
+PROMPT_5   ████████████ 100% PRODUCTION-GRADE HMI
+PROMPT_3c  ░░░░░░░░░░░░   0% (unblocked)
 PROMPT_6   ░░░░░░░░░░░░   0% (handoff Claude Design ready)
-─────────────────────────────────────
-MVP target: 9-12 May | Tests: 370 | Build: 12/12 | TODOs: 21 open (2 closed by D6)
+─────────────────────────────────
+75% MVP done | Tests 431 (+227% from baseline 127) | Build 12/12 | TODOs 23 | 6/8 PROMPT done
 ```
 
-**6/8 PROMPT done at 50%+** | **Test +191% in 5 days** (127 → 370) | **MVP at 68%**.
-
-PROMPT_5_FULL was the largest prompt of the project (8-10h Claude Code distributed across 6 deliverables). Closing it represents reaching the operational core of the MES. Everything from here builds on a stable, audited, production-grade execution layer.
+**Realistic MVP target**: 8-12 May. 3 PROMPT residui (~20-25h Claude Code).
