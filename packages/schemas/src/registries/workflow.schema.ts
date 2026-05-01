@@ -63,11 +63,31 @@ export const UpdateWorkflowVersionSchema = z
   })
   .partial()
 
+// ── Versioning lifecycle (PROMPT_3b Session B) ───────────────────────────────
+
+export const DeprecateWorkflowVersionSchema = z.object({
+  reason: z
+    .string()
+    .min(10, 'La motivazione deve contenere almeno 10 caratteri')
+    .max(2000),
+})
+
+// ── Templates wizard (PROMPT_3b Session B) ───────────────────────────────────
+
+export const CloneWorkflowSchema = z.object({
+  code: z.string().min(1).max(50),
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  plantId: z.string().cuid().optional(),
+})
+
 // ── Derived types ─────────────────────────────────────────────────────────────
 
 export type CreateWorkflowDto = z.infer<typeof CreateWorkflowSchema>
 export type UpdateWorkflowDto = z.infer<typeof UpdateWorkflowSchema>
 export type UpdateWorkflowVersionDto = z.infer<typeof UpdateWorkflowVersionSchema>
+export type DeprecateWorkflowVersionDto = z.infer<typeof DeprecateWorkflowVersionSchema>
+export type CloneWorkflowDto = z.infer<typeof CloneWorkflowSchema>
 export type WorkflowPhaseInput = z.infer<typeof WorkflowPhaseInputSchema>
 export type WorkflowGroupInput = z.infer<typeof WorkflowGroupInputSchema>
 export type WorkflowStepInput = z.infer<typeof WorkflowStepInputSchema>

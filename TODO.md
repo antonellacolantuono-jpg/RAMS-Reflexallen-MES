@@ -114,17 +114,12 @@
 
 ### TODO-010 — PROMPT_3b_FULL: versioning UI lifecycle modals
 
-**Discovered**: 2026-04-30 (during PROMPT_3b_REDUCED scope reduction)
-**File**: `apps/web/src/app/(registries)/workflows/[id]/page.tsx` + new modal components
-**Symptom**: Workflow API supports submit/approve/reject/publish (verified in PROMPT_3a D2) but UI exposes none of it. Engineers cannot move a workflow through draft→approved→deprecated states from the editor.
-**Acceptance criterion**:
-- Submit-for-approval modal with comment field (Process Engineer).
-- Approve / Reject modal (QC Manager).
-- Publish-as-effective modal (Plant Manager).
-- Version history sidebar showing prior versions and statuses.
-- Approval requires zero validation errors (gate via D2 ValidationPanel).
-**Estimated effort**: 3-4 hours
-**Blocker for**: production-grade workflow lifecycle management.
+**Status**: ✅ **CLOSED by PROMPT_3b_FULL Session B** (2026-05-01).
+**Wording correction**: original TODO described a 5-state submit→review→approve/reject→publish flow that does not exist in the codebase. The actual `WorkflowVersion` lifecycle is **3-state** (`draft → approved → deprecated`) per [packages/domain/src/machines/workflow.machine.ts](packages/domain/src/machines/workflow.machine.ts) and the `canTransition` rule. Session B implements that real lifecycle.
+**Resolution**:
+- Backend: 2 new controller endpoints (`POST /workflows/:id/versions/:vid/approve`, `…/deprecate`) + 2 service methods (`approveVersion`, `deprecateVersion`) gated by `canTransition` from `@mes/domain` + structural validation via `validateWorkflowStructure` on approve. `ConflictException` for invalid transitions; `BadRequestException` for empty/structural errors. Audit log entries with `state_change` action capture before/after status (and `reason` on deprecate). 12 new service tests + 4 new controller tests (zod parse + happy path).
+- Frontend: `ApproveVersionModal` (uses `useValidationContext` to block approval when validation errors are present), `DeprecateVersionModal` (required `reason` ≥10 chars, IATF traceability), `VersionHistorySidebar` (right rail, lists all versions with status/createdAt/approvedBy). Wired into the workflow detail page header.
+- SDK: `WorkflowsClient.approveVersion()` + `.deprecateVersion(reason)`.
 
 ---
 
@@ -240,33 +235,25 @@
 
 ### TODO-011 — PROMPT_3b_FULL: templates wizard ("Nuovo da template")
 
-**Discovered**: 2026-04-30 (during PROMPT_3b_REDUCED scope reduction)
-**File**: new `apps/web/src/components/workflow/TemplateWizard.tsx`
-**Symptom**: New workflows must be authored from scratch. Repeating common patterns (Pneumatic Air full pipeline, CFRP standard lamination, Safety Devices reflective lamination) wastes engineer time.
-**Acceptance criterion**:
-- "Nuovo da template" button on `/workflows` list.
-- At least 3 Pneumatic Air templates seeded from `MOCK_DATA_PNEUMATIC_AIR.md`.
-- Selecting a template clones its phases/groups/steps into a new draft workflow.
-**Estimated effort**: 2 hours
-**Blocker for**: nothing (productivity feature). Tied to TODO-005 / TODO-006 for CFRP and Safety Devices template seeds.
+**Status**: ✅ **CLOSED by PROMPT_3b_FULL Session B** (2026-05-01).
+**Resolution**:
+- Backend: new `POST /workflows/:id/clone` endpoint + `cloneWorkflow` service method + `cloneWorkflow` repository method (deep tree copy in a single Prisma transaction; new `id` on every Workflow/Phase/Group/Step row, source `plantId` preserved when not overridden, audit log entry with `sourceWorkflowId` in metadata). 6 new service tests + 5 new controller tests.
+- Seed: 3 reference templates added — `TPL_PNEU_EXTRUSION_V1`, `TPL_PNEU_CRIMPING_V1`, `TPL_PNEU_LEAK_TEST_V1` — each as a full `approved` Workflow + `WorkflowVersion v1` + Phase/Group/Step tree (extrusion: 2 phases, 5 steps; crimping: 2 phases, 4 steps; leak test: 1 phase, 4 steps including a DECISION step).
+- Frontend: new route `/workflows/from-template` with 3-step wizard (pick → configure → confirm). New `TemplatePicker` component renders a card grid filtered on `code: { startsWith: 'TPL_' }`. New "Nuovo da template" button on `/workflows` list page.
+- SDK: `WorkflowsClient.clone(id, body)`.
+- CFRP/Safety Devices template seeds remain as TODO-005 / TODO-006 (out of MVP scope per original prompt).
 
 ---
 
-### TODO-012 — PROMPT_3b_FULL: canvas polish (right-click, keyboard, drag-to-reorder)
+### TODO-012 — PROMPT_3b_FULL: canvas polish (right-click, keyboard, undo/redo)
 
-**Discovered**: 2026-04-30 (during PROMPT_3b_REDUCED scope reduction)
-**File**: `apps/web/src/components/workflow/WorkflowCanvas.tsx`
-**Symptom**: Canvas is functional but lacks polish:
-- No right-click context menu (delete, duplicate).
-- No keyboard shortcuts (Del, Ctrl+D for duplicate, Ctrl+Z / Ctrl+Shift+Z for undo/redo).
-- Cannot drag-to-reorder steps within a Group (must delete + re-add).
-**Acceptance criterion**:
-- Right-clicking a node opens a context menu with Delete and Duplicate.
-- Del key deletes selected node; Ctrl+D duplicates.
-- Ctrl+Z / Ctrl+Shift+Z drive an undo stack (at least node create/delete/move).
-- Drag-and-drop reordering of steps within a Group recalculates `step.order`.
-**Estimated effort**: 2-3 hours
-**Blocker for**: nothing (UX polish).
+**Status**: ✅ **CLOSED by PROMPT_3b_FULL Session B** (2026-05-01).
+**Resolution**:
+- Right-click: `onNodeContextMenu` wired on the xyflow canvas opens a fixed-position `CanvasContextMenu` (Tailwind primitives only, no new lib). Items per node type: Step → "Duplica" + "Elimina"; Phase / Group → "Elimina". Closes on click-outside / Escape.
+- Keyboard shortcuts: new `useCanvasKeyboardShortcuts` hook attaches a window `keydown` listener (skipped when focus is inside `<input>`/`<textarea>`/`[contenteditable]`). Bindings: `Del` / `Backspace` → delete selected, `Ctrl/Cmd+D` → duplicate selected step, `Ctrl/Cmd+Z` → undo, `Ctrl/Cmd+Shift+Z` → redo.
+- Undo/redo: custom history stack in the Zustand store (`history.past[]` + `history.future[]`, capped at 50 entries; no `zundo` dep). Mutating actions (`updateNodeData`, `deleteNode`, `duplicateNode`) call `pushHistory()` first; `clearHistory` available for new-workflow loads.
+- Delete cascades: deleting a Phase or Group also removes descendants and any incident edges.
+- Drag-to-reorder steps within a Group is **deferred to TODO-029** (post-MVP, requires `step.order` recomputation across siblings).
 
 ---
 
@@ -438,6 +425,36 @@ WARNING  no output files found for task @mes/storage#build. Please check your `o
 - This entry is closed automatically when TODO-002 is resolved (no separate work needed).
 **Estimated effort**: 0 (covered by TODO-002 fix; verification only)
 **Blocker for**: nothing (cosmetic). Demo polish.
+
+---
+
+### TODO-029 — Workflow canvas: drag-to-reorder steps within a Group
+
+**Discovered**: 2026-05-01 (deferred from PROMPT_3b_FULL Session B canvas polish scope)
+**File**: `apps/web/src/components/workflow/WorkflowCanvas.tsx` + `store.ts`
+**Symptom**: Today the only way to change the order of steps inside a Group is to delete and re-add them. xyflow has hooks for drag-and-drop reordering but Session B closed without wiring them — Session B shipped delete + duplicate + undo/redo via context menu and keyboard shortcuts, which already cover most user intents.
+**Acceptance criterion**:
+- Drag-and-drop a step node within its parent Group recalculates `step.order` for all siblings (1..N) in a single store update.
+- New `order` values are part of the auto-save payload (`buildSavePayload` already reads `step.data.order`).
+- Cross-Group drag is rejected (or moves the step to the new Group + recomputes both sides — design decision deferred).
+- Undo/redo restores the previous order array correctly (history snapshot already captures `nodes[]` shape).
+**Estimated effort**: 1-2 hours
+**Blocker for**: nothing. Productivity polish; expected post-MVP.
+
+---
+
+### TODO-030 — Workflow canvas: "Disable" action on right-click (Step.isEnabled)
+
+**Discovered**: 2026-05-01 (during PROMPT_3b_FULL Session B Q3 — omitted from MVP)
+**File**: `packages/prisma/schema.prisma` (Step model) + `apps/web/src/components/workflow/CanvasContextMenu.tsx` + service/repo
+**Symptom**: The right-click context menu shipped in Session B has Delete + Duplicate but no "Disable / Toggle Required" action. Some process engineers may want to keep an obsolete step in the workflow as documentation while marking it inactive (skip at runtime). The current Step Prisma model has no `isEnabled` boolean — only `isRequired` (semantically different: required-but-disabled doesn't fit).
+**Acceptance criterion**:
+- Schema change: `Step.isEnabled Boolean @default(true)` (migration required) — explicit product confirmation needed before touching schema.
+- HMI execution semantics: a step with `isEnabled = false` is auto-completed with `status: 'skipped'` when reached.
+- Right-click menu adds "Disabilita" / "Abilita" toggle entry.
+- Audit log entry on toggle.
+**Estimated effort**: 2-3 hours (mostly schema + migration + HMI auto-skip)
+**Blocker for**: nothing. Wait for product confirmation before schema work.
 
 ---
 

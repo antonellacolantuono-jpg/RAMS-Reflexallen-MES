@@ -214,4 +214,7 @@ export class WorkflowsClient extends BaseRegistryClient<WorkflowModel, Record<st
   createVersion(id: string) { return this.client.post<WorkflowVersionModel>(`/api/workflows/${id}/versions`, {}) }
   getVersion(id: string, vid: string) { return this.client.get<WorkflowVersionModel>(`/api/workflows/${id}/versions/${vid}`) }
   updateVersion(id: string, vid: string, data: Record<string, unknown>) { return this.client.patch<WorkflowVersionModel>(`/api/workflows/${id}/versions/${vid}`, data) }
+  approveVersion(id: string, vid: string) { return this.client.post<WorkflowVersionModel>(`/api/workflows/${id}/versions/${vid}/approve`, {}) }
+  deprecateVersion(id: string, vid: string, reason: string) { return this.client.post<WorkflowVersionModel>(`/api/workflows/${id}/versions/${vid}/deprecate`, { reason }) }
+  clone(id: string, data: { code: string; name: string; description?: string; plantId?: string }) { return this.client.post<WorkflowModel>(`/api/workflows/${id}/clone`, data) }
 }

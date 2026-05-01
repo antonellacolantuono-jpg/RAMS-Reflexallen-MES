@@ -20,6 +20,8 @@ import { PhaseNode } from './nodes/PhaseNode'
 import { GroupNode } from './nodes/GroupNode'
 import { StepNode } from './nodes/StepNode'
 import { SequentialEdge } from './edges/SequentialEdge'
+import { CanvasContextMenu, type CanvasContextMenuState } from './CanvasContextMenu'
+import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
 
 const nodeTypes = {
   phaseNode: PhaseNode,
@@ -206,6 +208,9 @@ function CanvasInner({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<CanvasContextMenuState | null>(null)
+
+  useCanvasKeyboardShortcuts()
 
   const nodesRef = useRef(nodes)
   useEffect(() => {
@@ -369,7 +374,20 @@ function CanvasInner({
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onNodeClick={(_, node) => selectNode(node.id, node.type ?? null)}
-          onPaneClick={() => selectNode(null, null)}
+          onPaneClick={() => {
+            selectNode(null, null)
+            setContextMenu(null)
+          }}
+          onNodeContextMenu={(event, node) => {
+            event.preventDefault()
+            selectNode(node.id, node.type ?? null)
+            setContextMenu({
+              x: event.clientX,
+              y: event.clientY,
+              nodeId: node.id,
+              nodeType: node.type ?? '',
+            })
+          }}
           fitView
         >
           <Background />
@@ -377,6 +395,7 @@ function CanvasInner({
           <MiniMap />
         </ReactFlow>
       </div>
+      <CanvasContextMenu state={contextMenu} onClose={() => setContextMenu(null)} />
       {isEmpty && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <p className="text-neutral-400 text-xs text-center">

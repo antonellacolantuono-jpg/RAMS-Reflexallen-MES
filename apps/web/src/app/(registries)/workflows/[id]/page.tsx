@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels'
@@ -10,10 +11,16 @@ import { WorkflowPalette } from '../../../../components/workflow/WorkflowPalette
 import { StepConfigurator } from '../../../../components/workflow/forms/StepConfigurator'
 import { ValidationPanel } from '../../../../components/workflow/ValidationPanel'
 import { WorkflowValidationProvider } from '../../../../components/workflow/validation-context'
+import { ApproveVersionModal } from '../../../../components/workflow/versioning/ApproveVersionModal'
+import { DeprecateVersionModal } from '../../../../components/workflow/versioning/DeprecateVersionModal'
+import { VersionHistorySidebar } from '../../../../components/workflow/versioning/VersionHistorySidebar'
 
 export default function WorkflowEditorPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const [approveOpen, setApproveOpen] = useState(false)
+  const [deprecateOpen, setDeprecateOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const { data: workflow, isLoading } = useQuery({
     queryKey: ['workflows', id],
@@ -46,6 +53,7 @@ export default function WorkflowEditorPage() {
   const versionStatus = workflow.currentVersion?.status
 
   return (
+    <WorkflowValidationProvider>
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-shrink-0 px-4 py-3 hairline-b flex items-center justify-between">
         <PageHeader
@@ -70,6 +78,24 @@ export default function WorkflowEditorPage() {
               {versionStatus}
             </StatusBadge>
           )}
+          {versionStatus === 'draft' && (
+            <button
+              type="button"
+              onClick={() => setApproveOpen(true)}
+              className="rounded-md bg-success-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-success-700"
+            >
+              Approva versione
+            </button>
+          )}
+          {(versionStatus === 'draft' || versionStatus === 'approved') && (
+            <button
+              type="button"
+              onClick={() => setDeprecateOpen(true)}
+              className="rounded-md border border-error-300 bg-white px-3 py-1.5 text-sm font-medium text-error-700 hover:bg-error-50"
+            >
+              Deprecata
+            </button>
+          )}
           {versionStatus === 'approved' && (
             <button
               type="button"
@@ -79,11 +105,17 @@ export default function WorkflowEditorPage() {
               Rilascia WO
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((v) => !v)}
+            className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          >
+            {historyOpen ? 'Nascondi storico' : 'Storico'}
+          </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-hidden">
-        <WorkflowValidationProvider>
           <PanelGroup orientation="horizontal" className="h-full">
           {/* Wizard / Validation pane — 20% */}
           <Panel defaultSize={20} minSize={15}>
@@ -136,9 +168,40 @@ export default function WorkflowEditorPage() {
               </div>
             </div>
           </Panel>
+
+          {historyOpen && (
+            <>
+              <PanelResizeHandle className="w-1 bg-neutral-200 hover:bg-primary-400 transition-colors cursor-col-resize" />
+              <Panel defaultSize={20} minSize={15}>
+                <VersionHistorySidebar
+                  workflowId={id}
+                  currentVersionId={workflow.currentVersionId}
+                />
+              </Panel>
+            </>
+          )}
           </PanelGroup>
-        </WorkflowValidationProvider>
       </div>
+
+      {workflow.currentVersion && (
+        <>
+          <ApproveVersionModal
+            open={approveOpen}
+            onClose={() => setApproveOpen(false)}
+            workflowId={id}
+            versionId={workflow.currentVersion.id}
+            versionNumber={workflow.currentVersion.version}
+          />
+          <DeprecateVersionModal
+            open={deprecateOpen}
+            onClose={() => setDeprecateOpen(false)}
+            workflowId={id}
+            versionId={workflow.currentVersion.id}
+            versionNumber={workflow.currentVersion.version}
+          />
+        </>
+      )}
     </div>
+    </WorkflowValidationProvider>
   )
 }

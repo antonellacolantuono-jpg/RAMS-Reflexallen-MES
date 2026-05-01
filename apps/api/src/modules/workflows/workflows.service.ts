@@ -1,12 +1,12 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common'
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common'
 import { BaseRegistryService, type BaseFilters } from '../../common/base-registry.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { RegistryGateway } from '../events/registry.gateway'
 import { WorkflowsRepository, type WorkflowModel, type WorkflowDetailModel, type WorkflowVersionModel, type WorkflowVersionDetailModel } from './workflows.repository'
-import { validateWorkflowStructure, canEdit } from '@mes/domain'
+import { validateWorkflowStructure, canEdit, canTransition } from '@mes/domain'
 import type { PaginatedResult } from '../../common/types/paginated'
-import type { CreateWorkflowDto, UpdateWorkflowDto, UpdateWorkflowVersionDto } from '@mes/schemas'
+import type { CreateWorkflowDto, UpdateWorkflowDto, UpdateWorkflowVersionDto, CloneWorkflowDto } from '@mes/schemas'
 
 @Injectable()
 export class WorkflowsService extends BaseRegistryService<WorkflowModel> {
@@ -188,5 +188,168 @@ export class WorkflowsService extends BaseRegistryService<WorkflowModel> {
 
     this.gateway.emit({ module: 'WorkflowVersion', id: versionId, action: 'updated' })
     return updated
+  }
+
+  // ── Lifecycle transitions (PROMPT_3b Session B) ─────────────────────────────
+
+  async approveVersion(
+    workflowId: string,
+    versionId: string,
+    actorId: string,
+  ): Promise<WorkflowVersionDetailModel> {
+    const workflow = await this.findById(workflowId)
+
+    const existing = await this.repo.findVersionById(versionId)
+    if (!existing || existing.workflowId !== workflowId) {
+      throw new NotFoundException(`WorkflowVersion ${versionId} not found`)
+    }
+
+    if (!canTransition(existing.status, 'approved')) {
+      throw new ConflictException(
+        `Cannot approve version with status '${existing.status}'`,
+      )
+    }
+
+    if (existing.phases.length === 0) {
+      throw new BadRequestException({
+        message: 'Cannot approve empty workflow',
+        errors: [{ field: 'phases', message: 'Workflow must have at least one phase' }],
+      })
+    }
+
+    const structureResult = validateWorkflowStructure(
+      {
+        phases: existing.phases.map((p) => ({
+          id: p.id,
+          groups: p.groups.map((g) => ({
+            id: g.id,
+            phaseId: p.id,
+            steps: g.steps.map((s) => ({
+              id: s.id,
+              groupId: g.id,
+              skillId: s.skillId ?? null,
+              deviceId: s.deviceId ?? null,
+              recipeId: s.recipeId ?? null,
+              toolId: s.toolId ?? null,
+            })),
+          })),
+        })),
+      },
+      { skillIds: new Set(), deviceIds: new Set(), recipeIds: new Set(), toolIds: new Set() },
+    )
+
+    const structuralErrors = structureResult.ok
+      ? []
+      : structureResult.errors.filter(
+          (e) =>
+            !e.field.includes('skillId') &&
+            !e.field.includes('deviceId') &&
+            !e.field.includes('recipeId') &&
+            !e.field.includes('toolId'),
+        )
+
+    if (structuralErrors.length > 0) {
+      throw new BadRequestException({
+        message: 'Cannot approve workflow with structural errors',
+        errors: structuralErrors,
+      })
+    }
+
+    const before = existing
+    await this.repo.approveVersion(versionId, actorId)
+    const after = await this.repo.findVersionById(versionId)
+    if (!after) throw new NotFoundException(`WorkflowVersion ${versionId} not found after update`)
+
+    await this.auditLog.record({
+      entityType: 'WorkflowVersion',
+      entityId: versionId,
+      action: 'state_change',
+      changedBy: actorId,
+      plantId: (workflow as { plantId: string }).plantId,
+      before: { status: before.status },
+      after: { status: after.status, approvedBy: after.approvedBy, approvedAt: after.approvedAt },
+    })
+
+    this.gateway.emit({ module: 'WorkflowVersion', id: versionId, action: 'updated' })
+    return after
+  }
+
+  async deprecateVersion(
+    workflowId: string,
+    versionId: string,
+    reason: string,
+    actorId: string,
+  ): Promise<WorkflowVersionDetailModel> {
+    const workflow = await this.findById(workflowId)
+
+    const existing = await this.repo.findVersionById(versionId)
+    if (!existing || existing.workflowId !== workflowId) {
+      throw new NotFoundException(`WorkflowVersion ${versionId} not found`)
+    }
+
+    if (!canTransition(existing.status, 'deprecated')) {
+      throw new ConflictException(
+        `Cannot deprecate version with status '${existing.status}'`,
+      )
+    }
+
+    const before = existing
+    await this.repo.deprecateVersion(versionId, actorId, reason)
+    const after = await this.repo.findVersionById(versionId)
+    if (!after) throw new NotFoundException(`WorkflowVersion ${versionId} not found after update`)
+
+    await this.auditLog.record({
+      entityType: 'WorkflowVersion',
+      entityId: versionId,
+      action: 'state_change',
+      changedBy: actorId,
+      plantId: (workflow as { plantId: string }).plantId,
+      before: { status: before.status },
+      after: { status: after.status, reason },
+    })
+
+    this.gateway.emit({ module: 'WorkflowVersion', id: versionId, action: 'updated' })
+    return after
+  }
+
+  // ── Templates / clone (PROMPT_3b Session B) ──────────────────────────────────
+
+  async cloneWorkflow(
+    sourceWorkflowId: string,
+    dto: CloneWorkflowDto,
+    actorId: string,
+  ): Promise<WorkflowDetailModel> {
+    const source = await this.repo.findDetailById(sourceWorkflowId)
+    if (!source) {
+      throw new NotFoundException(`Workflow ${sourceWorkflowId} not found`)
+    }
+    if (!source.currentVersion || source.currentVersion.phases.length === 0) {
+      throw new BadRequestException(
+        `Workflow ${sourceWorkflowId} has no current version with content to clone`,
+      )
+    }
+
+    const cloned = await this.repo.cloneWorkflow(
+      sourceWorkflowId,
+      {
+        code: dto.code,
+        name: dto.name,
+        description: dto.description ?? null,
+        plantId: dto.plantId ?? source.plantId,
+      },
+      actorId,
+    )
+
+    await this.auditLog.record({
+      entityType: 'Workflow',
+      entityId: cloned.id,
+      action: 'create',
+      changedBy: actorId,
+      plantId: cloned.plantId,
+      after: { sourceWorkflowId, code: cloned.code, name: cloned.name },
+    })
+
+    this.gateway.emit({ module: 'Workflow', id: cloned.id, action: 'created' })
+    return cloned
   }
 }
