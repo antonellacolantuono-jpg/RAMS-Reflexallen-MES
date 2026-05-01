@@ -31,6 +31,7 @@ type FakeRow = {
   result: string | null
   durationSec: number | null
   notes: string | null
+  data: string | null
   startedAt: Date | null
   completedAt: Date | null
   step: FakeStep
@@ -63,6 +64,7 @@ const baseRow = (over: Partial<FakeRow> = {}): FakeRow => ({
   result: null,
   durationSec: null,
   notes: null,
+  data: null,
   startedAt: null,
   completedAt: null,
   step: over.step ?? makeStep(),
@@ -547,5 +549,238 @@ describe('StepExecutionService.getState', () => {
     await expect(service.getState('se-1', 'plant-1')).rejects.toBeInstanceOf(
       NotFoundException,
     )
+  })
+
+  it('reflects recoveryStage and attemptCount from data JSON', async () => {
+    const { service } = makeService(
+      baseRow({
+        status: 'blocked',
+        data: JSON.stringify({ recoveryStage: 'attempt_1', attemptCount: 1 }),
+      }),
+    )
+    const result = await service.getState('se-1', 'plant-1')
+    expect(result.recoveryStage).toBe('attempt_1')
+    expect(result.attemptCount).toBe(1)
+  })
+})
+
+// =====================================================================
+// D5 — recovery flow + auto-scrap
+// =====================================================================
+
+describe('StepExecutionService.applyTransition — recovery flow (D5)', () => {
+  it('first COMPLETE_NOK on running stamps recoveryStage=diagnosis, attemptCount=0', async () => {
+    const { service, updateMock, recordMock } = makeService(
+      baseRow({ status: 'running' }),
+    )
+    const result = await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'COMPLETE_NOK', by: 'op-1', causeCode: 'leak_test_fail' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(result.toStatus).toBe('blocked')
+    expect(result.recoveryStage).toBe('diagnosis')
+    expect(result.attemptCount).toBe(0)
+    expect(result.autoScrapped).toBe(false)
+    const updateArg = updateMock.mock.calls[0]?.[0]
+    expect(updateArg?.data?.data).toBeTypeOf('string')
+    const persisted = JSON.parse(updateArg?.data?.data as string)
+    expect(persisted).toEqual({ recoveryStage: 'diagnosis', attemptCount: 0 })
+    const audit = recordMock.mock.calls[0]?.[0]
+    expect(audit?.after?.recoveryStage).toBe('diagnosis')
+  })
+
+  it('RECOVER from blocked increments attemptCount and stage=attempt_1', async () => {
+    const { service, updateMock } = makeService(
+      baseRow({
+        status: 'blocked',
+        data: JSON.stringify({ recoveryStage: 'diagnosis', attemptCount: 0 }),
+      }),
+    )
+    const result = await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'RECOVER', by: 'op-1', notes: 'reseated fitting' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(result.toStatus).toBe('recovered')
+    expect(result.recoveryStage).toBe('attempt_1')
+    expect(result.attemptCount).toBe(1)
+    const persisted = JSON.parse(updateMock.mock.calls[0]?.[0]?.data?.data as string)
+    expect(persisted).toEqual({ recoveryStage: 'attempt_1', attemptCount: 1 })
+  })
+
+  it('Second RECOVER bumps to attempt_2 with attemptCount=2', async () => {
+    const { service, updateMock } = makeService(
+      baseRow({
+        status: 'blocked',
+        data: JSON.stringify({ recoveryStage: 'attempt_1', attemptCount: 1 }),
+      }),
+    )
+    const result = await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'RECOVER', by: 'op-1' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(result.recoveryStage).toBe('attempt_2')
+    expect(result.attemptCount).toBe(2)
+    const persisted = JSON.parse(updateMock.mock.calls[0]?.[0]?.data?.data as string)
+    expect(persisted.attemptCount).toBe(2)
+  })
+
+  it('NOK while attemptCount=1 advances stage to attempt_1 (operator failed first retry)', async () => {
+    const { service, updateMock } = makeService(
+      baseRow({
+        status: 'running',
+        data: JSON.stringify({ recoveryStage: 'attempt_1', attemptCount: 1 }),
+      }),
+    )
+    const result = await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'COMPLETE_NOK', by: 'op-1', causeCode: 'still_failing' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(result.toStatus).toBe('blocked')
+    expect(result.recoveryStage).toBe('attempt_1')
+    expect(result.attemptCount).toBe(1)
+    expect(result.autoScrapped).toBe(false)
+    expect(updateMock).toHaveBeenCalledOnce()
+  })
+
+  it('MARK_SCRAPPED from blocked persists recoveryStage=scrap', async () => {
+    const { service, updateMock } = makeService(
+      baseRow({
+        status: 'blocked',
+        data: JSON.stringify({ recoveryStage: 'attempt_2', attemptCount: 2 }),
+      }),
+    )
+    const result = await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'MARK_SCRAPPED', by: 'sup-1', reason: 'physical damage' },
+      changedBy: 'sup-1',
+      plantId: 'plant-1',
+    })
+    expect(result.toStatus).toBe('scrapped')
+    expect(result.recoveryStage).toBe('scrap')
+    const persisted = JSON.parse(updateMock.mock.calls[0]?.[0]?.data?.data as string)
+    expect(persisted.recoveryStage).toBe('scrap')
+  })
+
+  it('auto-scrap: COMPLETE_NOK with prior attemptCount=2 chains MARK_SCRAPPED, autoScrapped=true', async () => {
+    // After the first applyTransition pass updates the row (running → blocked with
+    // attemptCount=2), the recursive call must see status=blocked. We dynamically
+    // mutate the FakeRow in the update mock to simulate persistence.
+    const row = baseRow({
+      status: 'running',
+      data: JSON.stringify({ recoveryStage: 'attempt_2', attemptCount: 2 }),
+    })
+    const updateMock = vi
+      .fn()
+      .mockImplementation(async (args: { data: { status?: string; data?: string } }) => {
+        if (args.data.status) row.status = args.data.status
+        if (args.data.data) row.data = args.data.data
+        return {}
+      })
+    const findUniqueMock = vi.fn().mockResolvedValue(row)
+    const findFirstMock = vi.fn().mockResolvedValue({ id: row.workOrderId })
+    const findManyMock = vi.fn().mockResolvedValue([row])
+    const prisma = {
+      stepExecution: {
+        findUnique: findUniqueMock,
+        findMany: findManyMock,
+        update: updateMock,
+      },
+      workOrder: {
+        findFirst: findFirstMock,
+      },
+    } as unknown as ConstructorParameters<typeof StepExecutionService>[0]
+    const recordMock = vi.fn().mockResolvedValue(undefined)
+    const auditLog = {
+      record: recordMock,
+    } as unknown as ConstructorParameters<typeof StepExecutionService>[1]
+    const emitMock = vi.fn()
+    const events = {
+      emitStepTransition: emitMock,
+      emitParallelSync: vi.fn(),
+    } as unknown as ConstructorParameters<typeof StepExecutionService>[2]
+    const service = new StepExecutionService(prisma, auditLog, events)
+
+    const result = await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'COMPLETE_NOK', by: 'op-1', causeCode: 'final_fail' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(result.toStatus).toBe('scrapped')
+    expect(result.autoScrapped).toBe(true)
+    expect(updateMock).toHaveBeenCalledTimes(2)
+    expect(recordMock).toHaveBeenCalledTimes(2)
+    expect(emitMock).toHaveBeenCalledTimes(2)
+    const auditTypes = recordMock.mock.calls.map((c) => c?.[0]?.after?.event)
+    expect(auditTypes).toEqual(['COMPLETE_NOK', 'MARK_SCRAPPED'])
+  })
+
+  it('RESET clears recoveryStage and attemptCount', async () => {
+    const { service, updateMock } = makeService(
+      baseRow({
+        status: 'error',
+        data: JSON.stringify({ recoveryStage: 'attempt_2', attemptCount: 2 }),
+      }),
+    )
+    await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'RESET', by: 'sup-1', supervisorId: 'sup-1' },
+      changedBy: 'sup-1',
+      plantId: 'plant-1',
+    })
+    const persisted = JSON.parse(updateMock.mock.calls[0]?.[0]?.data?.data as string)
+    expect(persisted).toEqual({ recoveryStage: null, attemptCount: 0 })
+  })
+
+  it('parseRecoveryData tolerates malformed legacy data and returns defaults', async () => {
+    const { service, updateMock } = makeService(
+      baseRow({
+        status: 'running',
+        data: '{not-json',
+      }),
+    )
+    const result = await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'COMPLETE_OK', by: 'op-1' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(result.recoveryStage).toBeNull()
+    expect(result.attemptCount).toBe(0)
+    // legacy data is replaced by valid JSON on next write
+    const persisted = JSON.parse(updateMock.mock.calls[0]?.[0]?.data?.data as string)
+    expect(persisted).toEqual({ recoveryStage: null, attemptCount: 0 })
+  })
+})
+
+describe('StepExecutionService.findStepsForWorkOrder — recovery payload (D5)', () => {
+  it('exposes recoveryStage and attemptCount on each step DTO', async () => {
+    const { service } = makeService(
+      baseRow({
+        status: 'blocked',
+        data: JSON.stringify({ recoveryStage: 'attempt_2', attemptCount: 2 }),
+      }),
+    )
+    const result = await service.findStepsForWorkOrder('wo-1', 'plant-1')
+    expect(result[0]).toMatchObject({
+      recoveryStage: 'attempt_2',
+      attemptCount: 2,
+    })
   })
 })

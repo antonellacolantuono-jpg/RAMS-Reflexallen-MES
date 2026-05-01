@@ -2,7 +2,7 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-04-30
+> **Last updated**: 2026-05-01
 
 ---
 
@@ -68,17 +68,16 @@
 
 ### TODO-020 — PROMPT_5_FULL: 4-stage recovery flow with state machine
 
-**Discovered**: 2026-04-30 (during PROMPT_5_LITE)
-**File**: extend step-execution machine (TODO-018) + `apps/hmi/src/app/wo/[id]/recovery/page.tsx` (new)
-**Symptom**: HMI LITE marks a NOK step as `blocked` with a free-text note in client memory, then continues to the next step. The MASTER_SPECIFICATION defines a 4-stage recovery flow: **diagnosis → attempt 1 → attempt 2 → scrap**, each as its own auto-generated step with cause-code linkage and operator decision points. None of this is wired.
-**Acceptance criterion**:
-- Recovery flow is auto-generated when a step transitions to `blocked` (overlaps with PROMPT_4 auto-gen rules).
-- Each recovery stage is its own `StepExecution` with cause code, attempted-by-operator, outcome.
-- After 2 failed attempts, the lot/piece is automatically marked for scrap (`scrapped` state, with audit log).
-- Recovery flow integrates with the 11-state machine (TODO-018) — `blocked → recovered` (success) or `blocked → scrapped` (terminal).
-- UI: a dedicated `/wo/[id]/recovery` screen guides the operator through diagnosis → attempt → scrap decision.
-**Estimated effort**: 4-5 hours
-**Blocker for**: full failure semantics; supersedes TODO-015.
+**Status**: ✅ **CLOSED by PROMPT_5_FULL D5** (2026-05-01).
+**Resolution**: Recovery flow shipped as a **single-StepExecution model with stage-machine tracking** (not separate steps per stage — pragmatic deviation from the original acceptance criterion, see TODO-026 for the rationale and the work that *would* be needed to switch to per-stage StepExecutions if PROMPT_4 auto-generation requires it).
+**Delivered**:
+- New XState v5 machine `packages/domain/src/machines/recovery.machine.ts` (5 states: diagnosis, attempt_1, attempt_2, recovered, scrap; 5 events) with 23 unit tests covering every transition + helpers (`nextRecoveryStage`, `isMaxAttemptsReached`).
+- New rule module `packages/domain/src/rules/quality-hold.rules.ts` (4 predicates) with 10 unit tests.
+- `apps/api/src/modules/work-orders/step-execution.service.ts` extended to track `recoveryStage` + `attemptCount` in `StepExecution.data` JSON column (zero schema change). Auto-scrap is enforced server-side: a COMPLETE_NOK fired with prior `attemptCount >= 2` chains a `MARK_SCRAPPED` transition with reason `auto_scrap_max_attempts`.
+- New module `apps/api/src/modules/qc-review/` with `GET /api/qc-review`, `POST /:id/approve`, `POST /:id/reject` (RBAC: requires QC skill via OperatorSkill join, plant-scoped) — 11 unit tests.
+- HMI: new `RecoveryFlow` component with Italian stepper UI (Diagnosi → Tentativo 1 → Tentativo 2 → Scarto), wired into `wo/[id]/page.tsx` for blocked + recovered statuses. New routes `/qc-review` (list) and `/qc-review/[stepExecId]` (approve/reject). Dashboard exposes a "Revisione QC" button only for operators with QC skill (skillCodes pulled from `/api/auth/me`).
+- `/api/auth/me` extended with `skillCodes: string[]` (additive, non-breaking — pre-D5 clients ignore the field).
+**Audit**: every transition (including the auto-scrap chain) emits a `state_change` AuditLog entry with `before`, `after.event`, `after.recoveryStage`, `after.attemptCount`. Socket.IO `step:transition` is also emitted twice on auto-scrap (once for blocked, once for scrapped).
 
 ---
 
@@ -382,6 +381,22 @@ WARNING  no output files found for task @mes/storage#build. Please check your `o
 ---
 
 ## 🟢 Low priority (nice to have)
+
+### TODO-026 — Recovery flow: per-stage StepExecution model (deferred from D5)
+
+**Discovered**: 2026-05-01 (during PROMPT_5_FULL D5 implementation)
+**File**: `apps/api/src/modules/work-orders/step-execution.service.ts` + future PROMPT_4 auto-generation rules
+**Symptom**: D5 ships recovery flow tracking as `recoveryStage` + `attemptCount` JSON fields on the **same** StepExecution row that originally went NOK. The original TODO-020 acceptance criterion called for **each recovery stage to be its own StepExecution** (auto-generated when a step transitions to `blocked`). This deviation was a pragmatic choice: zero schema change, simpler audit log, easier HMI rendering. It works for D5's "operator clicks recover/scrap" flow but does not yet emit per-stage rows.
+**Why this matters later**: PROMPT_4 (auto-generation engine) overlaps with this — if the auto-gen rules need to materialize the diagnosis/attempt_1/attempt_2/scrap stages as discrete `StepExecution` rows (e.g., to assign different cause codes per stage, route them to different operators, or compute per-stage cycle times), the current D5 single-row model is insufficient.
+**Acceptance criterion** (if revisited):
+- On `blocked → recovered` transition, the API auto-generates a new `StepExecution` row of category `recovery` with `recoveryStage` populated, linked to the parent step via a new `parentStepExecutionId` field (schema change required).
+- HMI renders the recovery sub-steps as nested cards under the parent step.
+- Each stage records its own `cause_code`, `operatorId`, and timing.
+- Migration path: existing single-row recovery state becomes a "compact" view; per-stage rows are written going forward without breaking historical data.
+**Estimated effort**: 3-4 hours (schema change + per-stage row generation + HMI nested rendering)
+**Blocker for**: nothing in MVP. Revisit when PROMPT_4 auto-generation requires per-stage rows or when reporting needs per-attempt analytics.
+
+---
 
 ### TODO-025 — HMI logo follow-up after PROMPT_5_LITE
 

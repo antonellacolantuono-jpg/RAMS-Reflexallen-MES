@@ -3,6 +3,7 @@ import * as React from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useMachine } from '@xstate/react'
 import {
+  pickNokEvent,
   stepExecutionMachine,
   type StepExecutionEvent,
 } from '@mes/domain'
@@ -17,6 +18,7 @@ import {
 } from '../../../lib/queries'
 import { StepCard } from '../../../components/StepCard'
 import { ParallelStepLane } from '../../../components/ParallelStepLane'
+import { RecoveryFlow } from '../../../components/RecoveryFlow'
 
 interface StepGroup {
   groupId: string
@@ -48,9 +50,10 @@ const TERMINAL_STATUSES: StepExecutionStatus[] = [
   'skipped',
   'cancelled',
 ]
+// `blocked` is intentionally NOT terminal in D5: recovery can move it back
+// to `running` via blocked → recovered → resume_after_recovery.
 const PAST_STATUSES: StepExecutionStatus[] = [
   ...TERMINAL_STATUSES,
-  'blocked',
   'scrapped',
 ]
 
@@ -186,15 +189,61 @@ export default function WorkOrderExecutionPage() {
 
   const confirmNok = React.useCallback(() => {
     if (!nokTargetId) return
+    const target = steps.find((s) => s.stepExecutionId === nokTargetId)
     const trimmed = nokDraft.trim()
-    sendEvent(nokTargetId, {
-      type: 'COMPLETE_NOK',
-      by: operator?.id ?? 'anonymous',
-      causeCode: 'manual_nok',
-      ...(trimmed ? { notes: trimmed } : {}),
-    })
+    const eventType = target ? pickNokEvent(target.stepCategory) : 'COMPLETE_NOK'
+    if (eventType === 'REQUEST_QC') {
+      sendEvent(nokTargetId, {
+        type: 'REQUEST_QC',
+        by: operator?.id ?? 'anonymous',
+      })
+    } else {
+      sendEvent(nokTargetId, {
+        type: 'COMPLETE_NOK',
+        by: operator?.id ?? 'anonymous',
+        causeCode: 'manual_nok',
+        ...(trimmed ? { notes: trimmed } : {}),
+      })
+    }
     closeNok()
-  }, [nokTargetId, nokDraft, sendEvent, closeNok, operator?.id])
+  }, [nokTargetId, nokDraft, sendEvent, closeNok, operator?.id, steps])
+
+  const handleRecover = React.useCallback(
+    (step: WorkOrderStep) =>
+      sendEvent(step.stepExecutionId, {
+        type: 'RECOVER',
+        by: operator?.id ?? 'anonymous',
+      }),
+    [sendEvent, operator?.id],
+  )
+
+  const handleScrap = React.useCallback(
+    (step: WorkOrderStep) =>
+      sendEvent(step.stepExecutionId, {
+        type: 'MARK_SCRAPPED',
+        by: operator?.id ?? 'anonymous',
+        reason: 'operator_scrap',
+      }),
+    [sendEvent, operator?.id],
+  )
+
+  const handleResumeAfterRecovery = React.useCallback(
+    (step: WorkOrderStep) =>
+      sendEvent(step.stepExecutionId, {
+        type: 'RESUME_AFTER_RECOVERY',
+        by: operator?.id ?? 'anonymous',
+      }),
+    [sendEvent, operator?.id],
+  )
+
+  const handleCompleteAfterRecovery = React.useCallback(
+    (step: WorkOrderStep) =>
+      sendEvent(step.stepExecutionId, {
+        type: 'COMPLETE_AFTER_RECOVERY',
+        by: operator?.id ?? 'anonymous',
+      }),
+    [sendEvent, operator?.id],
+  )
 
   const handlePause = React.useCallback(
     (step: WorkOrderStep) =>
@@ -339,17 +388,28 @@ export default function WorkOrderExecutionPage() {
           return (
             <div key={group.groupId} className="flex flex-col gap-3">
               {group.steps.map((step, i) => (
-                <StepCard
-                  key={step.stepExecutionId}
-                  step={step}
-                  index={i}
-                  totalSteps={total}
-                  isPending={transition.isPending}
-                  onComplete={() => handleComplete(step)}
-                  onMarkBlocked={() => openNok(step.stepExecutionId)}
-                  onPause={() => handlePause(step)}
-                  onResume={() => handleResume(step)}
-                />
+                <div key={step.stepExecutionId} className="flex flex-col gap-2">
+                  <StepCard
+                    step={step}
+                    index={i}
+                    totalSteps={total}
+                    isPending={transition.isPending}
+                    onComplete={() => handleComplete(step)}
+                    onMarkBlocked={() => openNok(step.stepExecutionId)}
+                    onPause={() => handlePause(step)}
+                    onResume={() => handleResume(step)}
+                  />
+                  {(step.status === 'blocked' || step.status === 'recovered') && (
+                    <RecoveryFlow
+                      step={step}
+                      isPending={transition.isPending}
+                      onRecover={() => handleRecover(step)}
+                      onScrap={() => handleScrap(step)}
+                      onResumeAfterRecovery={() => handleResumeAfterRecovery(step)}
+                      onCompleteAfterRecovery={() => handleCompleteAfterRecovery(step)}
+                    />
+                  )}
+                </div>
               ))}
             </div>
           )

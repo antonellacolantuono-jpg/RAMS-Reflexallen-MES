@@ -21,3 +21,16 @@ export type {
   StepExecutionStatus,
   StepExecutionInput,
 } from './step-execution.machine'
+
+export {
+  recoveryMachine,
+  nextRecoveryStage,
+  isMaxAttemptsReached,
+  MAX_RECOVERY_ATTEMPTS,
+} from './recovery.machine'
+export type {
+  RecoveryContext,
+  RecoveryEvent,
+  RecoveryStage,
+  RecoveryInput,
+} from './recovery.machine'
