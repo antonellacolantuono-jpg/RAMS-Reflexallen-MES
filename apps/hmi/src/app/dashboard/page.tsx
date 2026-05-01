@@ -2,7 +2,12 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@mes/ui'
-import { useLogout, useMe, useMyWorkOrders } from '../../lib/queries'
+import {
+  useLogout,
+  useMe,
+  useMyWorkOrders,
+  useWoAssignedSubscription,
+} from '../../lib/queries'
 import { ApiError } from '../../lib/api-client'
 import { useOperatorStore } from '../../lib/operator-store'
 import { WorkOrderCard } from '../../components/WorkOrderCard'
@@ -26,6 +31,11 @@ export default function DashboardPage() {
   React.useEffect(() => {
     if (me.data) setStoredOperator(me.data)
   }, [me.data, setStoredOperator])
+
+  // D6: live update — invalidate `my-work-orders` when API emits `wo:assigned`
+  // for this operator. Without this, a manager-released WO would only appear
+  // after a manual refresh.
+  useWoAssignedSubscription(me.data?.id)
 
   if (me.isLoading || !me.data) {
     return (

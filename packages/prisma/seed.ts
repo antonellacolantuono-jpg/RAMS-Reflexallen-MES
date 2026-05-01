@@ -38,6 +38,7 @@ async function main(): Promise<void> {
     { code: 'PACK', name: 'Imballaggio', category: 'logistics', description: 'Confezionamento e etichettatura colli' },
     { code: 'FORKLIFT', name: 'Mulettista', category: 'logistics', description: 'Abilitazione conduzione carrello elevatore' },
     { code: 'WAREHOUSE', name: 'Magazzino', category: 'logistics', description: 'Gestione magazzino materie prime e prodotti finiti' },
+    { code: 'MANAGER', name: 'Plant Manager', category: 'leadership', description: 'Rilascio ordini di lavoro, approvazione workflow (D6 PROMPT_5_FULL)' },
   ]
 
   const skills: Record<string, { id: string }> = {}
@@ -56,7 +57,7 @@ async function main(): Promise<void> {
     {
       badge: 'OP-001', firstName: 'Marco', lastName: 'Rossi',
       pin: '1234',
-      skillCodes: ['EXT', 'ASSY', 'QC'],
+      skillCodes: ['EXT', 'ASSY', 'QC', 'MANAGER'],
     },
     {
       badge: 'OP-002', firstName: 'Laura', lastName: 'Ferrari',
@@ -529,8 +530,25 @@ async function main(): Promise<void> {
         data: {
           workflowId: workflow.id,
           version: 1,
-          status: 'effective',
+          // D6: must be 'approved' for the release flow to accept it
+          // (canonical WorkflowVersionStatus values per schema.prisma).
+          status: 'approved',
+          approvedBy: SYSTEM,
+          approvedAt: new Date(),
           createdBy: SYSTEM,
+          updatedBy: SYSTEM,
+        },
+      })
+    } else if (version.status !== 'approved') {
+      // Backfill: any pre-D6 demo workflow seeded with the legacy 'effective'
+      // status is migrated to 'approved' so the release demo works without
+      // a manual db reset.
+      version = await prisma.workflowVersion.update({
+        where: { id: version.id },
+        data: {
+          status: 'approved',
+          approvedBy: SYSTEM,
+          approvedAt: new Date(),
           updatedBy: SYSTEM,
         },
       })
