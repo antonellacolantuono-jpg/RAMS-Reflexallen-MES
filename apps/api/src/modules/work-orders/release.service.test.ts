@@ -188,6 +188,28 @@ function makeService(opts: ServiceMocks = {}) {
   const itemFindFirst = vi.fn().mockResolvedValue(opts.item ?? null)
   const shiftFindFirst = vi.fn().mockResolvedValue(opts.shift ?? null)
   const workOrderCount = vi.fn().mockResolvedValue(opts.woCount ?? 0)
+  // Engine mock delegates rule "2" (WORK_ORDER_NUMBER) to a faithful
+  // re-implementation of D6's generateWoCode that uses the `woCount`
+  // opt for sequence determination — keeps the 17 existing assertions
+  // (WO-YYYYMMDD-NNN format) working unchanged after D3 extraction.
+  const engineResolve = vi
+    .fn()
+    .mockImplementation(
+      async (
+        ruleId: string,
+        ctx: { plantId: string; releasedAt: Date },
+      ) => {
+        if (ruleId !== '2') {
+          throw new Error(`Unexpected rule in test mock: ${ruleId}`)
+        }
+        const d = ctx.releasedAt
+        const y = d.getFullYear()
+        const m = (d.getMonth() + 1).toString().padStart(2, '0')
+        const day = d.getDate().toString().padStart(2, '0')
+        const seq = ((opts.woCount ?? 0) + 1).toString().padStart(3, '0')
+        return `WO-${y}${m}${day}-${seq}`
+      },
+    )
 
   const woCreate = vi.fn().mockImplementation(({ data }: { data: { code: string; itemId: string } }) =>
     Promise.resolve({
@@ -249,7 +271,11 @@ function makeService(opts: ServiceMocks = {}) {
     emitParallelSync: vi.fn(),
   } as unknown as ConstructorParameters<typeof ReleaseService>[2]
 
-  const service = new ReleaseService(prisma, auditLog, events)
+  const engine = {
+    resolve: engineResolve,
+  } as unknown as ConstructorParameters<typeof ReleaseService>[3]
+
+  const service = new ReleaseService(prisma, auditLog, events, engine)
   return {
     service,
     operatorFindFirst,
@@ -266,6 +292,7 @@ function makeService(opts: ServiceMocks = {}) {
     recordMock,
     emitReleasedMock,
     emitAssignedMock,
+    engineResolve,
   }
 }
 
@@ -547,5 +574,23 @@ describe('ReleaseService.release — RBAC + validation failures', () => {
     await expect(
       mocks.service.release(baseRequest({ quantity: 1.5 })),
     ).rejects.toBeInstanceOf(BadRequestException)
+  })
+})
+
+describe('ReleaseService.release — D3 AutoGenEngine delegation', () => {
+  it('delegates WO code generation to AutoGenEngineService rule "2"', async () => {
+    const mocks = makeService({
+      manager: { id: 'op-mgr', badge: 'OP-001', skills: ['MANAGER'] },
+      workflow: buildWorkflow(),
+      item: { id: 'item-1' },
+      assignedOperator: { id: 'op-2', badge: 'OP-002', skills: [] },
+    })
+    await mocks.service.release(baseRequest())
+    expect(mocks.engineResolve).toHaveBeenCalledOnce()
+    const call = mocks.engineResolve.mock.calls[0]
+    expect(call?.[0]).toBe('2')
+    const ctx = call?.[1] as { plantId: string; releasedAt: Date }
+    expect(ctx.plantId).toBe('plant-1')
+    expect(ctx.releasedAt).toBeInstanceOf(Date)
   })
 })

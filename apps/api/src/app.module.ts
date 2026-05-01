@@ -19,6 +19,7 @@ import { ToolsModule } from './modules/tools/tools.module'
 import { BoxTypesModule } from './modules/box-types/box-types.module'
 import { BoxesModule } from './modules/boxes/boxes.module'
 import { AutoGenRulesModule } from './modules/auto-gen-rules/auto-gen-rules.module'
+import { AutoGenEngineModule } from './modules/auto-gen-engine/auto-gen-engine.module'
 import { WorkflowsModule } from './modules/workflows/workflows.module'
 import { AppController } from './app.controller'
 
@@ -44,6 +45,7 @@ import { AppController } from './app.controller'
     BoxTypesModule,
     BoxesModule,
     AutoGenRulesModule,
+    AutoGenEngineModule,
     WorkflowsModule,
   ],
   controllers: [AppController],

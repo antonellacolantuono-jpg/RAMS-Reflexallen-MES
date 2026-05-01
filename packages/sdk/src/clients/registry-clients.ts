@@ -155,12 +155,23 @@ export class BoxesClient extends BaseRegistryClient<BoxModel, Record<string, unk
 
 // ---- Auto-Gen Rules ----
 export interface AutoGenRuleModel {
-  id: string; code: string; name: string; description: string
-  trigger: string; scope: string; isActive: boolean
+  id: string; name: string; description: string
+  trigger: string; scope: string
+}
+export interface AutoGenDryRunResponse {
+  ruleId: string
+  code: string
+  contextEcho: Record<string, unknown>
 }
 export class AutoGenRulesClient {
   constructor(private readonly client: MesClient) {}
   list() { return this.client.get<AutoGenRuleModel[]>('/api/auto-gen-rules') }
+  dryRun(ruleId: string, context: Record<string, unknown>) {
+    return this.client.post<AutoGenDryRunResponse>(
+      `/api/auto-gen-rules/${ruleId}/dry-run`,
+      context,
+    )
+  }
 }
 
 // ---- Workflows ----

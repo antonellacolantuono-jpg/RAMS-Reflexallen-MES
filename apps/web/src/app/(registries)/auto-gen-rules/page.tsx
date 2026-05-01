@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
 import { PageHeader, Skeleton } from '@mes/ui'
 import { sdk } from '../../../lib/sdk'
 
@@ -20,14 +21,14 @@ export default function AutoGenRulesPage() {
       />
 
       <div className="rounded-lg border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-800">
-        Queste regole sono configurate a livello di sistema e gestite dal Workflow Designer (PROMPT_4).
-        Non è possibile modificarle da questa schermata.
+        Queste regole sono configurate a livello di sistema. Usa &quot;Prova regola&quot; per
+        un&apos;anteprima del codice generato — l&apos;anteprima non scrive nel database.
       </div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Array.from({ length: 7 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-xl" />
+            <Skeleton key={i} className="h-28 w-full rounded-xl" />
           ))}
         </div>
       ) : (
@@ -41,8 +42,16 @@ export default function AutoGenRulesPage() {
                 </span>
               </div>
               <p className="text-xs text-neutral-600">{rule.description}</p>
-              <div className="mt-auto pt-1 text-xs text-neutral-400">
-                Trigger: <span className="font-mono text-neutral-600">{rule.trigger}</span>
+              <div className="flex items-center justify-between pt-1">
+                <div className="text-xs text-neutral-400">
+                  Trigger: <span className="font-mono text-neutral-600">{rule.trigger}</span>
+                </div>
+                <Link
+                  href={`/auto-gen-rules/${rule.id}/dry-run`}
+                  className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-700 transition"
+                >
+                  Prova regola
+                </Link>
               </div>
             </div>
           ))}
