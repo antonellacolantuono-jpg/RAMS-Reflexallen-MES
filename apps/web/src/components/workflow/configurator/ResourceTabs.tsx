@@ -1,10 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Tabs, EmptyState, type Tab } from '@mes/ui'
+import { Tabs, type Tab } from '@mes/ui'
 import { MaterialsTab } from './MaterialsTab'
 import { ToolsTab } from './ToolsTab'
 import { DevicesTab } from './DevicesTab'
+import { SkillsTab } from './SkillsTab'
+import { RecipesTab } from './RecipesTab'
+import { AttentionPointsTab } from './AttentionPointsTab'
 
 export type ResourceTabId =
   | 'materials'
@@ -110,17 +113,26 @@ export function ResourceTabs(props: ResourceTabsProps) {
             onClear={props.onClearDevices}
           />
         )}
-        {(active === 'skills' ||
-          active === 'recipes' ||
-          active === 'attention-points') && (
-          <div className="flex h-full items-center justify-center rounded-md border border-dashed border-neutral-200 bg-neutral-50/50 p-6">
-            <EmptyState
-              kind="no-data"
-              title="Tab in sviluppo (D2)"
-              body="Skill, Ricette e Attention Points saranno disponibili nel prossimo incremento."
-              compact
-            />
-          </div>
+        {active === 'skills' && (
+          <SkillsTab
+            selectedIds={props.selectedSkillIds}
+            onToggle={props.onToggleSkill}
+            onClear={props.onClearSkills}
+          />
+        )}
+        {active === 'recipes' && (
+          <RecipesTab
+            selectedDeviceIds={props.selectedDeviceIds}
+            selectedRecipeId={props.selectedRecipeId}
+            onSelect={props.onSelectRecipe}
+          />
+        )}
+        {active === 'attention-points' && (
+          <AttentionPointsTab
+            selectedIds={props.selectedAttentionPointIds}
+            onToggle={props.onToggleAttentionPoint}
+            onClear={props.onClearAttentionPoints}
+          />
         )}
       </div>
     </div>
