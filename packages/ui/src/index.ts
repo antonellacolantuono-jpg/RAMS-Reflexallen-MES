@@ -67,6 +67,24 @@ export type {
   OpTablePagination,
 } from './components/op-table/operational-table'
 
+export { RegistryTile } from './components/registry-tile'
+export type { RegistryTileProps } from './components/registry-tile'
+
+export { KpiHero } from './components/kpi-hero'
+export type { KpiHeroProps, KpiHeroTone, KpiHeroTrend } from './components/kpi-hero'
+
+export { PhaseChip } from './components/phase-chip'
+export type { PhaseChipProps, PhaseId } from './components/phase-chip'
+
+export { WCCard } from './components/wc-card'
+export type { WCCardProps, WCStatus } from './components/wc-card'
+
+export { AlertBanner } from './components/alert-banner'
+export type { AlertBannerProps, AlertBannerTone } from './components/alert-banner'
+
+export { LiveAlert } from './components/live-alert'
+export type { LiveAlertProps, LiveAlertTone } from './components/live-alert'
+
 export { Skeleton } from './components/Skeleton'
 export type { SkeletonProps } from './components/Skeleton'
 
