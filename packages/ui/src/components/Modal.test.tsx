@@ -48,6 +48,32 @@ describe('Modal', () => {
     )
     expect(screen.getByRole('button', { name: 'OK' })).toBeInTheDocument()
   })
+
+  it('uses default sizing (centered, max-h-[90vh], rounded-xl) when fullScreen is false', () => {
+    render(
+      <Modal open title="T">
+        <p>x</p>
+      </Modal>,
+    )
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).not.toHaveAttribute('data-fullscreen')
+    expect(dialog.className).toContain('max-h-[90vh]')
+    expect(dialog.className).toContain('rounded-xl')
+  })
+
+  it('renders edge-to-edge full-viewport sizing when fullScreen is true', () => {
+    render(
+      <Modal open title="T" fullScreen>
+        <p>x</p>
+      </Modal>,
+    )
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('data-fullscreen', 'true')
+    expect(dialog.className).toContain('h-screen')
+    expect(dialog.className).toContain('w-screen')
+    expect(dialog.className).toContain('rounded-none')
+    expect(dialog.style.width).toBe('')
+  })
 })
 
 describe('ConfirmModal', () => {

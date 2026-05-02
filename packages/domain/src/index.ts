@@ -110,3 +110,14 @@ export type {
   StepCategoryDescriptor,
   StepKindDescriptor,
 } from './rules/workflow-palette.rules'
+
+// workflow-compatibility rules (D2 of PROMPT_3d)
+export {
+  isStepCategoryAllowedInGroup,
+  listAllowedStepCategories,
+  mapPaletteCategoryToStepCategory,
+} from './rules/workflow-compatibility.rules'
+export type {
+  GroupCategory,
+  SchemaStepCategory,
+} from './rules/workflow-compatibility.rules'

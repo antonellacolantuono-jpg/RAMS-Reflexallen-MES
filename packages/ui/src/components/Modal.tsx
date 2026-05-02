@@ -11,6 +11,7 @@ export interface ModalProps {
   title?: string | undefined
   description?: string | undefined
   width?: number | undefined
+  fullScreen?: boolean | undefined
   children?: React.ReactNode
   footer?: React.ReactNode
   actions?: React.ReactNode
@@ -35,6 +36,7 @@ export function Modal({
   title,
   description,
   width = 480,
+  fullScreen = false,
   children,
   footer,
   actions,
@@ -82,7 +84,12 @@ export function Modal({
   const footerNode = actions ?? footer
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      className={cn(
+        'fixed inset-0 z-50 flex',
+        fullScreen ? 'items-stretch justify-stretch' : 'items-center justify-center p-4',
+      )}
+    >
       <div
         className={cn(
           'absolute inset-0 bg-black/40 motion-safe:transition-opacity motion-safe:duration-150',
@@ -95,14 +102,16 @@ export function Modal({
       <div
         ref={dialogRef}
         className={cn(
-          'relative flex max-h-[90vh] flex-col rounded-xl bg-white shadow-2xl motion-safe:transition-all motion-safe:duration-150',
+          'relative flex flex-col bg-white shadow-2xl motion-safe:transition-all motion-safe:duration-150',
+          fullScreen ? 'h-screen w-screen rounded-none' : 'max-h-[90vh] rounded-xl',
           open ? 'opacity-100 scale-100' : 'opacity-0 scale-95',
           className,
         )}
-        style={{ width, maxWidth: '95vw' }}
+        style={fullScreen ? undefined : { width, maxWidth: '95vw' }}
         role="dialog"
         aria-modal
         aria-label={title}
+        data-fullscreen={fullScreen ? 'true' : undefined}
         tabIndex={-1}
       >
         {(title || onClose) && (

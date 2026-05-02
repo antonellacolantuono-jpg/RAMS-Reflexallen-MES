@@ -6,6 +6,7 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react'
 import type { Node, Edge, NodeChange, EdgeChange } from '@xyflow/react'
+import type { StepCategoryId, StepKindId } from '@mes/domain'
 
 type NodeUpdater = (updater: (nodes: Node[]) => Node[]) => void
 
@@ -23,6 +24,18 @@ function snapshot(nodes: Node[], edges: Edge[]): HistoryEntry {
   }
 }
 
+export interface PaletteDragSource {
+  source: 'category' | 'kind'
+  id: string
+}
+
+export interface AddStepDialogState {
+  open: boolean
+  groupId: string | null
+  preselectedKind: StepKindId | null
+  preselectedCategory: StepCategoryId | null
+}
+
 interface WorkflowCanvasStore {
   nodes: Node[]
   edges: Edge[]
@@ -30,6 +43,10 @@ interface WorkflowCanvasStore {
   selectedNodeType: string | null
   isDirty: boolean
   history: { past: HistoryEntry[]; future: HistoryEntry[] }
+  // Drag-drop state shared between palette and canvas group nodes (D2).
+  dragSource: PaletteDragSource | null
+  // Add Step shell dialog state (D2 — full shell, full content in PNE_1).
+  addStepDialog: AddStepDialogState
   // Callbacks registered by WorkflowCanvas so the configurator forms can
   // mutate the canvas's local React Flow state and trigger the auto-save
   // debounce without forms importing the canvas component.
@@ -64,6 +81,25 @@ interface WorkflowCanvasStore {
   // Canvas mutations triggered by right-click menu / keyboard shortcuts.
   deleteNode: (nodeId: string) => void
   duplicateNode: (nodeId: string) => void
+  // D2 drag-drop + Add Step dialog actions.
+  setDragSource: (source: PaletteDragSource | null) => void
+  openAddStepDialog: (params: {
+    groupId: string
+    preselectedKind?: StepKindId | null
+    preselectedCategory?: StepCategoryId | null
+  }) => void
+  closeAddStepDialog: () => void
+  // Append a new step node + group→step edge under the given group.
+  addStepNodeToGroup: (
+    groupId: string,
+    payload: {
+      label: string
+      category: string
+      kind?: string | null
+      durationSec?: number | null
+      instructions?: string | null
+    },
+  ) => string
 }
 
 function newId(): string {
@@ -80,6 +116,13 @@ export const useWorkflowStore = create<WorkflowCanvasStore>((set, get) => ({
   selectedNodeType: null,
   isDirty: false,
   history: { past: [], future: [] },
+  dragSource: null,
+  addStepDialog: {
+    open: false,
+    groupId: null,
+    preselectedKind: null,
+    preselectedCategory: null,
+  },
   canvasSetNodes: null,
   triggerAutoSave: null,
   scrollToNode: null,
@@ -207,5 +250,66 @@ export const useWorkflowStore = create<WorkflowCanvasStore>((set, get) => ({
     set((state) => ({ nodes: updater(state.nodes), isDirty: true }))
     canvasSetNodes?.(updater)
     triggerAutoSave?.()
+  },
+  setDragSource: (source) => set({ dragSource: source }),
+  openAddStepDialog: ({ groupId, preselectedKind, preselectedCategory }) =>
+    set({
+      addStepDialog: {
+        open: true,
+        groupId,
+        preselectedKind: preselectedKind ?? null,
+        preselectedCategory: preselectedCategory ?? null,
+      },
+    }),
+  closeAddStepDialog: () =>
+    set({
+      addStepDialog: {
+        open: false,
+        groupId: null,
+        preselectedKind: null,
+        preselectedCategory: null,
+      },
+    }),
+  addStepNodeToGroup: (groupId, payload) => {
+    const { nodes, edges, canvasSetNodes, triggerAutoSave } = get()
+    const group = nodes.find((n) => n.id === groupId && n.type === 'groupNode')
+    if (!group) return ''
+    get().pushHistory()
+    const id = newId()
+    const order =
+      nodes.filter(
+        (n) => n.type === 'stepNode' && n.data['parentId'] === groupId,
+      ).length + 1
+    const groupX = group.position?.x ?? 0
+    const groupY = group.position?.y ?? 0
+    const newNode: Node = {
+      id,
+      type: 'stepNode',
+      position: { x: groupX + 40, y: groupY + 80 + order * 60 },
+      data: {
+        label: payload.label,
+        category: payload.category,
+        order,
+        parentId: groupId,
+        ...(payload.kind ? { kind: payload.kind } : {}),
+        ...(payload.durationSec != null ? { durationSec: payload.durationSec } : {}),
+        ...(payload.instructions ? { instructions: payload.instructions } : {}),
+      },
+    }
+    const updater = (ns: Node[]) => [...ns, newNode]
+    const newEdge: Edge = {
+      id: `e-${groupId}-${id}`,
+      source: groupId,
+      target: id,
+      type: 'sequential',
+    }
+    set({
+      nodes: updater(nodes),
+      edges: [...edges, newEdge],
+      isDirty: true,
+    })
+    canvasSetNodes?.(updater)
+    triggerAutoSave?.()
+    return id
   },
 }))

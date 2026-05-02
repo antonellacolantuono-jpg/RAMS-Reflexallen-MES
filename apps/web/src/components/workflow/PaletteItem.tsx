@@ -15,6 +15,7 @@ import {
   GitBranch,
   type LucideIcon,
 } from 'lucide-react'
+import { useWorkflowStore } from './store'
 
 const ICONS: Record<string, LucideIcon> = {
   ScanLine,
@@ -49,6 +50,7 @@ export function PaletteItem({
   iconName,
 }: PaletteItemProps) {
   const Icon = ICONS[iconName] ?? ScanLine
+  const setDragSource = useWorkflowStore((s) => s.setDragSource)
 
   const onDragStart = (event: React.DragEvent<HTMLDivElement>) => {
     event.dataTransfer.setData(
@@ -56,6 +58,11 @@ export function PaletteItem({
       JSON.stringify({ source, id, labelIt }),
     )
     event.dataTransfer.effectAllowed = 'copy'
+    setDragSource({ source, id })
+  }
+
+  const onDragEnd = () => {
+    setDragSource(null)
   }
 
   return (
@@ -64,6 +71,7 @@ export function PaletteItem({
       tabIndex={0}
       draggable
       onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       data-palette-source={source}
       data-palette-id={id}
       className="group flex items-start gap-2 px-2.5 py-2 rounded-md border border-neutral-200 bg-white hover:border-primary-400 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-grab active:cursor-grabbing select-none shadow-sm transition-colors"

@@ -14,6 +14,7 @@ import { WorkflowValidationProvider } from '../../../../components/workflow/vali
 import { ApproveVersionModal } from '../../../../components/workflow/versioning/ApproveVersionModal'
 import { DeprecateVersionModal } from '../../../../components/workflow/versioning/DeprecateVersionModal'
 import { VersionHistorySidebar } from '../../../../components/workflow/versioning/VersionHistorySidebar'
+import { AddStepDialog } from '../../../../components/workflow/AddStepDialog'
 
 export default function WorkflowEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -201,6 +202,7 @@ export default function WorkflowEditorPage() {
           />
         </>
       )}
+      <AddStepDialog />
     </div>
     </WorkflowValidationProvider>
   )

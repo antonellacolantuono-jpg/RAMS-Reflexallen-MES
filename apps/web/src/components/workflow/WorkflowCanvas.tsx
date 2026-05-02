@@ -22,6 +22,13 @@ import { StepNode } from './nodes/StepNode'
 import { SequentialEdge } from './edges/SequentialEdge'
 import { CanvasContextMenu, type CanvasContextMenuState } from './CanvasContextMenu'
 import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
+import { useToast } from '@mes/ui'
+import {
+  isStepCategoryAllowedInGroup,
+  mapPaletteCategoryToStepCategory,
+  type StepCategoryId,
+  type StepKindId,
+} from '@mes/domain'
 
 const nodeTypes = {
   phaseNode: PhaseNode,
@@ -201,8 +208,15 @@ function CanvasInner({
   workflowId: string
   versionId: string
 }) {
-  const { selectNode, markDirty, markClean, registerCanvasCallbacks, unregisterCanvasCallbacks } =
-    useWorkflowStore()
+  const {
+    selectNode,
+    markDirty,
+    markClean,
+    registerCanvasCallbacks,
+    unregisterCanvasCallbacks,
+    openAddStepDialog,
+  } = useWorkflowStore()
+  const toast = useToast()
   const { screenToFlowPosition, setCenter } = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -290,6 +304,50 @@ function CanvasInner({
   const onDrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault()
+
+      // PROMPT_3d D2 — new palette format. Drop a Step Kind / Step Category
+      // onto a Group node opens the AddStepDialog.
+      const paletteRaw = event.dataTransfer.getData('application/workflow-palette')
+      if (paletteRaw) {
+        let palette: { source: 'category' | 'kind'; id: string }
+        try {
+          palette = JSON.parse(paletteRaw) as { source: 'category' | 'kind'; id: string }
+        } catch {
+          return
+        }
+        const targetEl = event.target as HTMLElement | null
+        const groupEl = targetEl?.closest('[data-id]') as HTMLElement | null
+        const groupId = groupEl?.getAttribute('data-id') ?? null
+        const groupNode = groupId
+          ? nodes.find((n) => n.id === groupId && n.type === 'groupNode')
+          : null
+        if (!groupNode) {
+          toast.show('Trascina su un gruppo per aggiungere uno step', 'info')
+          return
+        }
+        const groupCategory = (groupNode.data['category'] as string) ?? ''
+        if (palette.source === 'category') {
+          const schemaCategory = mapPaletteCategoryToStepCategory(palette.id as StepCategoryId)
+          if (schemaCategory && !isStepCategoryAllowedInGroup(groupCategory, schemaCategory)) {
+            toast.show(
+              `La categoria step non è ammessa nel gruppo "${groupCategory}"`,
+              'warn',
+            )
+            return
+          }
+        }
+        openAddStepDialog({
+          groupId: groupNode.id,
+          ...(palette.source === 'kind' ? { preselectedKind: palette.id as StepKindId } : {}),
+          ...(palette.source === 'category'
+            ? { preselectedCategory: palette.id as StepCategoryId }
+            : {}),
+        })
+        return
+      }
+
+      // Legacy `application/workflow-node` format (kept for backward-compat
+      // with any in-canvas drag-source that emits the old shape).
       const raw = event.dataTransfer.getData('application/workflow-node')
       if (!raw) return
 
@@ -352,7 +410,16 @@ function CanvasInner({
       markDirty()
       triggerAutoSave()
     },
-    [nodes, setNodes, setEdges, markDirty, triggerAutoSave, screenToFlowPosition],
+    [
+      nodes,
+      setNodes,
+      setEdges,
+      markDirty,
+      triggerAutoSave,
+      screenToFlowPosition,
+      openAddStepDialog,
+      toast,
+    ],
   )
 
   const isEmpty = nodes.length === 0

@@ -19,6 +19,7 @@ export function CanvasContextMenu({ state, onClose }: CanvasContextMenuProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const deleteNode = useWorkflowStore((s) => s.deleteNode)
   const duplicateNode = useWorkflowStore((s) => s.duplicateNode)
+  const openAddStepDialog = useWorkflowStore((s) => s.openAddStepDialog)
 
   useEffect(() => {
     if (!state) return
@@ -39,6 +40,7 @@ export function CanvasContextMenu({ state, onClose }: CanvasContextMenuProps) {
   if (!state) return null
 
   const isStep = state.nodeType === 'stepNode'
+  const isGroup = state.nodeType === 'groupNode'
 
   return (
     <div
@@ -47,6 +49,19 @@ export function CanvasContextMenu({ state, onClose }: CanvasContextMenuProps) {
       className="fixed z-50 min-w-[180px] rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
       style={{ top: state.y, left: state.x }}
     >
+      {isGroup && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            openAddStepDialog({ groupId: state.nodeId })
+            onClose()
+          }}
+          className="block w-full px-3 py-1.5 text-left text-sm text-neutral-800 hover:bg-neutral-100"
+        >
+          Aggiungi Step
+        </button>
+      )}
       {isStep && (
         <button
           type="button"
