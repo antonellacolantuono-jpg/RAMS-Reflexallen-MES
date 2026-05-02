@@ -1,17 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   PageHeader,
-  SearchBar,
-  DataTable,
-  BulkActionBar,
   TrashBannerBar,
   StatusBadge,
   ConfirmModal,
+  OperationalTable,
 } from '@mes/ui'
-import type { Column, BulkAction } from '@mes/ui'
+import type {
+  OpTableColumn,
+  OpTableBulkAction,
+  SavedView,
+} from '@mes/ui'
+import { Trash2 } from 'lucide-react'
 import { sdk } from '../../../lib/sdk'
 import type { ItemModel } from '@mes/sdk'
 import Link from 'next/link'
@@ -24,32 +27,34 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
   consumable: 'Consumabile',
 }
 
-const ITEM_TYPE_TABS = [
-  { key: '', label: 'Tutti' },
-  { key: 'finished_good', label: 'PF' },
-  { key: 'semi_finished', label: 'Semi.' },
-  { key: 'raw_material', label: 'MP' },
-  { key: 'component', label: 'Comp.' },
-  { key: 'consumable', label: 'Cons.' },
+const TYPE_VIEWS: { id: string; label: string; itemType: string }[] = [
+  { id: 'all', label: 'Tutti', itemType: '' },
+  { id: 'fg', label: 'PF', itemType: 'finished_good' },
+  { id: 'semi', label: 'Semi.', itemType: 'semi_finished' },
+  { id: 'raw', label: 'MP', itemType: 'raw_material' },
+  { id: 'component', label: 'Comp.', itemType: 'component' },
+  { id: 'consumable', label: 'Cons.', itemType: 'consumable' },
 ]
 
-const COLUMNS: Column<ItemModel>[] = [
-  { key: 'code', header: 'Codice', sortable: true, width: '120px' },
-  { key: 'name', header: 'Nome', sortable: true },
+const COLUMNS: OpTableColumn<ItemModel>[] = [
+  { id: 'code', label: 'Codice', sortable: true, width: 120 },
+  { id: 'name', label: 'Nome', sortable: true },
   {
-    key: 'itemType',
-    header: 'Tipo',
-    width: '140px',
+    id: 'itemType',
+    label: 'Tipo',
+    width: 140,
     render: (row) => ITEM_TYPE_LABELS[row.itemType] ?? row.itemType,
   },
-  { key: 'uom', header: 'UdM', width: '60px' },
-  { key: 'trackingMode', header: 'Tracking', width: '80px' },
+  { id: 'uom', label: 'UdM', width: 60 },
+  { id: 'trackingMode', label: 'Tracking', width: 80 },
   {
-    key: 'isActive',
-    header: 'Stato',
-    width: '80px',
+    id: 'isActive',
+    label: 'Stato',
+    width: 80,
     render: (row) => (
-      <StatusBadge tone={row.isActive ? 'ok' : 'neutral'}>{row.isActive ? 'Attivo' : 'Inattivo'}</StatusBadge>
+      <StatusBadge tone={row.isActive ? 'ok' : 'neutral'}>
+        {row.isActive ? 'Attivo' : 'Inattivo'}
+      </StatusBadge>
     ),
   },
 ]
@@ -60,9 +65,11 @@ export default function ItemsPage() {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-  const [itemType, setItemType] = useState('')
+  const [activeView, setActiveView] = useState('all')
   const [selected, setSelected] = useState(new Set<string>())
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
+  const itemType = TYPE_VIEWS.find((v) => v.id === activeView)?.itemType ?? ''
 
   const { data, isLoading } = useQuery({
     queryKey: ['items', page, search, sortBy, sortDir, itemType],
@@ -96,25 +103,40 @@ export default function ItemsPage() {
     },
   })
 
-  function handleSort(key: string, dir: 'asc' | 'desc') {
-    setSortBy(key)
+  function handleSort(col: string, dir: 'asc' | 'desc') {
+    setSortBy(col)
     setSortDir(dir)
     setPage(1)
   }
 
-  function handleSearch(value: string) {
-    setSearch(value)
+  function handleSearchChange(v: string) {
+    setSearch(v)
     setPage(1)
   }
 
-  const bulkActions: BulkAction[] = [
-    {
-      key: 'delete',
-      label: 'Elimina',
-      variant: 'danger',
-      onClick: () => bulkDeleteMutation.mutate(Array.from(selected)),
-    },
-  ]
+  function handleViewChange(id: string) {
+    setActiveView(id)
+    setPage(1)
+    setSelected(new Set())
+  }
+
+  const views: SavedView[] = useMemo(
+    () => TYPE_VIEWS.map((v) => ({ id: v.id, label: v.label })),
+    [],
+  )
+
+  const bulkActions: OpTableBulkAction[] = useMemo(
+    () => [
+      {
+        id: 'delete',
+        label: 'Elimina',
+        icon: Trash2,
+        tone: 'bad',
+        onClick: () => bulkDeleteMutation.mutate(Array.from(selected)),
+      },
+    ],
+    [bulkDeleteMutation, selected],
+  )
 
   const pagination = data
     ? { page: data.page, limit: data.limit, total: data.total, totalPages: data.totalPages }
@@ -140,49 +162,26 @@ export default function ItemsPage() {
         onView={() => window.location.assign('/items/trash')}
       />
 
-      {/* Type tabs */}
-      <div className="flex gap-0 border-b border-neutral-200">
-        {ITEM_TYPE_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => { setItemType(tab.key); setPage(1) }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              itemType === tab.key
-                ? 'border-primary-600 text-primary-700'
-                : 'border-transparent text-neutral-600 hover:text-neutral-900'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <SearchBar
-        value={search}
-        onChange={handleSearch}
-        placeholder="Cerca per codice o nome…"
-      />
-
-      <DataTable
-        data={data?.data ?? []}
+      <OperationalTable<ItemModel>
+        rows={data?.data ?? []}
         columns={COLUMNS}
-        pagination={pagination}
+        views={views}
+        activeView={activeView}
+        onViewChange={handleViewChange}
+        search={search}
+        onSearchChange={handleSearchChange}
+        searchPlaceholder="Cerca per codice o nome…"
         sortBy={sortBy}
         sortDir={sortDir}
-        selectedIds={selected}
+        onSort={handleSort}
+        selection={selected}
+        onSelectionChange={setSelected}
+        bulkActions={bulkActions}
+        {...(pagination ? { pagination } : {})}
+        onPageChange={setPage}
         isLoading={isLoading}
         emptyMessage="Nessun articolo trovato"
-        onSort={handleSort}
-        onPageChange={setPage}
-        onSelectionChange={setSelected}
         onRowClick={(row) => window.location.assign(`/items/${row.id}`)}
-      />
-
-      <BulkActionBar
-        selectedCount={selected.size}
-        actions={bulkActions}
-        onClear={() => setSelected(new Set())}
       />
 
       <ConfirmModal

@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '../utils/cn'
+import { useFocusTrap } from '../utils/focus-trap'
 
 export interface ModalProps {
   open?: boolean | undefined
@@ -12,6 +13,7 @@ export interface ModalProps {
   width?: number | undefined
   children?: React.ReactNode
   footer?: React.ReactNode
+  actions?: React.ReactNode
   className?: string | undefined
 }
 
@@ -27,9 +29,20 @@ export interface ConfirmModalProps {
   isLoading?: boolean | undefined
 }
 
-export function Modal({ open = false, onClose, title, description, width = 480, children, footer, className }: ModalProps) {
+export function Modal({
+  open = false,
+  onClose,
+  title,
+  description,
+  width = 480,
+  children,
+  footer,
+  actions,
+  className,
+}: ModalProps) {
   const [mounted, setMounted] = React.useState(false)
   const [visible, setVisible] = React.useState(false)
+  const dialogRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     setMounted(true)
@@ -53,24 +66,36 @@ export function Modal({ open = false, onClose, title, description, width = 480, 
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
+  React.useEffect(() => {
+    if (!open) return
+    const original = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = original
+    }
+  }, [open])
+
+  useFocusTrap(open, dialogRef)
+
   if (!mounted || !visible) return null
+
+  const footerNode = actions ?? footer
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div
         className={cn(
-          'absolute inset-0 bg-black/40 transition-opacity duration-150',
+          'absolute inset-0 bg-black/40 motion-safe:transition-opacity motion-safe:duration-150',
           open ? 'opacity-100' : 'opacity-0',
         )}
         onClick={onClose}
         aria-hidden
       />
 
-      {/* Dialog */}
       <div
+        ref={dialogRef}
         className={cn(
-          'relative flex max-h-[90vh] flex-col rounded-xl bg-white shadow-2xl transition-all duration-150',
+          'relative flex max-h-[90vh] flex-col rounded-xl bg-white shadow-2xl motion-safe:transition-all motion-safe:duration-150',
           open ? 'opacity-100 scale-100' : 'opacity-0 scale-95',
           className,
         )}
@@ -78,8 +103,8 @@ export function Modal({ open = false, onClose, title, description, width = 480, 
         role="dialog"
         aria-modal
         aria-label={title}
+        tabIndex={-1}
       >
-        {/* Header */}
         {(title || onClose) && (
           <div className="flex items-start justify-between border-b border-neutral-200 px-5 py-4 shrink-0">
             <div>
@@ -101,13 +126,11 @@ export function Modal({ open = false, onClose, title, description, width = 480, 
           </div>
         )}
 
-        {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
 
-        {/* Footer */}
-        {footer && (
+        {footerNode && (
           <div className="border-t border-neutral-200 px-5 py-4 shrink-0 flex justify-end gap-2">
-            {footer}
+            {footerNode}
           </div>
         )}
       </div>

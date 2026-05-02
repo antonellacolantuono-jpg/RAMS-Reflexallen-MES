@@ -458,6 +458,51 @@ WARNING  no output files found for task @mes/storage#build. Please check your `o
 
 ---
 
+### TODO-031 — Turborepo cache restores @mes/prisma dist/ but not generated Prisma client
+
+**Discovered**: 2026-05-02 (during PROMPT_DS_LIFT pre-flight check)
+**File**: `packages/prisma/package.json` (build script) + `turbo.json`
+**Symptom**: `pnpm build` from a fresh clone or after a turbo cache restore fails on `@mes/api#build` with ~30 errors of the form `Property 'X' does not exist on type 'PrismaService'` (where X is `stepExecution`, `workflow`, `workflowVersion`, `$transaction`, etc.). Root cause: `@mes/prisma` package builds with `prisma generate && tsc`. Turbo caches `dist/` but the Prisma client is generated to `node_modules/.pnpm/@prisma+client@*/node_modules/@prisma/client` (outside the package's normal output). When turbo restores `dist/` from cache, the generated client is missing. Manual workaround: `pnpm --filter @mes/prisma generate` before `pnpm build`.
+**Acceptance criterion** (chosen approach: **option b — turbo dependency**):
+- Configure `turbo.json` so `@mes/api#build` (and any other consumer of `@mes/prisma`) declares an explicit dependency on the Prisma generation step. Most likely shape: split `@mes/prisma`'s build into two tasks (`prisma:generate` + `build`) and add `dependsOn: ["@mes/prisma#prisma:generate"]` on dependent builds; turbo then re-runs generate when its inputs (`schema.prisma`) change. Alternative: extend `@mes/prisma#build` `outputs` glob to include the generated client path so cache restores it correctly.
+- Rejected option a (`postinstall` hook): runs on every `pnpm install` regardless of need — slows CI and local installs unnecessarily.
+- Rejected option c (manual workaround): keeps the friction in pre-flight forever.
+- After fix: `pnpm install && pnpm build` from a clean clone or after `pnpm clean` succeeds 12/12 with no manual `pnpm --filter @mes/prisma generate` step.
+**Estimated effort**: 30-60 min (turbo experimentation + verification on clean clone)
+**Blocker for**: dev onboarding ergonomics. Not blocking work but adds friction on every fresh clone / cache invalidation.
+
+---
+
+### TODO-033 — P7/P9: write adapter audit-log API row → AuditTimelineEntry
+
+**Discovered**: 2026-05-02 (during PROMPT_DS_LIFT D5 — AuditTimeline primitive lift)
+**File**: future `apps/web/src/lib/audit-log-adapter.ts` + first AuditTimeline callsite in P7 (registry detail) or P9 (WO Detail BO)
+**Symptom**: D5 ships `AuditTimeline` as a UI primitive in @mes/ui with its own `AuditTimelineEntry` shape: `{ id, at: Date, actor, action, entity?, diff?: AuditDiffLine[], tone? }`. The existing `AuditEntry` type (from `ActivityFeed.tsx`, used by `items/[id]/page.tsx`) has a different shape — `{ changedBy, createdAt, ... }` — closer to the API audit_log row shape. Both types coexist **intentionally**: AuditTimeline is the new primitive for richer detail views (with diffs and tone-coloured timeline dots), ActivityFeed is the legacy compact list. Wiring AuditTimeline to real audit-log API rows requires an adapter.
+**Acceptance criterion**:
+- New util `mapAuditLogRowToTimelineEntry(row)` in `apps/web/src/lib/audit-log-adapter.ts` (or similar) that maps the SDK audit-log row shape to `AuditTimelineEntry`. Inputs come from `sdk.auditLog.list(...)` (define endpoint if not present); output drives AuditTimeline.
+- `tone` mapping: state changes → ok, overrides → warn, NCR/scrap → bad, comments → info, system events → neutral.
+- `diff` mapping: when the row's `before` and `after` JSON columns contain materialised changes, derive `AuditDiffLine[]` per top-level key; skip empty diffs.
+- First callsite (P7 registry detail OR P9 WO Detail) renders the new AuditTimeline driven by the adapter; verify with at least 5 audit-log rows in seed data.
+- **Do NOT delete** any `ActivityFeed` callsites in `items/[id]/page.tsx` (or anywhere else) until the adapter is wired and the new AuditTimeline rendering is tested. Both types coexist intentionally during the migration window.
+**Estimated effort**: 1-2 hours (adapter + first callsite + test).
+**Blocker for**: nothing currently. Lights up the AuditTimeline primitive once detail pages need richer audit views than ActivityFeed provides.
+
+---
+
+### TODO-032 — Audit existing useToast() callsites after Toast.tsx no-op stub fix
+
+**Discovered**: 2026-05-02 (during PROMPT_DS_LIFT D1 — Toast component audit)
+**File**: any caller of `useToast()` from `@mes/ui` across `apps/web/` and `apps/hmi/`
+**Symptom**: Before D1, `Toast.tsx` was a no-op stub: `ToastProvider` returned `{ show: () => undefined, dismiss: () => undefined }`. Every call to `useToast().show(...)` produced zero user feedback for the entire history of the project. D1 wired up the real implementation (top-right portal, max 3 stack, 4000ms default). From the D1 commit forward, those same callsites now produce visible toasts — intended behavior, but a UX delta.
+**Acceptance criterion**:
+- Grep for `useToast(` across `apps/web/src` and `apps/hmi/src`; for each callsite, verify the wording, tone (`ok`/`warn`/`bad`/`info`), and frequency are appropriate. Adjust if specific flows now feel too noisy (e.g. validation errors firing on every keystroke would now spam toasts).
+- Confirm there is no callsite that relied on the silent no-op (none expected — silent no-ops are usually accidental, not intentional).
+- If any flow needs a quieter behavior, pass `options: { duration: 0 }` (no auto-dismiss; only manual) or simply remove the call.
+**Estimated effort**: 30-60 min (mostly grep + read).
+**Blocker for**: nothing. UX polish; do during F1 demo prep or at the start of P6/P7.
+
+---
+
 ## ✅ Resolved
 
 _No entries yet._

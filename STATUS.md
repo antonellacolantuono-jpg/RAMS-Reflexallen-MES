@@ -1,8 +1,82 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 1, 2026, very late evening (PROMPT_3b_FULL Session A merged)
+> **Last update**: May 2, 2026 (PROMPT_DS_LIFT D1-D6 merged — 100% complete)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ PROMPT_DS_LIFT — 100% complete (May 2, 2026)
+
+Lift the Reflexallen design-handoff bundle (`docs/design-handoff/source/*.jsx`)
+into typed @mes/ui primitives. Foundation for F1.2 (PROMPT_6 Andon / Plant
+Overview), F1.3 (PROMPT_7 Registry detail + WO Detail BO), F1.4 (PROMPT_3c
+Live Preview).
+
+### Test count
+
+- **Baseline**: 473 (Session B commit message — the 385 observed in pre-flight was flaky due to the Windows vitest tmp dir bug `ANTONE~1.COL` dropping 3 @mes/api test files; counted correctly from D1 onward).
+- **Final**: **587** tests across 7 packages (api 249, domain 176, schemas 29, cache 8, queue 5, storage 6, **ui 114**).
+- **Delta**: **+114 tests** (target was ≥+25 minimum / +87 ideal; achieved with +27 buffer over ideal).
+
+### D1-D6 breakdown
+
+| Increment | Components added | Test delta | Cumul total | Commit |
+|---|---|---|---|---|
+| D1 | Drawer audit + Modal audit + Toast (full impl from no-op stub) + PriorityBadge | +20 | 493 | `8991925` |
+| D2 | TreeNode + EmptyState + ViewSwitcher + SplitView + lucide-react dep | +19 | 512 | `ec1a3fb` |
+| D3 | Operational Table v0.7 (8 sub-components + composer) + RegistryListPage `useOperationalTable` flag + Items canary | +24 | 536 | `51422e1` |
+| D4 | RegistryTile + KpiHero + PhaseChip + WCCard + AlertBanner + LiveAlert | +23 | 559 | `2398be9` |
+| D5 | DetailHeader + DetailBody + AuditTimeline + Tabs extensions (count/dot/kbd) | +15 | 574 | `dfc7281` |
+| D6 | PlantNode + PlantMap + Canvas suite (CanvasGrid/ZoomControls/Minimap/CanvasToolbar/CanvasStateBar/GenericNode/Edge/ArrowDefs) + showcase 3 new tabs | +13 | 587 | _this commit_ |
+| **Total** | **~32 new primitives + 1 extended (Tabs)** | **+114** | **587** | |
+
+### Architectural decisions (kept after D6)
+
+- **Test baseline correction**: 473 confirmed; pre-flight 385 was flaky.
+- **RegistryListPage feature-flag (D3)**: opt-in `useOperationalTable=true`; the 10 standard callsites stay on the legacy DataTable path. Items is the only canary on the new path (migrated directly inline because Items has bespoke type-tab logic). The flag's API surface is in place so the 10 standard pages can opt in incrementally.
+- **Toast.tsx was a no-op stub before D1**: D1 wired up the real implementation. Existing `useToast().show()` callers now produce visible top-right toasts. UX delta tracked by TODO-032 (audit callsites for tone/duration tuning).
+- **AuditTimeline naming (D5)**: `AuditTimelineEntry`, NOT `AuditEntry` — the latter is exported from the legacy `ActivityFeed.tsx` with a different shape (`{changedBy, createdAt}`) consumed by `items/[id]/page.tsx`. Both types coexist intentionally; adapter from API audit_log row → `AuditTimelineEntry` tracked by TODO-033 for P7/P9.
+- **Drawer width default 480 (D1)**: kept the existing default to avoid breaking 8 existing callsites. Bundle spec is 720; downstream consumers (WO Detail in P7, Equipment 7-tab in P9) should pass `width={720}` explicitly.
+- **lucide-react** (D2): added to `packages/ui/package.json` as a regular dependency (^0.453.0); also added to `apps/web/package.json` as a direct dep (Next.js production build needs the explicit reference; transitive resolution is enough only for type-checking).
+- **Canvas suite is standalone** (D6): NOT a replacement for `@xyflow/react` in the workflow editor. The suite is for one-off mini-flow renders (e.g. dashboard widgets). React Flow replacement is scope of P3c.
+- **Prisma client cache gap** (TODO-031, discovered in pre-flight): turbo restores `@mes/prisma` `dist/` but not the generated client at `node_modules/.pnpm/@prisma+client@*/`. Manual workaround `pnpm --filter @mes/prisma generate` until TODO-031 is fixed (recommended approach: turbo `dependsOn` split, NOT a postinstall hook).
+
+### TODOs closed by PROMPT_DS_LIFT
+
+- **Operational Table v0.7 lift** → done in D3 (commit `51422e1`).
+- **Drawer / Modal / Toast in @mes/ui** → done in D1 (commit `8991925`); Toast was a no-op stub, now full impl.
+- **AuditTrail UI viewer (§16.2)** → primitive done in D5 (commit `dfc7281`); backend integration tracked by TODO-033 for P7/P9.
+- **Plant Map primitives** → done in D6 (this commit); integration with live data tracked by P6 Andon / Plant Overview.
+
+### TODOs opened by PROMPT_DS_LIFT
+
+- **TODO-031** — Prisma client cache gap (recommended fix: turbo `dependsOn`).
+- **TODO-032** — Audit existing `useToast()` callsites after Toast no-op stub fix.
+- **TODO-033** — Adapter audit-log API row shape → `AuditTimelineEntry`; do not delete ActivityFeed callsites until adapter is wired.
+
+### Verification commands (final)
+
+```
+pnpm install
+pnpm build                           # 12/12 successful
+pnpm lint                            # 3/3 (0 new warnings; 2 baseline @mes/hmi <img> warnings tracked by TODO-002)
+pnpm --filter @mes/ui test           # 114/114 pass (29 files)
+pnpm --filter @mes/api test          # 249/249 pass
+pnpm --filter @mes/domain test       # 176/176 pass
+pnpm --filter @mes/schemas test      # 29/29 pass
+pnpm --filter @mes/cache test        # 8/8 pass
+pnpm --filter @mes/queue test        # 5/5 pass
+pnpm --filter @mes/storage test      # 6/6 pass
+```
+
+Runtime smoke deferred to user pre-merge (no Playwright / Vitest browser-mode
+infrastructure in repo). Suggested checks:
+- `/items` (canary) — 6 SavedViews tabs, search, sort, multi-select, BulkBar
+- `/operators`, `/equipment` (any 2 of 10 RegistryListPage callsites) — render
+  identically to pre-D3 (legacy path)
+- `/` showcase — 6 tabs (Components / Patterns / Detail / Dashboard / Colors /
+  Typography) navigate; Drawer/Modal/Toast/PlantMap/Canvas demos render
 
 ---
 
