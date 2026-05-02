@@ -11,6 +11,7 @@
 // Schema has no qtyBuffer column → buffer documented in `notes` field.
 
 import { SYSTEM, type PneumaticSeedContext, type Prisma } from '../helpers/upsert'
+import { createSnapshot } from '../helpers/snapshot'
 
 export const PNE_WORK_ORDER = {
   code: 'WO-2026-PNE-0042',
@@ -76,4 +77,82 @@ export async function seedWorkOrderDraft(prisma: Prisma, ctx: PneumaticSeedConte
 
   console.log(`✓ Work order: ${wo.code} (status=${wo.status}, qtyTarget=${PNE_WORK_ORDER.qtyTarget}+buffer ${PNE_WORK_ORDER.qtyBuffer})`)
   return { workOrderId: wo.id }
+}
+
+/**
+ * D3 — Release WO-2026-PNE-0042: transition status draft → released, create
+ * WorkflowSnapshot, transition WorkOrderAssignment proposed → accepted, seed
+ * StepExecution rows for every step in the snapshot (status=pending,
+ * startedAt=releasedAt). Bypasses the API release service (which requires
+ * request context).
+ *
+ * Idempotent: if WO already released and snapshot exists, skip; if
+ * StepExecutions already exist, skip per-step.
+ */
+export async function releaseWorkOrder(
+  prisma: Prisma,
+  ctx: PneumaticSeedContext,
+  workOrderId: string,
+  workflowVersionId: string,
+): Promise<{ snapshotId: string; stepExecutionCount: number }> {
+  const wo = await prisma.workOrder.findUniqueOrThrow({ where: { id: workOrderId } })
+  const operator = ctx.operators[PNE_WORK_ORDER.assignedOperatorBadge]
+  if (!operator) throw new Error('Work order release requires Mario Rossi (badge 1234)')
+
+  const releasedAt = wo.releasedAt ?? new Date()
+
+  // 1. Transition WO → released (no-op if already released)
+  if (wo.status !== 'released') {
+    const today6am = new Date()
+    today6am.setHours(6, 0, 0, 0)
+    await prisma.workOrder.update({
+      where: { id: wo.id },
+      data: {
+        status: 'released',
+        releasedAt,
+        releasedBy: SYSTEM,
+        scheduledStart: today6am,
+        actualStart: null,
+        updatedBy: SYSTEM,
+      },
+    })
+  }
+
+  // 2. Transition assignment proposed → accepted
+  await prisma.workOrderAssignment.update({
+    where: { workOrderId_operatorId: { workOrderId: wo.id, operatorId: operator.id } },
+    data: {
+      status: 'accepted',
+      acceptedAt: releasedAt,
+      updatedBy: SYSTEM,
+    },
+  })
+
+  // 3. Create snapshot (idempotent — skip if exists)
+  const { snapshotId, stepIds } = await createSnapshot(prisma, workflowVersionId, wo.id, releasedAt)
+
+  // 4. Create StepExecution rows (one per step, status=pending)
+  let createdExec = 0
+  for (const stepId of stepIds) {
+    const existing = await prisma.stepExecution.findFirst({
+      where: { workOrderId: wo.id, stepId },
+    })
+    if (!existing) {
+      await prisma.stepExecution.create({
+        data: {
+          workOrderId: wo.id,
+          stepId,
+          status: 'pending',
+          startedAt: releasedAt,
+        },
+      })
+      createdExec++
+    }
+  }
+
+  console.log(
+    `✓ WO release: ${wo.code} → released, snapshot ${snapshotId.slice(0, 8)}…, ` +
+      `${stepIds.length} step executions (${createdExec} new)`,
+  )
+  return { snapshotId, stepExecutionCount: stepIds.length }
 }

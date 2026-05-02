@@ -20,7 +20,8 @@ import { seedOperators } from './pneumatic-data/operators'
 import { seedCauseCodes } from './pneumatic-data/cause-codes'
 import { seedFaultCodes } from './pneumatic-data/fault-codes'
 import { seedAttentionPoints } from './pneumatic-data/attention-points'
-import { seedWorkOrderDraft } from './pneumatic-data/work-orders'
+import { seedWorkOrderDraft, releaseWorkOrder } from './pneumatic-data/work-orders'
+import { seedWorkflowV1 } from './pneumatic-data/workflow-v1'
 
 async function main(): Promise<void> {
   console.log('🌱 Seeding Pneumatic Air (PROMPT_PNE_2)...')
@@ -37,9 +38,13 @@ async function main(): Promise<void> {
   await seedCauseCodes(prisma, ctx)
   await seedFaultCodes(prisma, ctx) // CauseCode rows with category=recovery_fault (S1 workaround)
   await seedAttentionPoints(prisma, ctx)
-  await seedWorkOrderDraft(prisma, ctx) // depends on items + operators
+  const { workOrderId } = await seedWorkOrderDraft(prisma, ctx)
 
-  console.log('✅ Pneumatic Air seed (D2) complete.')
+  // D3 — workflow v1 + WO release transition + snapshot
+  const { workflowVersionId } = await seedWorkflowV1(prisma, ctx)
+  await releaseWorkOrder(prisma, ctx, workOrderId, workflowVersionId)
+
+  console.log('✅ Pneumatic Air seed (D3) complete.')
 }
 
 main()

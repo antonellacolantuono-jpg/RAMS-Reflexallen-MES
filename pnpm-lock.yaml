@@ -323,6 +323,9 @@ importers:
 
   packages/prisma:
     dependencies:
+      '@mes/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@prisma/client':
         specifier: ^5.21.0
         version: 5.22.0(prisma@5.22.0)
