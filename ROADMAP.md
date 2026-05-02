@@ -33,7 +33,7 @@ This pivot accepts **~3-4 week MVP slip** (mid-July → end of July / early Augu
 | # | PROMPT | Scope summary | Effort | Calendar |
 |---|---|---|---|---|
 | F1.1 | DS_LIFT (closed) | 14 patterns lifted to `@mes/ui` (foundation, view, op-table, card, detail, plant-map, canvas) + showcase | 18h actual (closed 2026-05-02) | done |
-| F1.2 | **PROMPT_3d** Workflow Editor UX-lift | Palette ungated, drag-drop step-on-group, canvas phase-columns horizontal, inspector 3-tab Properties/Metadata/Audit, Visual/Parallel toggle | 14-20h | 5-7 May |
+| F1.2 | PROMPT_3d (closed) | Palette ungated, drag-drop step-on-group, canvas phase-columns horizontal, inspector 3-tab Properties/Metadata/Audit, AddPhase/AddGroup/AddStep/Validate dialogs, Visual/Parallel toggle, WorkflowTopBar | ~16h actual (closed 2026-05-02) | done |
 | F1.3 | **PROMPT_PNE_1** Resource Selection | Step configurator with 6 tabs Materials/Tools/Devices/Skills/Recipes/Attention Points, multi-select + search | 8-12h | 8-9 May |
 | F1.4 | **PROMPT_PNE_2** Pneumatic Air seed (double) | Prisma seed: items, recipes, devices, materials, fault codes, cause codes, attention points + 2 workflows ("v1 Demo" pre-configured 4 phases/4 groups/19 steps + "v0 Empty" resources only) + 1 WO ready to release | 6-10h | 10-11 May |
 | F1.5 | **PROMPT_PNE_3** Mock device simulator | DEV-LEAK-001 service mock (45s cycle, RCP-LEAK-PNE-12-001 v2, threshold 0.5 mbar/min, demo toggle PASS/FAIL/MARGINAL). DEV-CAMERA-001 (8s, 4 ROIs). WebSocket events for live HMI updates | 8-12h | 12-13 May |
@@ -147,7 +147,16 @@ Carried forward from PROMPT_DS_LIFT closure.
 
 - **TODO-031** — Prisma client cache gap. Turbo restores `dist/` but not generated Prisma client. Fix path: `turbo.json` `dependsOn` split (NOT postinstall hook). Owner: PROMPT_PNE_2 (touches Prisma seed, can address there).
 - **TODO-032** — Audit `useToast()` callsites in `apps/web` and `apps/hmi`. Toast moved from no-op stub to full impl in DS_LIFT D1; existing callsites now produce visible toasts. Verify no UX regression. Owner: opportunistic, Antonella spot-check during F1.
-- **TODO-033** — Adapter API audit-log row → `AuditTimelineEntry` shape. Both `AuditEntry` (legacy ActivityFeed) and `AuditTimelineEntry` (new) coexist. Adapter to be wired when Audit tab activates in WO Detail (PROMPT_7 / F2.2).
+- **TODO-033** — Adapter API audit-log row → `AuditTimelineEntry` shape. Both `AuditEntry` (legacy ActivityFeed) and `AuditTimelineEntry` (new) coexist. AuditTab in PROMPT_3d D4 wires a stub returning []. Full adapter owner: PROMPT_7 / F2.2.
+
+Opened during PROMPT_3d (F1.2):
+
+- **TODO-034** — Add Step full configurator (6 resource tabs Materials/Tools/Devices/Skills/Recipes/AttentionPoints). Shell shipped in D2; full content owner: PROMPT_PNE_1.
+- **TODO-035** — Parallel view editing (currently read-only since D6). Owner: F2.
+- **TODO-036** — Decision-step `onOk`/`onNok` schema fields missing on Step model. Schema migration required. Owner: F2 (or earlier if PROMPT_PNE_2 seeds decision branches for recovery).
+- **TODO-037** — `@mes/ui` CanvasEdge / React Flow `EdgeProps` API asymmetry. Recommend Option B (document architectural decision) for MVP. Owner: F2.
+- **TODO-038** — Workflow-root metadata editing (`tags` + `defaultWorkCenters`). MetadataTab in D4 is read-only on canvas-node selection; workflow-level fields belong in the topbar / page header. Owner: PROMPT_7 / F2.2.
+- **TODO-039** — Design token migration. `bg-primary-*` / `bg-success-*` / `text-primary-*` unmapped in apps/web tailwind config — pre-existing pages render unstyled buttons. PROMPT_3d D5 hotfix only fixed the 4 dialogs. Recommend Option A (extend tailwind config). Owner: PROMPT_7 / F2.2.
 
 New TODOs to be opened during F1 will be tracked per-PROMPT.
 

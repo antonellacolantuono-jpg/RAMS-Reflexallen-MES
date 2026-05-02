@@ -131,3 +131,15 @@ export type {
   LayoutPosition,
   LayoutOptions,
 } from './rules/workflow-layout.rules'
+
+// workflow-parallel-view rules (D6 of PROMPT_3d)
+export {
+  selectParallelGroups,
+  groupParallelChildren,
+} from './rules/workflow-parallel-view.rules'
+export type {
+  ParallelViewPhase,
+  ParallelViewGroup,
+  ParallelViewStep,
+  ParallelViewSplit,
+} from './rules/workflow-parallel-view.rules'

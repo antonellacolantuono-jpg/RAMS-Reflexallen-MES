@@ -1,8 +1,79 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 2, 2026 (PROMPT_DS_LIFT D1-D6 merged — 100% complete)
+> **Last update**: May 2, 2026 (PROMPT_3d D1-D6 + hotfix merged — 100% complete)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ PROMPT_3d — Workflow Editor UX-lift — 100% complete (May 2, 2026)
+
+Refactor of the workflow editor to mockup-faithful layout (F1.2 in ROADMAP v2 Pneumatic First). The editor was the demo-blocking customer-facing surface for Reflex Allen — palette ungated, canvas phase-columns horizontal, inspector 3-tab Properties/Metadata/Audit, dialogs for phase/group/step/validate, Visual/Parallel toggle.
+
+### Test count
+
+- **Baseline (post DS_LIFT)**: 587
+- **Final**: **619** (api 249 / domain 197 / ui 119 / schemas 29 / cache 8 / queue 5 / storage 6 / **web 6**)
+- **Delta**: **+32 tests** (target floor +18 → ≥605, ideal +24 → ≥611; achieved with +8 buffer over ideal)
+
+### D1-D6 breakdown
+
+| Increment | Scope | Test delta | Cumul | Commit |
+|---|---|---|---|---|
+| D1 | Palette refactor to ungated STEP CATEGORIES + STEP KINDS; apps/web vitest setup | +5 | 592 | `a388f46` |
+| D2 | Drag-drop wiring + AddStepDialog shell + Modal.fullScreen prop | +8 | 600 | `c668dec` |
+| D3 | Canvas refactor — horizontal phase columns + DS_LIFT chrome (Toolbar/StateBar/Zoom) | +7 | 607 | `25505b8` |
+| D4 | Inspector 3-tab Properties/Metadata/Audit + audit-adapter stub (TODO-033) | +1 | 608 | `7aece39` |
+| D5 | AddPhaseDrawer + AddGroupModal + ValidateDrawer + EmptyState success | +4 | 612 | `b52ab67` |
+| D5 hotfix | Primary submit button visibility (`bg-accent` token; Drawer flex footer) | +3 | 615 | `89ed752` |
+| D6 | Visual/Parallel toggle + ParallelView + WorkflowTopBar + STATUS / ROADMAP / TODO | +4 | **619** | _this commit_ |
+
+### Architectural decisions (kept after D6)
+
+1. **Mixed test strategy** (decided in PHASE 1 of plan): pure logic extracted to `@mes/domain` (palette descriptors, compatibility matrix, layout algorithm, parallel-view selectors, validation issue navigator) + presentational primitives extended in `@mes/ui` (Modal `fullScreen`, EmptyState `success`, Drawer flex footer) covered most of the test budget. apps/web gained a minimal vitest setup (vitest + jsdom + @testing-library) timeboxed at ≤2h — finished within budget and now hosts 6 component smokes. **Apps/web now has new devDeps** (vitest, @testing-library/react, @testing-library/jest-dom, @testing-library/user-event, jsdom). Contributors must run `pnpm install` after pulling this branch on local Windows, otherwise smoke tests fail with module-not-found (same lesson as DS_LIFT lucide-react episode).
+
+2. **`EmptyState.kind="success"` extension** (D5): added the missing success variant with CheckCircle illust in `var(--ok)` tone. Backward-compatible — pre-existing 4 kinds untouched. Used by ValidateDrawer's "Workflow valido" empty state.
+
+3. **`Modal.fullScreen` prop extension** (D2): additive `fullScreen?: boolean` (default false). When true: `h-screen w-screen rounded-none`, no width style. Used by AddStepDialog. Pre-existing centered behavior unchanged. Tracked in `Modal.test.tsx` regressions.
+
+4. **`Drawer` footer flex layout fix** (D5 hotfix): `@mes/ui` Drawer footer container previously rendered `<div className="border-t … px-5 py-4">` with no flex layout — when callsites passed a Fragment with two buttons (Annulla + primary submit) they did not align right. D5 hotfix harmonized with Modal: `flex justify-end gap-2`. Audited all callsites — fragment / array / single child all compose correctly. Drawer test asserts the layout shape so future regressions are caught.
+
+5. **Custom column layout (not dagre LR)** (D3): the new `layoutPhaseColumns` pure function in `@mes/domain` is deterministic and configurable (column width / gap / header height / step indent). Easier to reason about, easier to test, mockup-aligned. `applyDagreLayout` retained as named export for fallback / Parallel view future expansion.
+
+6. **Dialog primary buttons use `bg-accent` token** (D5 hotfix): apps/web tailwind config defines `accent` / `ok` / `bad` / `warn` / `info` semantic tokens but does NOT define a `primary` color SCALE. Classes like `bg-primary-600` generate zero CSS → invisible buttons. PROMPT_3d's 4 dialogs (AddPhase / AddGroup / AddStep / topbar Aggiungi Fase) use `bg-accent` + `hover:bg-accent-2` (matches `Button.tsx` primary variant). Pre-existing pages with the same antipattern tracked separately as **TODO-039**.
+
+7. **Backward-compat preserved**: schema unchanged (zero migrations); `buildSavePayload` format unchanged; both drag-drop dataTransfer formats (`application/workflow-palette` new, `application/workflow-node` legacy) honored side-by-side; existing 9 step forms + Phase + Group configurators reused verbatim inside `PropertiesTab`.
+
+### TODOs closed by PROMPT_3d
+
+- Workflow editor mockup-fidelity refactor (PROMPT_3d full scope) — done across D1-D6.
+
+### TODOs opened by PROMPT_3d
+
+- **TODO-034** — Add Step full configurator (6 resource tabs) — owned by **PROMPT_PNE_1**.
+- **TODO-035** — Parallel view editing (currently read-only) — owned by **F2**.
+- **TODO-036** — Decision-step `onOk`/`onNok` schema fields missing — owned by **F2** (or earlier if PNE_2 needs decision branches for recovery flows).
+- **TODO-037** — `@mes/ui` CanvasEdge / React Flow EdgeProps API asymmetry — owned by **F2** (recommend Option B = document).
+- **TODO-038** — Workflow-root metadata editing (tags + defaultWorkCenters) — owned by **F2 / PROMPT_7** (registry detail polish).
+- **TODO-039** — Design token migration (`bg-primary-*` / `bg-success-*` / `text-primary-*` unmapped in apps/web) — owned by **F2 / PROMPT_7**. Recommend extending tailwind config (option A) rather than blanket migration.
+
+### Verification commands (final)
+
+```
+pnpm install
+pnpm build                              # 12/12 successful
+pnpm lint                               # 3/3 (apps/web clean; pre-existing hmi <img> warning per TODO-002)
+pnpm --filter @mes/domain test          # 197/197 pass
+pnpm --filter @mes/ui     test          # 119/119 pass
+pnpm --filter @mes/web    test          # 6/6 pass
+pnpm --filter @mes/api    test          # 249/249 pass
+pnpm --filter @mes/schemas test         # 29/29 pass
+pnpm --filter @mes/cache  test          # 8/8 pass
+pnpm --filter @mes/queue  test          # 5/5 pass
+pnpm --filter @mes/storage test         # 6/6 pass
+```
+
+Runtime smoke deferred to user pre-merge (per CLAUDE.md PHASE 4). End-to-end flow verified on `WF-TEST-001` after D5 hotfix (re-smoke 2026-05-02 confirmed 16 functional points all green: phase create, group create, step drag-drop, AddStepDialog full-screen, reload-persistence, validate drawer, all dialog primaries visible).
 
 ---
 

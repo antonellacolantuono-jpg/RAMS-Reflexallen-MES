@@ -153,6 +153,27 @@
 
 ## 🟡 Medium priority (good to have)
 
+### TODO-039 — Design token migration: bg-primary-* / bg-success-* / text-primary-* unmapped in apps/web
+
+**Discovered**: 2026-05-02 (during PROMPT_3d D5 hotfix — primary submit button invisible bug)
+**File**: `apps/web/tailwind.config.ts` + multiple callsites across `apps/web/src` and a few in `packages/ui` legacy components
+**Symptom**: `apps/web/tailwind.config.ts` defines `accent` / `accent-2` / `accent-soft` / `accent-ink` (and `ok` / `warn` / `bad` / `info` semantic tokens) but does NOT define a `primary` / `success` / `error` color SCALE. Classes like `bg-primary-600`, `bg-success-600`, `bg-error-600`, `text-primary-700` therefore generate **zero CSS** — buttons using them render as white text on transparent (= invisible white-on-white on white backgrounds). The D5 hotfix fixed the 4 dialogs added in PROMPT_3d (AddPhaseDrawer, AddGroupModal, AddStepDialog, "+ Aggiungi Fase" topbar) by switching to `bg-accent`. The wider codebase still uses `bg-primary-600` / `bg-success-600` extensively:
+- `apps/web/src/app/(registries)/items/page.tsx` — primary CTA button
+- `apps/web/src/app/(registries)/workflows/page.tsx` — "Nuovo workflow" button
+- `apps/web/src/app/(registries)/workflows/from-template/page.tsx` — wizard buttons
+- `apps/web/src/app/(registries)/workflows/[id]/page.tsx` — `Approva versione` (`bg-success-600`), `Rilascia WO` (`bg-primary-600`)
+- `apps/web/src/app/(registries)/workflows/[id]/release/page.tsx` — release submit button
+- `packages/ui/src/components/Modal.tsx` — `ConfirmModal` default variant (`bg-primary-600`)
+- `packages/ui/src/components/EntityForm.tsx`, `DataTable.tsx`, `EntityDetail.tsx`, `SearchBar.tsx` — various
+**Acceptance criterion**:
+- Either (a) extend `apps/web/tailwind.config.ts` with explicit `primary` / `success` / `error` color scales mapped to the existing OKLCH tokens, OR (b) migrate every `bg-primary-*` / `bg-success-*` / `text-primary-*` callsite to use the defined `accent` / `ok` / `bad` tokens. (a) is the safer, less-churn option.
+- Add a regression test in `packages/ui` that asserts critical buttons (Modal `ConfirmModal` primary, Drawer footer primaries) carry a defined background class — protects against silent re-introduction.
+- Visual smoke on every primary / success / danger button in the registry detail / list pages.
+**Estimated effort**: 1-2 hours for option (a) + visual smoke; 4-6 hours for option (b) blanket migration.
+**Blocker for**: any registry detail polish where primary CTAs need to be visible. Owner: F2 PROMPT_7 (registry detail + WO detail polish). Could pull earlier if Reflex Allen demo touches a page with hidden CTAs.
+
+---
+
 ### TODO-038 — Workflow-root metadata editing (tags + defaultWorkCenters)
 
 **Discovered**: 2026-05-02 (during PROMPT_3d D4 — Inspector 3-tab refactor)

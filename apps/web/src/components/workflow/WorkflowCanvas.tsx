@@ -35,6 +35,7 @@ import {
   type StepKindId,
 } from '@mes/domain'
 import { applyPhaseColumnsLayout } from './canvas-layout'
+import { ParallelView } from './ParallelView'
 
 const nodeTypes = {
   phaseNode: PhaseNode,
@@ -230,6 +231,7 @@ function CanvasInner({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<CanvasContextMenuState | null>(null)
+  const [viewMode, setViewMode] = useState<'visual' | 'parallel'>('visual')
 
   useCanvasKeyboardShortcuts()
 
@@ -485,6 +487,44 @@ function CanvasInner({
   return (
     <div className="relative w-full h-full">
       <div
+        className="absolute top-3 left-1/2 z-10 -translate-x-1/2 inline-flex rounded-1 border border-line bg-paper p-0.5 text-xs"
+        role="tablist"
+        aria-label="Modalità canvas"
+        data-canvas-view-toggle
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={viewMode === 'visual'}
+          onClick={() => setViewMode('visual')}
+          className={
+            'rounded-1 px-3 py-1 font-medium transition-colors ' +
+            (viewMode === 'visual'
+              ? 'bg-accent text-white'
+              : 'text-ink-3 hover:text-ink')
+          }
+        >
+          Visual Editor
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={viewMode === 'parallel'}
+          onClick={() => setViewMode('parallel')}
+          className={
+            'rounded-1 px-3 py-1 font-medium transition-colors ' +
+            (viewMode === 'parallel'
+              ? 'bg-accent text-white'
+              : 'text-ink-3 hover:text-ink')
+          }
+        >
+          Parallel
+        </button>
+      </div>
+      {viewMode === 'parallel' ? (
+        <ParallelView />
+      ) : (
+      <div
         className="w-full h-full"
         onDragOver={onDragOver}
         onDrop={onDrop}
@@ -519,25 +559,30 @@ function CanvasInner({
           <Background gap={16} size={0.6} color="var(--ink-3)" />
         </ReactFlow>
       </div>
-      <CanvasToolbar tools={toolbarTools} />
-      <CanvasStateBar tone={stateBarTone} status={stateBarStatus} counts={counts} />
-      <ZoomControls
-        zoomPercent={zoomPercent}
-        onZoomIn={() => zoomIn()}
-        onZoomOut={() => zoomOut()}
-        onFit={() => fitView()}
-      />
-      <CanvasContextMenu
-        state={contextMenu}
-        onClose={() => setContextMenu(null)}
-        onAddGroupRequested={(phaseId) => openAddGroupModal(phaseId)}
-      />
-      {isEmpty && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <p className="text-neutral-400 text-xs text-center">
-            Aggiungi una Fase dal topbar per iniziare
-          </p>
-        </div>
+      )}
+      {viewMode === 'visual' && (
+        <>
+          <CanvasToolbar tools={toolbarTools} />
+          <CanvasStateBar tone={stateBarTone} status={stateBarStatus} counts={counts} />
+          <ZoomControls
+            zoomPercent={zoomPercent}
+            onZoomIn={() => zoomIn()}
+            onZoomOut={() => zoomOut()}
+            onFit={() => fitView()}
+          />
+          <CanvasContextMenu
+            state={contextMenu}
+            onClose={() => setContextMenu(null)}
+            onAddGroupRequested={(phaseId) => openAddGroupModal(phaseId)}
+          />
+          {isEmpty && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <p className="text-neutral-400 text-xs text-center">
+                Aggiungi una Fase dal topbar per iniziare
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

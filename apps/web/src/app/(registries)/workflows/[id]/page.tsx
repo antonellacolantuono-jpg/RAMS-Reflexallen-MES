@@ -18,6 +18,7 @@ import { AddStepDialog } from '../../../../components/workflow/AddStepDialog'
 import { AddPhaseDrawer } from '../../../../components/workflow/AddPhaseDrawer'
 import { AddGroupModal } from '../../../../components/workflow/AddGroupModal'
 import { ValidateDrawer } from '../../../../components/workflow/ValidateDrawer'
+import { WorkflowTopBar } from '../../../../components/workflow/WorkflowTopBar'
 import { useWorkflowStore } from '../../../../components/workflow/store'
 
 export default function WorkflowEditorPage() {
@@ -28,12 +29,10 @@ export default function WorkflowEditorPage() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const addPhaseDrawer = useWorkflowStore((s) => s.addPhaseDrawer)
   const closeAddPhaseDrawer = useWorkflowStore((s) => s.closeAddPhaseDrawer)
-  const openAddPhaseDrawer = useWorkflowStore((s) => s.openAddPhaseDrawer)
   const addGroupModal = useWorkflowStore((s) => s.addGroupModal)
   const closeAddGroupModal = useWorkflowStore((s) => s.closeAddGroupModal)
   const validateDrawer = useWorkflowStore((s) => s.validateDrawer)
   const closeValidateDrawer = useWorkflowStore((s) => s.closeValidateDrawer)
-  const openValidateDrawer = useWorkflowStore((s) => s.openValidateDrawer)
 
   const { data: workflow, isLoading } = useQuery({
     queryKey: ['workflows', id],
@@ -91,29 +90,11 @@ export default function WorkflowEditorPage() {
               {versionStatus}
             </StatusBadge>
           )}
-          <button
-            type="button"
-            onClick={() => openAddPhaseDrawer()}
-            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-2"
-          >
-            + Aggiungi Fase
-          </button>
-          <button
-            type="button"
-            onClick={() => openValidateDrawer()}
-            className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-          >
-            Valida
-          </button>
-          {versionStatus === 'draft' && (
-            <button
-              type="button"
-              onClick={() => setApproveOpen(true)}
-              className="rounded-md bg-success-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-success-700"
-            >
-              Approva versione
-            </button>
-          )}
+          <WorkflowTopBar
+            versionNumber={workflow.currentVersion?.version ?? null}
+            versionStatus={versionStatus ?? null}
+            onPublishClick={() => setApproveOpen(true)}
+          />
           {(versionStatus === 'draft' || versionStatus === 'approved') && (
             <button
               type="button"
