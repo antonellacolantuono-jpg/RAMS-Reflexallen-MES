@@ -15,6 +15,9 @@ export type { StatusBadgeProps, StatusTone } from './components/StatusBadge'
 export { PhaseBadge } from './components/PhaseBadge'
 export type { PhaseBadgeProps, PhaseCategory } from './components/PhaseBadge'
 
+export { PriorityBadge } from './components/priority-badge'
+export type { PriorityBadgeProps, Priority } from './components/priority-badge'
+
 export { Skeleton } from './components/Skeleton'
 export type { SkeletonProps } from './components/Skeleton'
 
