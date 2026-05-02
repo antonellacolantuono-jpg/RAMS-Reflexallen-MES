@@ -1,8 +1,87 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 2, 2026 (PROMPT_PNE_2 D1-D4 closed — F1.4 100% complete)
+> **Last update**: May 2, 2026 (PROMPT_PNE_3 D1-D4 closed — F1.5 100% complete)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ PROMPT_PNE_3 — Mock device simulator + Demo Toggle Panel — 100% complete (May 2, 2026)
+
+F1.5 of ROADMAP v2 (Pneumatic First). Three demo-grade device simulators (LeakTester / CameraTester / CrimpPress) with deterministic outcome bands keyed off the PROMPT_PNE_2 seeded recipes; WS broadcast of `device:cycle:started/progress/complete` on the existing `WorkOrderEventsGateway`; REST controls under `/api/internal/mock-devices/*`; `/api/internal/fast-forward/:woId/complete-step` debug endpoint; back-office Demo Toggle Panel at `/demo` (server-gated `notFound()` + client polling 2s + Italian Toast feedback). Every surface gated on `DEMO_MODE=true`; production builds refuse to boot if `DEMO_MODE` is unset.
+
+### Test count
+
+- **Baseline (post PROMPT_PNE_2 D4)**: 655
+- **Final**: **692** (api 281 / domain 197 / ui 119 / schemas 29 / cache 8 / queue 5 / storage 6 / web 29 / prisma 18)
+- **Delta**: **+37 tests** (target floor +12 → ≥667, ideal +18 → ≥673; achieved with +19 buffer over ideal)
+
+### D1-D4 breakdown
+
+| Increment | Scope | Test delta | Cumul | Commit |
+|---|---|---|---|---|
+| D1 | MockDevicesModule + types + DemoControllerService + MockLeakTesterService + REST controller (gated DEMO_MODE) + WorkOrderEventsGateway emitDeviceCycle{Started,Progress,Complete} broadcasts + main.ts boot guard + .env.example DEMO_MODE | +17 | 672 | `53347fa` |
+| D2 | MockCameraTesterService (4 ROIs/PASS-FAIL) + MockCrimpPressService (25kN ±1/PASS-FAIL) + controller route refactor `/api/internal/mock-devices/*` (`override-next` / `start-cycle`) + `/demo` page scaffolding + DeviceCard primitive | +12 | 684 | `a3e5f4e` |
+| D3 | `MockDeviceStatus.lastOutcome` (set on complete, cleared on next start) on all 3 simulators + `/demo` server/client split (server gate + client polling 2s + Toast IT) + override + start handlers + DeviceCard `lastOutcome` badge + override-scheduled message + TODO-044 (WS deferral) | +3 | 687 | `f9cb037` |
+| D4 | FastForwardController (`/api/internal/fast-forward/:woId/complete-step` mapping PASS/FAIL/SCRAP → COMPLETE_OK/COMPLETE_NOK/MARK_SCRAPPED via existing StepExecutionService.applyTransition) + WorkOrdersModule import + STATUS / ROADMAP / TODO closure | +5 | **692** | _this commit_ |
+
+### Architectural decisions (kept after D4)
+
+1. **Deferred device-execution integration (Issue 3 / TODO-043 / Option 3b)**: PROMPT_PNE_3 § 3.4 assumed `apps/api/src/modules/work-orders/step-execution/device-step-executor.ts` already existed (presumed-shipped by PROMPT_5_FULL D3). It does NOT — the actual `step-execution.service.ts` is purely XState-driven and never calls a "device client". Creating the device-execution dispatch branch from scratch is out of PROMPT_PNE_3's 8-12h budget per § 8 surprise budget. Resolution: ship standalone simulators reachable via `/api/internal/mock-devices/*` + DemoToggle UI + FastForward (which drives the existing state machine API directly, no new dispatch branch). Wiring the `SimulatorRegistry` into step-execution dispatch when an HMI operator advances a `device_run` step is owned by **PROMPT_PNE_4 D1** (HMI Leak/Camera specialized work) — tracked by TODO-043 with full acceptance criteria.
+
+2. **MARGINAL outcome scoped to LeakTester only**: leak rate has a real grey zone (0.5..1.0 mbar/min — passing under spec but flagged for retest). Camera ROI similarity and crimp force tolerance are binary tolerance checks — values either pass or fail, no MARGINAL. `MockDevice.supportedOutcomes` declares this per-device and the controller's `parseOutcomeBody` rejects MARGINAL on camera/crimp with BadRequest. DeviceCard hides the MARGINAL button when not supported.
+
+3. **2s polling vs WebSocket (TODO-044, deferred)**: simulators broadcast `device:cycle:started/progress/complete` on `WorkOrderEventsGateway` since D1, but apps/web `DemoPanel` uses a `setInterval(2000ms)` polling loop on `listMockDevices()` instead. Polling is sufficient for the demo (3 devices, low traffic) but adds ~30 req/min/tab and aliases sub-second crimp telemetry to 2s ticks. Replacement with `useDeviceEventsSubscription` hook + `socket.io-client` tracked in TODO-044 (Medium, 1-2h, owner F2 PROMPT_7 or earlier if demo prep flags lag).
+
+4. **`/api/internal/*` namespace for debug-only surfaces**: PROMPT_PNE_3 § 3.3 said `/api/mock-devices/*`. Per the user's D2 instruction, all debug routes live under `/api/internal/*` (mock-devices + fast-forward) to give ops a clear "this isn't part of the production API surface" signal. Combined with the `DEMO_MODE` controller gate + main.ts boot guard, that's three layers of safety against accidental production exposure.
+
+5. **`/demo` server/client split (Next.js 14 pattern)**: `app/demo/page.tsx` stays as a server component that calls `notFound()` if `NEXT_PUBLIC_DEMO_MODE != 'true'` (so non-demo deployments don't ship the JS bundle at all); the interactive `<DemoPanel>` is the only `'use client'` component on the route. Mirrors the dynamic-import idiom but works at the route level. The `ToastProvider` is wrapped inside `DemoPanel` because the `/demo` route has no parent `(registries)` layout (no shared sidebar / chrome).
+
+### TODOs closed by PROMPT_PNE_3
+
+- _none directly closed_ — PROMPT_PNE_3 was greenfield.
+
+### TODOs opened by PROMPT_PNE_3
+
+- **TODO-043** — Wire SimulatorRegistry into step-execution dispatch (deferred). Owner: **PROMPT_PNE_4 D1**. HIGH priority. PNE_3 ships standalone simulators + DemoToggle + FastForward as the reachable surfaces; step-execution auto-dispatch when an operator advances a `device_run` step is the natural extension.
+- **TODO-044** — DemoToggle Panel: replace 2s polling with WebSocket subscription. Owner: **F2 PROMPT_7** (or earlier if demo prep flags polling lag on crimp's 100ms telemetry). MEDIUM priority. Simulator broadcasts already exist (D1) — only the apps/web subscription is missing.
+
+### Verification commands (final)
+
+```
+pnpm install                                            # already installed, no-op (729 pkgs)
+pnpm --filter @mes/prisma generate                      # already generated by turbo prisma:generate task
+pnpm build                                              # 13/13 successful
+pnpm lint                                               # 3/3 (apps/web ESLint clean; apps/api type-check clean)
+pnpm --filter @mes/api      exec vitest run --no-file-parallelism   # 281/281 pass (24 + 6 mock-devices test files)
+pnpm --filter @mes/domain   exec vitest run --no-file-parallelism   # 197/197 pass
+pnpm --filter @mes/ui       test                                    # 119/119 pass
+pnpm --filter @mes/schemas  test                                    # 29/29 pass
+pnpm --filter @mes/cache    test                                    # 8/8 pass
+pnpm --filter @mes/queue    test                                    # 5/5 pass
+pnpm --filter @mes/storage  test                                    # 6/6 pass
+pnpm --filter @mes/web      exec vitest run --no-file-parallelism   # 29/29 pass (24 baseline + 3 DeviceCard + 2 DemoPanel)
+pnpm --filter @mes/prisma   test                                    # 18/18 pass
+```
+
+Note: per-package serial run (`--no-file-parallelism`) used for `@mes/api`, `@mes/domain`, `@mes/web` to dodge the documented Vitest 2.1.x + Windows temp-dir race (Lesson #54 from STATUS history).
+
+Runtime smoke deferred to user pre-merge per CLAUDE.md PHASE 4. Suggested checks (assumes `.env` populated with `DEMO_MODE=true` + `NEXT_PUBLIC_DEMO_MODE=true` and dev DB seeded via `pnpm --filter @mes/prisma seed:pneumatic`):
+
+1. `pnpm dev` — API on 3000, web on 3001, hmi on 3002.
+2. Open http://localhost:3001/demo (back-office, port 3001).
+3. Verify 3 device cards (DEV-LEAK-001 / DEV-CAMERA-001 / DEV-CRIMP-001) — each with default PASS, idle status, expected duration (45s / 8s / 8s).
+4. Click "Force FAIL" on DEV-LEAK-001 → toast "Override programmato su DEV-LEAK-001: FAIL ...". Card body shows "Override programmato: FAIL".
+5. Click "Start cycle" on DEV-LEAK-001 → toast "Ciclo avviato su DEV-LEAK-001". Card transitions to RUNNING badge; buttons disabled.
+6. Wait ~45 seconds (or polling tick at 2s). Card returns to IDLE with `Ultimo: FAIL` badge in the header.
+7. FastForward smoke (curl):
+   ```
+   curl -X POST http://localhost:3000/api/internal/fast-forward/<woId>/complete-step \
+     -H 'Content-Type: application/json' -H 'Cookie: <login JWT cookie>' \
+     -d '{"stepExecutionId":"<seId>","outcome":"PASS"}'
+   ```
+   Should return 200 with `{ result: { fromStatus: 'running', toStatus: 'done', event: 'COMPLETE_OK', ... } }`.
+8. With `DEMO_MODE=false`: `/api/internal/mock-devices` and `/api/internal/fast-forward/...` both return 404; `/demo` page returns 404.
 
 ---
 
