@@ -18,6 +18,23 @@ export type { PhaseBadgeProps, PhaseCategory } from './components/PhaseBadge'
 export { PriorityBadge } from './components/priority-badge'
 export type { PriorityBadgeProps, Priority } from './components/priority-badge'
 
+export { ViewSwitcher } from './components/view-switcher'
+export type { ViewSwitcherProps, ViewMode } from './components/view-switcher'
+
+export { TreeNode } from './components/tree-node'
+export type {
+  TreeNodeProps,
+  TreeNodeStatus,
+  TreeNodeMetric,
+  TreeNodeMetricTone,
+} from './components/tree-node'
+
+export { EmptyState } from './components/empty-state'
+export type { EmptyStateProps, EmptyStateKind, EmptyStateCTA } from './components/empty-state'
+
+export { SplitView, useSplitViewSelection } from './components/split-view'
+export type { SplitViewProps } from './components/split-view'
+
 export { Skeleton } from './components/Skeleton'
 export type { SkeletonProps } from './components/Skeleton'
 
