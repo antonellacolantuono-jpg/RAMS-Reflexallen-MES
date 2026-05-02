@@ -1,0 +1,190 @@
+/* RAMS — Glassmorphism style probe */
+
+/* Background: tech-industrial gradient with subtle mesh */
+:root {
+  --g-bg: oklch(0.16 0.02 280);
+  --g-bg-2: oklch(0.20 0.04 290);
+  --g-accent: oklch(0.72 0.18 290);
+  --g-accent-2: oklch(0.78 0.14 220);
+  --g-ok: oklch(0.78 0.16 155);
+  --g-warn: oklch(0.82 0.16 75);
+  --g-bad: oklch(0.72 0.20 25);
+  --g-info: oklch(0.78 0.14 220);
+  --g-text: oklch(0.98 0.005 280);
+  --g-text-2: oklch(0.78 0.02 280);
+  --g-text-3: oklch(0.62 0.02 280);
+  --g-line: oklch(1 0 0 / 0.10);
+  --g-line-2: oklch(1 0 0 / 0.06);
+  --g-card: oklch(1 0 0 / 0.06);
+  --g-card-2: oklch(1 0 0 / 0.10);
+  --g-card-strong: oklch(1 0 0 / 0.14);
+}
+
+.glass-stage {
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  color: var(--g-text);
+  background:
+    radial-gradient(1200px 800px at 20% 10%, oklch(0.42 0.18 290 / 0.45), transparent 60%),
+    radial-gradient(1000px 700px at 90% 90%, oklch(0.45 0.18 220 / 0.40), transparent 60%),
+    radial-gradient(800px 600px at 50% 50%, oklch(0.40 0.16 320 / 0.25), transparent 60%),
+    linear-gradient(180deg, var(--g-bg) 0%, var(--g-bg-2) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle dot grid noise on top */
+.glass-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 1px 1px, oklch(1 0 0 / 0.05) 1px, transparent 0);
+  background-size: 24px 24px;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.glass-card {
+  background: var(--g-card);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--g-line);
+  border-radius: 16px;
+  position: relative;
+}
+.glass-card-strong {
+  background: var(--g-card-2);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid var(--g-line);
+  border-radius: 18px;
+}
+.glass-card-elev {
+  background: var(--g-card-strong);
+  backdrop-filter: blur(32px) saturate(170%);
+  -webkit-backdrop-filter: blur(32px) saturate(170%);
+  border: 1px solid var(--g-line);
+  border-radius: 20px;
+  box-shadow:
+    0 1px 0 0 oklch(1 0 0 / 0.08) inset,
+    0 24px 60px -20px oklch(0 0 0 / 0.5);
+}
+/* Subtle top edge highlight (inner) */
+.glass-card::after, .glass-card-strong::after, .glass-card-elev::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, oklch(1 0 0 / 0.10), transparent 35%);
+  opacity: 0.7;
+}
+
+.glass-pill {
+  background: var(--g-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--g-line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.glass-btn {
+  background: linear-gradient(180deg, oklch(1 0 0 / 0.18), oklch(1 0 0 / 0.06));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--g-line);
+  border-radius: 10px;
+  color: var(--g-text);
+  font-weight: 500;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.glass-btn:hover { background: linear-gradient(180deg, oklch(1 0 0 / 0.24), oklch(1 0 0 / 0.10)); }
+.glass-btn-primary {
+  background: linear-gradient(180deg, oklch(0.78 0.18 290), oklch(0.62 0.20 290));
+  border: 1px solid oklch(0.85 0.15 290 / 0.5);
+  color: white;
+  box-shadow: 0 8px 24px -8px oklch(0.50 0.20 290 / 0.5);
+}
+.glass-btn-primary:hover { background: linear-gradient(180deg, oklch(0.82 0.18 290), oklch(0.66 0.20 290)); }
+
+.glass-mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+.glass-uppercase {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  color: var(--g-text-3);
+}
+
+/* status dots */
+.glass-dot { width: 6px; height: 6px; border-radius: 999px; display: inline-block; }
+.glass-dot.ok { background: var(--g-ok); box-shadow: 0 0 8px var(--g-ok); }
+.glass-dot.warn { background: var(--g-warn); box-shadow: 0 0 8px var(--g-warn); }
+.glass-dot.bad { background: var(--g-bad); box-shadow: 0 0 10px var(--g-bad); animation: glassPulse 1.4s ease-in-out infinite; }
+.glass-dot.info { background: var(--g-info); box-shadow: 0 0 8px var(--g-info); }
+
+@keyframes glassPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+/* Accent ring for highlighted cards */
+.glass-ring {
+  position: relative;
+  isolation: isolate;
+}
+.glass-ring::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, oklch(0.78 0.18 290) 0%, oklch(0.78 0.14 220) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.6;
+  z-index: -1;
+}
+
+/* Progress bar in glass */
+.glass-progress {
+  height: 6px;
+  background: oklch(1 0 0 / 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+.glass-progress-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: linear-gradient(90deg, var(--g-accent-2), var(--g-accent));
+  border-radius: 999px;
+  box-shadow: 0 0 12px oklch(0.78 0.18 290 / 0.6);
+}
+
+/* Tabular grid lines */
+.glass-row { border-bottom: 1px solid var(--g-line-2); }
+.glass-row:last-child { border-bottom: 0; }
+
+/* Phase chip */
+.phase-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 8px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 500;
+  background: oklch(1 0 0 / 0.08);
+  border: 1px solid oklch(1 0 0 / 0.10);
+  backdrop-filter: blur(12px);
+}
