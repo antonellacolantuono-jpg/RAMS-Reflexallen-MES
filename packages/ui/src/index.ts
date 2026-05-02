@@ -99,6 +99,49 @@ export type {
   AuditTone,
 } from './components/audit-timeline'
 
+export { PlantNode } from './components/plant-map/plant-node'
+export type { PlantNodeProps, PlantNodeStatus } from './components/plant-map/plant-node'
+
+export { PlantMap } from './components/plant-map/plant-map'
+export type {
+  PlantMapProps,
+  PlantMapNode,
+  PlantMapZone,
+  PlantMapPhase,
+} from './components/plant-map/plant-map'
+
+export { CanvasGrid } from './components/canvas/canvas-grid'
+export type { CanvasGridProps } from './components/canvas/canvas-grid'
+
+export { ZoomControls } from './components/canvas/zoom-controls'
+export type { ZoomControlsProps } from './components/canvas/zoom-controls'
+
+export { Minimap } from './components/canvas/minimap'
+export type { MinimapProps, MinimapNode, MinimapViewport } from './components/canvas/minimap'
+
+export { CanvasToolbar } from './components/canvas/canvas-toolbar'
+export type { CanvasToolbarProps, CanvasTool } from './components/canvas/canvas-toolbar'
+
+export { CanvasStateBar } from './components/canvas/canvas-state-bar'
+export type { CanvasStateBarProps, CanvasStateTone } from './components/canvas/canvas-state-bar'
+
+export { GenericNode } from './components/canvas/generic-node'
+export type {
+  GenericNodeProps,
+  GenericNodeStatus,
+  GenericNodePort,
+} from './components/canvas/generic-node'
+
+export { Edge as CanvasEdge } from './components/canvas/edge'
+export type {
+  EdgeProps as CanvasEdgeProps,
+  EdgeKind,
+  EdgeTone,
+  EdgeEndpoint,
+} from './components/canvas/edge'
+
+export { ArrowDefs } from './components/canvas/arrow-defs'
+
 export { Skeleton } from './components/Skeleton'
 export type { SkeletonProps } from './components/Skeleton'
 
