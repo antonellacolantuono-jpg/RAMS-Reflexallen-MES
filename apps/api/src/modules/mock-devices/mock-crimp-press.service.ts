@@ -54,6 +54,7 @@ export class MockCrimpPressService implements MockDevice, OnModuleDestroy {
   private currentCycle: ActiveCrimpCycle | null = null
   private interval: ReturnType<typeof setInterval> | null = null
   private completion: ReturnType<typeof setTimeout> | null = null
+  private lastOutcome: DeviceOutcome | null = null
 
   constructor(
     private readonly demo: DemoControllerService,
@@ -71,6 +72,7 @@ export class MockCrimpPressService implements MockDevice, OnModuleDestroy {
     const finalPeak = this.computeFinalPeakForce(outcome)
 
     this.state = 'running'
+    this.lastOutcome = null
     this.currentCycle = {
       stepExecutionId,
       outcome,
@@ -118,6 +120,7 @@ export class MockCrimpPressService implements MockDevice, OnModuleDestroy {
       defaultOutcome: this.defaultOutcome,
       supportedOutcomes: this.supportedOutcomes,
       nextOutcome: this.demo.peekNextOutcome(this.deviceSerialNumber),
+      lastOutcome: this.lastOutcome,
       telemetry: {
         phase: cycle?.phase ?? null,
         forceKn: cycle?.forceKn ?? 0,
@@ -171,6 +174,7 @@ export class MockCrimpPressService implements MockDevice, OnModuleDestroy {
       },
     })
 
+    this.lastOutcome = cycle.outcome
     this.currentCycle = null
     this.state = 'idle'
   }

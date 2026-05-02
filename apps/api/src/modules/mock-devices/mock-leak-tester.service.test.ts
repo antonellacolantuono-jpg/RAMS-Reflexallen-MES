@@ -121,4 +121,21 @@ describe('MockLeakTesterService', () => {
     expect(gateway.emitDeviceCycleProgress).toHaveBeenCalledTimes(4)
     expect(gateway.emitDeviceCycleComplete).not.toHaveBeenCalled()
   })
+
+  it('exposes lastOutcome after a cycle completes; clears it when a new cycle starts (D3)', async () => {
+    const { svc, demo } = makeSvc()
+    expect(svc.getStatus().lastOutcome).toBeNull()
+
+    demo.setNextOutcome(LEAK_DEVICE_SERIAL, 'FAIL')
+    svc.start('se-leak-7')
+    await vi.advanceTimersByTimeAsync(45_000)
+    expect(svc.getStatus().lastOutcome).toBe('FAIL')
+
+    // Starting a new cycle clears the previous lastOutcome until that cycle
+    // completes (so the UI doesn't show a stale outcome alongside in-progress
+    // telemetry).
+    svc.start('se-leak-8')
+    expect(svc.getStatus().lastOutcome).toBeNull()
+    svc.stop()
+  })
 })

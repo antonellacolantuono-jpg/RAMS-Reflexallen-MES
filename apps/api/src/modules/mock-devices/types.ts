@@ -14,6 +14,13 @@ export interface MockDeviceStatus {
   defaultOutcome: DeviceOutcome
   supportedOutcomes: readonly DeviceOutcome[]
   nextOutcome: DeviceOutcome | null
+  /**
+   * D3 — outcome of the most recently completed cycle. Populated when the
+   * cycle completes; cleared when a new cycle starts (so `idle + lastOutcome`
+   * means "ready, last result was X" and `running + lastOutcome=null` means
+   * "first cycle in progress").
+   */
+  lastOutcome: DeviceOutcome | null
   telemetry: Record<string, unknown>
 }
 

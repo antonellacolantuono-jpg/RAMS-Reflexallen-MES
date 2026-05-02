@@ -2,7 +2,7 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-02 (PROMPT_PNE_3 pre-flight — opened TODO-043)
+> **Last updated**: 2026-05-02 (PROMPT_PNE_3 D3 — opened TODO-044)
 
 ---
 
@@ -169,6 +169,22 @@
 ---
 
 ## 🟡 Medium priority (good to have)
+
+### TODO-044 — DemoToggle Panel: replace 2s polling with WebSocket subscription
+
+**Discovered**: 2026-05-02 (during PROMPT_PNE_3 D3)
+**Status**: 🟢 PENDING — D3 ships polling intentionally; WebSocket integration deferred.
+**File**: `apps/web/src/components/demo/DemoPanel.tsx` + `apps/api/src/modules/events/work-order-events.gateway.ts` (already emits `device:cycle:started/progress/complete` from PROMPT_PNE_3 D1)
+**Symptom**: D3 of PROMPT_PNE_3 wires the Demo Toggle Panel state via a `setInterval`-based 2s polling loop on `GET /api/internal/mock-devices`. The simulators ALREADY broadcast `device:cycle:started/progress/complete` via `WorkOrderEventsGateway` (added in D1) — those broadcasts are not yet consumed on the web side. Polling is acceptable for the demo (3 devices, low traffic) but adds a baseline of ~30 requests/min per open tab and lags real-time progress (sub-second cycle telemetry on crimp gets aliased to 2s ticks).
+**Acceptance criterion**:
+- New `useDeviceEventsSubscription()` hook in `apps/web/src/lib/demo-api.ts` (or a new `apps/web/src/lib/socket.ts`) opens a `socket.io-client` connection to `NEXT_PUBLIC_WS_URL`, listens to `device:cycle:started/progress/complete`, and merges the payload into `MockDeviceStatus` via the same shape `getMockDeviceStatus()` returns.
+- DemoPanel drops the `setInterval(2000)` loop and calls `useDeviceEventsSubscription()` instead. Initial fetch (`listMockDevices`) on mount is preserved as the baseline state.
+- Cleanup on unmount: socket disconnect + listener removal (mirror the HMI pattern from `apps/hmi/src/lib/socket.ts` once it lands per TODO-023 follow-up).
+- DEV MODE leaves the room ungated (broadcast). Production hardening (per-device room scope) is captured by TODO-017 follow-up.
+**Estimated effort**: 1-2 hours (socket client wiring + hook + DemoPanel migration + tests).
+**Blocker for**: nothing in MVP demo (polling is sufficient). Owner: F2 PROMPT_7 or earlier if Reflex Allen demo prep flags polling lag on the cycle progress display.
+
+---
 
 ### TODO-042 — PROMPT_PNE_2 § 1 summary said "19 steps" but enumeration totals 34 step rows (documentation hygiene only)
 

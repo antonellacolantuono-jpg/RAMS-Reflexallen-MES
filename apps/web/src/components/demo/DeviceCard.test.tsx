@@ -13,6 +13,7 @@ const idleLeak: MockDeviceStatus = {
   defaultOutcome: 'PASS',
   supportedOutcomes: ['PASS', 'MARGINAL', 'FAIL'],
   nextOutcome: null,
+  lastOutcome: null,
   telemetry: {},
 }
 
@@ -26,6 +27,7 @@ const runningCamera: MockDeviceStatus = {
   defaultOutcome: 'PASS',
   supportedOutcomes: ['PASS', 'FAIL'],
   nextOutcome: null,
+  lastOutcome: null,
   telemetry: { phase: 'analyze' },
 }
 
@@ -62,5 +64,23 @@ describe('DeviceCard', () => {
     expect(screen.getByRole('button', { name: 'Force PASS' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Force FAIL' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Start cycle' })).toBeDisabled()
+  })
+
+  it('renders lastOutcome badge and override-scheduled message when present (D3)', () => {
+    render(
+      <DeviceCard
+        device={{
+          ...idleLeak,
+          nextOutcome: 'FAIL',
+          lastOutcome: 'PASS',
+        }}
+      />,
+    )
+
+    const lastBadge = screen.getByTestId('last-outcome-badge')
+    expect(lastBadge).toHaveTextContent('Ultimo: PASS')
+    expect(screen.getByText(/Override programmato:/)).toBeInTheDocument()
+    // The next-outcome value renders as a child of the message.
+    expect(screen.getByText('FAIL')).toBeInTheDocument()
   })
 })

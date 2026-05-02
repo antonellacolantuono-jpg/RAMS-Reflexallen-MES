@@ -15,6 +15,8 @@ export interface MockDeviceStatus {
   defaultOutcome: DeviceOutcome
   supportedOutcomes: readonly DeviceOutcome[]
   nextOutcome: DeviceOutcome | null
+  /** Outcome of the most recently completed cycle. Cleared on next start. */
+  lastOutcome: DeviceOutcome | null
   telemetry: Record<string, unknown>
 }
 

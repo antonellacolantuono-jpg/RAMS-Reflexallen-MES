@@ -1,7 +1,8 @@
-// PROMPT_PNE_3 D2 — Demo Toggle Panel device card (presentational).
+// PROMPT_PNE_3 D2 + D3 — Demo Toggle Panel device card (presentational).
 //
-// Receives a MockDeviceStatus + override/start callbacks. D4 will wire the
-// callbacks to the demo-api fetch wrappers + WebSocket-driven live status.
+// Receives a MockDeviceStatus + override/start callbacks. The parent panel
+// owns the data fetching + polling; this component is purely presentational
+// so it stays trivial to test.
 
 'use client'
 import * as React from 'react'
@@ -21,6 +22,12 @@ const STATE_TONE: Record<MockDeviceStatus['state'], 'neutral' | 'warn' | 'ok'> =
   complete: 'ok',
 }
 
+const OUTCOME_TONE: Record<DeviceOutcome, 'ok' | 'warn' | 'bad'> = {
+  PASS: 'ok',
+  MARGINAL: 'warn',
+  FAIL: 'bad',
+}
+
 export function DeviceCard({ device, onOverride, onStart, disabled = false }: DeviceCardProps) {
   const isRunning = device.state === 'running'
   const showMarginal = device.supportedOutcomes.includes('MARGINAL')
@@ -36,17 +43,33 @@ export function DeviceCard({ device, onOverride, onStart, disabled = false }: De
             Default: {device.defaultOutcome} · {device.expectedDurationSec}s cycle
           </div>
         </div>
-        <Badge tone={STATE_TONE[device.state]}>{device.state.toUpperCase()}</Badge>
+        <div className="flex items-center gap-2">
+          {device.lastOutcome && (
+            <Badge
+              tone={OUTCOME_TONE[device.lastOutcome]}
+              dot
+              data-testid="last-outcome-badge"
+            >
+              Ultimo: {device.lastOutcome}
+            </Badge>
+          )}
+          <Badge tone={STATE_TONE[device.state]}>{device.state.toUpperCase()}</Badge>
+        </div>
       </Card.Header>
 
       <Card.Body>
         <div className="mb-3 text-sm text-ink-2">
           {isRunning ? (
             <>
-              In cycle: {device.elapsedSec.toFixed(1)}s / {device.expectedDurationSec}s
+              In ciclo: {device.elapsedSec.toFixed(1)}s / {device.expectedDurationSec}s
+            </>
+          ) : device.nextOutcome ? (
+            <>
+              Override programmato:{' '}
+              <span className="font-semibold text-ink">{device.nextOutcome}</span>
             </>
           ) : (
-            <>Next override: {device.nextOutcome ?? 'none (default)'}</>
+            <>Nessun override — verrà usato il default ({device.defaultOutcome}).</>
           )}
         </div>
 

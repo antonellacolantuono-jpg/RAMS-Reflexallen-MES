@@ -63,6 +63,7 @@ export class MockCameraTesterService implements MockDevice, OnModuleDestroy {
   private currentCycle: ActiveCameraCycle | null = null
   private interval: ReturnType<typeof setInterval> | null = null
   private completion: ReturnType<typeof setTimeout> | null = null
+  private lastOutcome: DeviceOutcome | null = null
 
   constructor(
     private readonly demo: DemoControllerService,
@@ -80,6 +81,7 @@ export class MockCameraTesterService implements MockDevice, OnModuleDestroy {
     const finals = this.computeFinalSimilarities(outcome)
 
     this.state = 'running'
+    this.lastOutcome = null
     this.currentCycle = {
       stepExecutionId,
       outcome,
@@ -129,6 +131,7 @@ export class MockCameraTesterService implements MockDevice, OnModuleDestroy {
       defaultOutcome: this.defaultOutcome,
       supportedOutcomes: this.supportedOutcomes,
       nextOutcome: this.demo.peekNextOutcome(this.deviceSerialNumber),
+      lastOutcome: this.lastOutcome,
       telemetry: {
         phase: cycle?.phase ?? null,
         rois: cycle?.rois.map((r) => ({ roiId: r.roiId, similarityPct: r.similarityPct })) ?? [],
@@ -180,6 +183,7 @@ export class MockCameraTesterService implements MockDevice, OnModuleDestroy {
       },
     })
 
+    this.lastOutcome = cycle.outcome
     this.currentCycle = null
     this.state = 'idle'
   }

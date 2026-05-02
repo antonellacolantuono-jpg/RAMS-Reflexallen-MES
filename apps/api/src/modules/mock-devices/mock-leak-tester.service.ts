@@ -51,6 +51,7 @@ export class MockLeakTesterService implements MockDevice, OnModuleDestroy {
   private currentCycle: ActiveLeakCycle | null = null
   private interval: ReturnType<typeof setInterval> | null = null
   private completion: ReturnType<typeof setTimeout> | null = null
+  private lastOutcome: DeviceOutcome | null = null
 
   constructor(
     private readonly demo: DemoControllerService,
@@ -68,6 +69,7 @@ export class MockLeakTesterService implements MockDevice, OnModuleDestroy {
     const finalLeak = this.computeFinalLeakRate(outcome)
 
     this.state = 'running'
+    this.lastOutcome = null
     this.currentCycle = {
       stepExecutionId,
       outcome,
@@ -114,6 +116,7 @@ export class MockLeakTesterService implements MockDevice, OnModuleDestroy {
       defaultOutcome: this.defaultOutcome,
       supportedOutcomes: this.supportedOutcomes,
       nextOutcome: this.demo.peekNextOutcome(this.deviceSerialNumber),
+      lastOutcome: this.lastOutcome,
       telemetry: {
         phase: cycle?.phase ?? null,
         pressureBar: cycle?.pressureBar ?? 0,
@@ -165,6 +168,7 @@ export class MockLeakTesterService implements MockDevice, OnModuleDestroy {
       },
     })
 
+    this.lastOutcome = cycle.outcome
     this.currentCycle = null
     this.state = 'idle'
   }
