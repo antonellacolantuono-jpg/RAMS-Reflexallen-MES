@@ -183,7 +183,18 @@ function buildSavePayload(nodes: Node[]) {
             const instructions = step.data.instructions as string | undefined
             const skillId = step.data.skillId as string | undefined
             const deviceId = step.data.deviceId as string | undefined
-            const standardTimeSec = step.data.standardTimeSec as number | null | undefined
+            const recipeId = step.data.recipeId as string | undefined
+            const toolId = step.data.toolId as string | undefined
+            // Time can land in node.data under `standardTimeSec` (existing
+            // forms) or `durationSec` (AddStepDialog through PROMPT_PNE_1 D4).
+            // Honor whichever is present so dialog-created steps persist their
+            // standard time.
+            const standardTimeSec =
+              typeof step.data.standardTimeSec === 'number'
+                ? (step.data.standardTimeSec as number)
+                : typeof step.data.durationSec === 'number'
+                  ? (step.data.durationSec as number)
+                  : null
             const isRequired =
               typeof step.data.isRequired === 'boolean' ? step.data.isRequired : true
             return {
@@ -196,6 +207,8 @@ function buildSavePayload(nodes: Node[]) {
               ...(instructions ? { instructions } : {}),
               ...(skillId ? { skillId } : {}),
               ...(deviceId ? { deviceId } : {}),
+              ...(recipeId ? { recipeId } : {}),
+              ...(toolId ? { toolId } : {}),
               ...(typeof standardTimeSec === 'number' ? { standardTimeSec } : {}),
               isRequired,
             }

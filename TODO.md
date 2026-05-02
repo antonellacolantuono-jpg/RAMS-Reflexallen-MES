@@ -153,6 +153,23 @@
 
 ## 🟡 Medium priority (good to have)
 
+### TODO-040 — AddStepDialog multi-select arrays + per-form Action Config session-only / lossy on reload
+
+**Discovered**: 2026-05-02 (during PROMPT_PNE_1 D1 surprise-budget resolution — § 7 trigger A & B)
+**File**: `packages/prisma/schema.prisma` (`Step` model) + `packages/schemas/src/registries/workflow.schema.ts` (`WorkflowStepInputSchema`) + new `apps/api/src/modules/workflow-steps/` lookup endpoints + `apps/web/src/components/workflow/AddStepDialog.tsx` (hydrate path) + `apps/web/src/components/workflow/WorkflowCanvas.tsx` (`buildSavePayload`)
+**Symptom**: PROMPT_PNE_1 D4 saves a new step via `addStepNodeToGroup` and the canvas auto-save pipeline. Single-FK ids (`skillId`, `deviceId`, `recipeId`, `toolId`) round-trip fine via `WorkflowStepInputSchema`. But the **multi-select resource arrays** (`materialIds[]` from MaterialsTab, `attentionPointIds[]` from AttentionPointsTab) and the **per-form Action Config blob** (Manual `maxDurationStr`/`labelIt`/`labelEn`/`isRequired`, Automatic `parallelStepsBufferSec`/`onNok`/`onNokWorkflowId`/`passThresholdNote`, Guided `verificationChecklist`, Parallel `partReference`/`durationDuringDeviceCycleSec`/`description`, Sub-flow `triggerCondition`, Decision `branchLabel`/`on*TargetId`, Information `contentType`/`contentUrl`/`ackRequired`, SetupTeardown `durationStr`) are stored only in `node.data` — they survive zustand state but are dropped at the `WorkflowStepInputSchema` boundary. Reloading `/workflows/<id>` rebuilds steps from the server payload, and those fields come back empty. The InlineHint banner above the Action Config column flags this to the operator.
+**Why this matters**: PROMPT_PNE_2 will seed `WF-PNEU-680-V1-DEMO` with all resources pre-wired so the demo path is unaffected. PROMPT_PNE_2 v0 (Empty workflow) and any process engineer building a workflow from scratch will hit lossy reload — annoyance, not blocker, but a quality-of-life cliff.
+**Acceptance criterion**:
+- Schema change: `Step.config Json?` + `step_materials` (Step ↔ Item M:N) + `step_attention_points` (Step ↔ AttentionPoint M:N). Migration required. Explicit product confirmation needed before touching schema.
+- Extend `WorkflowStepInputSchema` to accept `config: z.record(z.unknown()).optional()`, `materialIds: z.array(z.string().cuid()).optional()`, `attentionPointIds: z.array(z.string().cuid()).optional()`.
+- `buildSavePayload` emits the new fields from `node.data`.
+- API `findOne` / `findVersion` projection hydrates them back into the response shape.
+- AddStepDialog hydrates from `step.config` + `step.materialIds` + `step.attentionPointIds` when re-opening on an existing step (covered by the future "edit existing step" merge of `forms/*` + `action-forms/*` ecosystems).
+**Estimated effort**: 6-10 hours backend (schema + migration + payload wiring + tests) + 2-4 hours frontend (hydration path + cross-form-ecosystem unification).
+**Blocker for**: nothing in MVP demo (PROMPT_PNE_2 seed pre-wires v1 Demo). Owner: F2 / PROMPT_7. Pull earlier if process engineer feedback flags lossy reload during F1.4-F1.6 user testing.
+
+---
+
 ### TODO-039 — Design token migration: bg-primary-* / bg-success-* / text-primary-* unmapped in apps/web
 
 **Discovered**: 2026-05-02 (during PROMPT_3d D5 hotfix — primary submit button invisible bug)

@@ -34,7 +34,7 @@ This pivot accepts **~3-4 week MVP slip** (mid-July → end of July / early Augu
 |---|---|---|---|---|
 | F1.1 | DS_LIFT (closed) | 14 patterns lifted to `@mes/ui` (foundation, view, op-table, card, detail, plant-map, canvas) + showcase | 18h actual (closed 2026-05-02) | done |
 | F1.2 | PROMPT_3d (closed) | Palette ungated, drag-drop step-on-group, canvas phase-columns horizontal, inspector 3-tab Properties/Metadata/Audit, AddPhase/AddGroup/AddStep/Validate dialogs, Visual/Parallel toggle, WorkflowTopBar | ~16h actual (closed 2026-05-02) | done |
-| F1.3 | **PROMPT_PNE_1** Resource Selection | Step configurator with 6 tabs Materials/Tools/Devices/Skills/Recipes/Attention Points, multi-select + search | 8-12h | 8-9 May |
+| F1.3 | PROMPT_PNE_1 (closed) | Step configurator with 6 tabs Materials/Tools/Devices/Skills/Recipes/Attention Points, multi-select + search, Recipe-Device coupling, 8 Action Config forms, Save flow wired | ~10h actual (closed 2026-05-02) | done |
 | F1.4 | **PROMPT_PNE_2** Pneumatic Air seed (double) | Prisma seed: items, recipes, devices, materials, fault codes, cause codes, attention points + 2 workflows ("v1 Demo" pre-configured 4 phases/4 groups/19 steps + "v0 Empty" resources only) + 1 WO ready to release | 6-10h | 10-11 May |
 | F1.5 | **PROMPT_PNE_3** Mock device simulator | DEV-LEAK-001 service mock (45s cycle, RCP-LEAK-PNE-12-001 v2, threshold 0.5 mbar/min, demo toggle PASS/FAIL/MARGINAL). DEV-CAMERA-001 (8s, 4 ROIs). WebSocket events for live HMI updates | 8-12h | 12-13 May |
 | F1.6 | **PROMPT_PNE_4** HMI specialized + label/scrap fidelity | HMI Leak Test split layout (top device + bottom 3 parallel slots side-by-side), HMI Camera Test, recovery flow UI fidelity, scrap UI fidelity (cause code + photo mock + counters), label print mock (toast + SVG preview) | 12-16h | 14-17 May |
@@ -151,7 +151,7 @@ Carried forward from PROMPT_DS_LIFT closure.
 
 Opened during PROMPT_3d (F1.2):
 
-- **TODO-034** — Add Step full configurator (6 resource tabs Materials/Tools/Devices/Skills/Recipes/AttentionPoints). Shell shipped in D2; full content owner: PROMPT_PNE_1.
+- ~~**TODO-034**~~ — ✅ closed by PROMPT_PNE_1 (2026-05-02). Add Step full configurator (6 resource tabs) + Action Config (8 forms) + save flow shipped across D1-D4.
 - **TODO-035** — Parallel view editing (currently read-only since D6). Owner: F2.
 - **TODO-036** — Decision-step `onOk`/`onNok` schema fields missing on Step model. Schema migration required. Owner: F2 (or earlier if PROMPT_PNE_2 seeds decision branches for recovery).
 - **TODO-037** — `@mes/ui` CanvasEdge / React Flow `EdgeProps` API asymmetry. Recommend Option B (document architectural decision) for MVP. Owner: F2.

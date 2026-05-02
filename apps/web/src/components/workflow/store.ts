@@ -107,6 +107,11 @@ interface WorkflowCanvasStore {
   }) => void
   closeAddStepDialog: () => void
   // Append a new step node + group→step edge under the given group.
+  // PROMPT_PNE_1 D4: extended payload — single-FK ids (skillId/deviceId/
+  // recipeId/toolId) bake into node.data and persist via the existing
+  // buildSavePayload + WorkflowStepInputSchema; multi-select arrays
+  // (materialIds, attentionPointIds) and actionConfig are session-only and
+  // sit in node.data only (TODO-040).
   addStepNodeToGroup: (
     groupId: string,
     payload: {
@@ -115,6 +120,13 @@ interface WorkflowCanvasStore {
       kind?: string | null
       durationSec?: number | null
       instructions?: string | null
+      skillId?: string | null
+      deviceId?: string | null
+      recipeId?: string | null
+      toolId?: string | null
+      materialIds?: string[]
+      attentionPointIds?: string[]
+      actionConfig?: Record<string, unknown>
     },
   ) => string
   // Append a new phase node (column) at the end + chain edge from previous.
@@ -336,8 +348,31 @@ export const useWorkflowStore = create<WorkflowCanvasStore>((set, get) => ({
         order,
         parentId: groupId,
         ...(payload.kind ? { kind: payload.kind } : {}),
-        ...(payload.durationSec != null ? { durationSec: payload.durationSec } : {}),
+        // Write standardTimeSec (canonical key consumed by buildSavePayload +
+        // WorkflowStepInputSchema). Mirror to durationSec for the inspector
+        // forms that read it.
+        ...(payload.durationSec != null
+          ? {
+              standardTimeSec: payload.durationSec,
+              durationSec: payload.durationSec,
+            }
+          : {}),
         ...(payload.instructions ? { instructions: payload.instructions } : {}),
+        // Single-FK ids (PROMPT_PNE_1 D4) — persisted via canvas auto-save.
+        ...(payload.skillId ? { skillId: payload.skillId } : {}),
+        ...(payload.deviceId ? { deviceId: payload.deviceId } : {}),
+        ...(payload.recipeId ? { recipeId: payload.recipeId } : {}),
+        ...(payload.toolId ? { toolId: payload.toolId } : {}),
+        // Session-only multi-select arrays + action config (TODO-040).
+        ...(payload.materialIds && payload.materialIds.length > 0
+          ? { materialIds: payload.materialIds }
+          : {}),
+        ...(payload.attentionPointIds && payload.attentionPointIds.length > 0
+          ? { attentionPointIds: payload.attentionPointIds }
+          : {}),
+        ...(payload.actionConfig
+          ? { actionConfig: payload.actionConfig }
+          : {}),
       },
     }
     const updater = (ns: Node[]) => [...ns, newNode]

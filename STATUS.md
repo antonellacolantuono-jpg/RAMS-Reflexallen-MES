@@ -1,8 +1,73 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 2, 2026 (PROMPT_3d D1-D6 + hotfix merged — 100% complete)
+> **Last update**: May 2, 2026 (PROMPT_PNE_1 D1-D4 closed — F1.3 100% complete)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ PROMPT_PNE_1 — Resource Selection complete (Step Configurator) — 100% complete (May 2, 2026)
+
+F1.3 of ROADMAP v2 (Pneumatic First). Fills the AddStepDialog SHELL that PROMPT_3d D2 created with: 6 Resource tabs (Materials/Tools/Devices/Skills/Recipes/Attention Points), Recipe-Device coupling (client-side filter on `recipe.deviceId IN [selectedDeviceIds]`), Action Configuration per step kind/category (8 forms), and the Save flow wired into the existing canvas auto-save pipeline.
+
+### Test count
+
+- **Baseline (post PROMPT_3d D6)**: 619
+- **Final**: **637** (api 249 / domain 197 / ui 119 / schemas 29 / cache 8 / queue 5 / storage 6 / **web 24**)
+- **Delta**: **+18 tests** (target floor +12 → ≥631, ideal +18 → ≥637; achieved ideal exactly)
+
+### D1-D4 breakdown
+
+| Increment | Scope | Test delta | Cumul | Commit |
+|---|---|---|---|---|
+| D1 | Resource tabs scaffold (Materials/Tools/Devices) + ResourceList primitive + AddStepDialog state lift | +5 | 624 | `91a15b2` |
+| D2 | Skills + Recipes (device-coupled) + Attention Points tabs | +4 | 628 | `0c83c6e` |
+| D3 | 8 Action Config forms + ActionConfig switch + 8 Zod schemas + AddStepDialog wire | +5 | 633 | `62033f9` |
+| D4 | Save flow with Zod validation + extended store payload + buildSavePayload toolId/recipeId + STATUS / ROADMAP / TODO | +4 | **637** | _this commit_ |
+
+### Architectural decisions (kept after D4)
+
+1. **Session-only persistence for multi-select arrays + per-form Action Config** (TODO-040): single-FK ids (`skillId`, `deviceId`, `recipeId`, `toolId`) bake into `node.data` and persist via the existing `WorkflowStepInputSchema`; multi-select arrays (`materialIds[]`, `attentionPointIds[]`) and the kind-specific `actionConfig` blob live in `node.data` only — lossy on reload. Decision rationale: stays inside § 7 surprise budget (no DB migration); fits 8-12h effort budget; PROMPT_PNE_2 will seed `WF-PNEU-680-V1-DEMO` with all resources pre-wired so the demo path doesn't suffer the lossy contract. Tracked by **TODO-040** for F2 / PROMPT_7 (`Step.config Json?` column + `step_materials` / `step_attention_points` M:N tables).
+
+2. **Two parallel form ecosystems — explicit decision, not technical debt**: the existing 9-form ecosystem in `apps/web/src/components/workflow/forms/*` (ProductionStepForm, QualityControlStepForm, …, PhaseConfigurator, GroupConfigurator) drives the **edit** path via `PropertiesTab` for already-existing steps. The new 8-form ecosystem in `apps/web/src/components/workflow/configurator/action-forms/*` drives the **create** path inside `AddStepDialog` with a single shared `actionConfig` state object. Both ecosystems coexist intentionally; merging them requires backend persistence parity (TODO-040 dependency).
+
+3. **Client-side recipe-device filter (no API extension)**: `Recipe.deviceId` is a single FK; PROMPT_PNE_1 § 3.2's `compatibleDevices` array does not exist in the schema. RecipesTab fetches `sdk.recipes.list({ limit: 200 })` once and filters client-side via `recipes.filter(r => selectedDeviceIds.includes(r.deviceId))`. Mirrors `ProductionStepForm`'s pattern. Backend `?compatibleDeviceIds=` extension deferred to F2 / PROMPT_7 if a recipe set ever exceeds the 200-item paginated cap.
+
+4. **Mixed test strategy continued**: pure logic in `@mes/domain` + presentational primitives in `@mes/ui` covered most of DS_LIFT and PROMPT_3d. PROMPT_PNE_1 land entirely in `apps/web` because the configurator forms are intrinsically tied to TanStack Query + react-hook-form + zustand — not mockable as pure functions. apps/web web test count grew from 6 (post-PROMPT_3d) to **24** (+18 from D1-D4). New test infrastructure: `afterEach(cleanup)` registered in `apps/web/src/test-setup.ts` to fix DOM pollution between tests on Windows + Vitest 2.1.x (auto-cleanup is unreliable in this combo per documented escape hatch).
+
+5. **Backward-compat preserved**: schema unchanged (zero migrations); `buildSavePayload` extended additively to also emit `recipeId` + `toolId` from `node.data` (was missing — latent bug pre-existed D4); `addStepNodeToGroup` now writes `standardTimeSec` (canonical key consumed by `buildSavePayload`) alongside `durationSec` for inspector-form compat — closes the previously-broken duration round-trip from dialog-created steps. Both fixes are additive and do not affect existing seeded test workflows.
+
+### TODOs closed by PROMPT_PNE_1
+
+- **TODO-034** — Add Step full configurator (6 resource tabs Materials/Tools/Devices/Skills/Recipes/AttentionPoints) — done across D1+D2.
+
+### TODOs opened by PROMPT_PNE_1
+
+- **TODO-040** — Multi-select resources (materialIds, attentionPointIds) + kind/category-specific Action Config in AddStepDialog are session-only / lossy on reload. Owner: F2 / PROMPT_7 (registry detail polish + schema migration). Scope: add `Step.config Json?` column + `step_materials` + `step_attention_points` M:N tables, hydrate on GET, persist on save. Estimate 6-10h backend + 2-4h frontend.
+
+### Verification commands (final)
+
+```
+pnpm install                        # clean (729 packages, 17.8s)
+pnpm --filter @mes/prisma generate  # TODO-031 workaround
+pnpm build                          # 12/12 successful (24.5s — most cached)
+pnpm lint                           # 3/3 (apps/web clean; pre-existing TODO-002 hmi <img> warnings)
+pnpm --filter @mes/web      type-check   # tsc --noEmit clean
+pnpm --filter @mes/api      test    # 249/249 pass
+pnpm --filter @mes/domain   test    # 197/197 pass
+pnpm --filter @mes/ui       test    # 119/119 pass
+pnpm --filter @mes/schemas  test    # 29/29 pass
+pnpm --filter @mes/cache    test    # 8/8 pass
+pnpm --filter @mes/queue    test    # 5/5 pass
+pnpm --filter @mes/storage  test    # 6/6 pass
+pnpm --filter @mes/web      test    # 24/24 pass (was 6 baseline; +18 from D1-D4)
+```
+
+Runtime smoke deferred to user pre-merge per CLAUDE.md PHASE 4. Suggested checks (per ROADMAP § 4.6 `.next` cache reminder):
+- `Remove-Item -Recurse -Force apps\web\.next -ErrorAction SilentlyContinue ; pnpm dev`
+- Open `/workflows/<wf-test-001-id>`, drag a `manual` step kind onto an existing group.
+- Fill name + Manual instructions + open Materials tab, select 2 items + open Tools tab, select 1 tool.
+- Save → step appears in canvas, name visible, single-FK fields persist across browser reload (multi-select arrays + actionConfig session-only by design — TODO-040).
 
 ---
 

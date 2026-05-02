@@ -29,7 +29,18 @@ import {
   defaultDecision,
   defaultInformation,
   defaultSetupTeardown,
+  deriveFormKey,
+  ManualSchema,
+  AutomaticSchema,
+  GuidedSchema,
+  ParallelSchema,
+  SubFlowSchema,
+  DecisionSchema,
+  InformationSchema,
+  SetupTeardownSchema,
+  type FormKey,
 } from '../../lib/step-validation-schemas'
+import type { ZodTypeAny } from 'zod'
 
 function toggleId(prev: string[], id: string): string[] {
   return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -46,10 +57,23 @@ const defaultActionConfig: ActionConfigState = {
   setupTeardown: defaultSetupTeardown,
 }
 
+const SCHEMAS_BY_FORM_KEY: Record<FormKey, ZodTypeAny> = {
+  manual: ManualSchema,
+  automatic: AutomaticSchema,
+  guided: GuidedSchema,
+  parallel: ParallelSchema,
+  sub_flow: SubFlowSchema,
+  decision: DecisionSchema,
+  information: InformationSchema,
+  setupTeardown: SetupTeardownSchema,
+}
+
 export function AddStepDialog() {
   const dialog = useWorkflowStore((s) => s.addStepDialog)
   const closeAddStepDialog = useWorkflowStore((s) => s.closeAddStepDialog)
   const addStepNodeToGroup = useWorkflowStore((s) => s.addStepNodeToGroup)
+  const selectNode = useWorkflowStore((s) => s.selectNode)
+  const scrollToNode = useWorkflowStore((s) => s.scrollToNode)
   const nodes = useWorkflowStore((s) => s.nodes)
   const toast = useToast()
 
@@ -157,15 +181,48 @@ export function AddStepDialog() {
       return
     }
     const category = resolveStepCategory()
-    addStepNodeToGroup(dialog.groupId!, {
+    const formKey = deriveFormKey(kindId, category)
+
+    // Validate the active form's slice via its Zod schema. This catches the
+    // session-level required fields (e.g. instructions on Manual / Guided,
+    // branchLabel on Decision, description on Parallel, subFlowWorkflowId on
+    // Sub-flow). Multi-select arrays are not gated — they're optional.
+    const formSchema = SCHEMAS_BY_FORM_KEY[formKey]
+    const formValue = actionConfig[formKey]
+    const result = formSchema.safeParse(formValue)
+    if (!result.success) {
+      toast.show('Compilare i campi obbligatori', 'warn')
+      return
+    }
+
+    const newId = addStepNodeToGroup(dialog.groupId!, {
       label: name.trim(),
       category,
       kind: kindId,
       durationSec: resolveDurationSec(category),
       instructions: resolveInstructions(),
+      // Single-FK ids — first selection wins (multi-select arrays for
+      // skill/tool/device persist via session-only node.data per TODO-040).
+      skillId: selectedSkillIds[0] ?? null,
+      deviceId: selectedDeviceIds[0] ?? null,
+      recipeId: selectedRecipeId,
+      toolId: selectedToolIds[0] ?? null,
+      // Session-only multi-select arrays.
+      materialIds: selectedMaterialIds,
+      attentionPointIds: selectedAttentionPointIds,
+      // Session-only kind/category-specific config.
+      actionConfig: actionConfig as unknown as Record<string, unknown>,
     })
+
     toast.show(`Step "${name.trim()}" aggiunto`, 'ok')
     closeAddStepDialog()
+
+    // Focus the freshly-created node so the inspector pre-populates and the
+    // canvas scrolls it into view.
+    if (newId) {
+      selectNode(newId, 'stepNode')
+      scrollToNode?.(newId)
+    }
   }
 
   return (
