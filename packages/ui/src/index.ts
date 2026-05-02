@@ -35,6 +35,38 @@ export type { EmptyStateProps, EmptyStateKind, EmptyStateCTA } from './component
 export { SplitView, useSplitViewSelection } from './components/split-view'
 export type { SplitViewProps } from './components/split-view'
 
+export { Check } from './components/op-table/check'
+export type { CheckProps, CheckState } from './components/op-table/check'
+
+export { SortIcon } from './components/op-table/sort-icon'
+export type { SortIconProps, SortDir } from './components/op-table/sort-icon'
+
+export { FilterChip as OpTableFilterChip } from './components/op-table/filter-chip'
+export type { FilterChipProps as OpTableFilterChipProps } from './components/op-table/filter-chip'
+
+export { SavedViews } from './components/op-table/saved-views'
+export type { SavedViewsProps, SavedView, SavedViewDot } from './components/op-table/saved-views'
+
+export { FilterBar } from './components/op-table/filter-bar'
+export type { FilterBarProps, OpTableFilter } from './components/op-table/filter-bar'
+
+export { BulkBar } from './components/op-table/bulk-bar'
+export type {
+  BulkBarProps,
+  BulkAction as OpTableBulkAction,
+  BulkActionTone,
+} from './components/op-table/bulk-bar'
+
+export { RowMenu } from './components/op-table/row-menu'
+export type { RowMenuProps, RowMenuItem, RowMenuTone } from './components/op-table/row-menu'
+
+export { OperationalTable } from './components/op-table/operational-table'
+export type {
+  OperationalTableProps,
+  OpTableColumn,
+  OpTablePagination,
+} from './components/op-table/operational-table'
+
 export { Skeleton } from './components/Skeleton'
 export type { SkeletonProps } from './components/Skeleton'
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   PageHeader,
@@ -9,8 +9,16 @@ import {
   BulkActionBar,
   TrashBannerBar,
   ConfirmModal,
+  OperationalTable,
 } from '@mes/ui'
-import type { Column, BulkAction } from '@mes/ui'
+import type {
+  Column,
+  BulkAction,
+  OpTableColumn,
+  SavedView,
+  OpTableBulkAction,
+} from '@mes/ui'
+import { Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 interface RegistryClient<T> {
@@ -28,6 +36,18 @@ export interface RegistryListPageProps<T extends { id: string }> {
   newHref?: string | undefined
   newLabel?: string | undefined
   extraFilters?: Record<string, string | undefined> | undefined
+  /**
+   * Opt-in to the new OperationalTable surface (PROMPT_DS_LIFT D3).
+   * Default `false` keeps the legacy DataTable + SearchBar + BulkActionBar stack
+   * intact for the 10 existing callsites.
+   */
+  useOperationalTable?: boolean | undefined
+  /** When `useOperationalTable` is true, optional saved-view tabs at the top of the table. */
+  views?: SavedView[] | undefined
+  /** Active view id; pairs with `onViewChange` and `views`. */
+  activeView?: string | undefined
+  /** Called when the user picks a different saved view tab. */
+  onViewChange?: ((id: string) => void) | undefined
 }
 
 export function RegistryListPage<T extends { id: string }>({
@@ -39,6 +59,10 @@ export function RegistryListPage<T extends { id: string }>({
   newHref,
   newLabel = '+ Nuovo',
   extraFilters,
+  useOperationalTable = false,
+  views,
+  activeView,
+  onViewChange,
 }: RegistryListPageProps<T>) {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
@@ -100,6 +124,170 @@ export function RegistryListPage<T extends { id: string }>({
     ? { page: data.page, limit: data.limit, total: data.total, totalPages: data.totalPages }
     : undefined
 
+  // Legacy stack (default): unchanged callsite contract for the 10 pages that use it.
+  if (!useOperationalTable) {
+    return (
+      <div className="flex flex-col gap-4 p-6 h-full overflow-y-auto">
+        <PageHeader
+          title={title}
+          subtitle={subtitle}
+          actions={
+            newHref ? (
+              <Link
+                href={newHref}
+                className="rounded-md bg-primary-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-primary-700"
+              >
+                {newLabel}
+              </Link>
+            ) : undefined
+          }
+        />
+
+        <TrashBannerBar count={trashData?.total ?? 0} />
+
+        <SearchBar
+          value={search}
+          onChange={(v) => { setSearch(v); setPage(1) }}
+        />
+
+        <DataTable
+          data={data?.data ?? []}
+          columns={columns}
+          pagination={pagination}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          selectedIds={selected}
+          isLoading={isLoading}
+          onSort={handleSort}
+          onPageChange={setPage}
+          onSelectionChange={setSelected}
+          onRowClick={(row) => window.location.assign(`/${moduleKey.replace('_', '-')}/${row.id}`)}
+        />
+
+        <BulkActionBar
+          selectedCount={selected.size}
+          actions={bulkActions}
+          onClear={() => setSelected(new Set())}
+        />
+
+        <ConfirmModal
+          open={deleteTarget !== null}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+          title={`Elimina ${title.toLowerCase()}`}
+          description="L'elemento verrà spostato nel cestino. Potrai ripristinarlo in seguito."
+          confirmLabel="Elimina"
+          variant="danger"
+          isLoading={deleteMutation.isPending}
+        />
+      </div>
+    )
+  }
+
+  // Opt-in OperationalTable surface (PROMPT_DS_LIFT D3).
+  return (
+    <RegistryListPageOpTable
+      title={title}
+      subtitle={subtitle}
+      newHref={newHref}
+      newLabel={newLabel}
+      moduleKey={moduleKey}
+      trashCount={trashData?.total ?? 0}
+      legacyColumns={columns}
+      rows={data?.data ?? []}
+      pagination={pagination}
+      isLoading={isLoading}
+      search={search}
+      onSearchChange={(v) => { setSearch(v); setPage(1) }}
+      sortBy={sortBy}
+      sortDir={sortDir}
+      onSort={handleSort}
+      onPageChange={setPage}
+      selection={selected}
+      onSelectionChange={setSelected}
+      bulkDeleteHandler={() => bulkDeleteMutation.mutate(Array.from(selected))}
+      {...(views ? { views } : {})}
+      {...(activeView != null ? { activeView } : {})}
+      {...(onViewChange ? { onViewChange } : {})}
+    />
+  )
+}
+
+interface OpTableShellProps<T extends { id: string }> {
+  title: string
+  subtitle?: string | undefined
+  newHref?: string | undefined
+  newLabel: string
+  moduleKey: string
+  trashCount: number
+  legacyColumns: Column<T>[]
+  rows: T[]
+  pagination?: { page: number; limit: number; total: number; totalPages: number } | undefined
+  isLoading?: boolean | undefined
+  search: string
+  onSearchChange: (v: string) => void
+  sortBy: string
+  sortDir: 'asc' | 'desc'
+  onSort: (col: string, dir: 'asc' | 'desc') => void
+  onPageChange: (page: number) => void
+  selection: Set<string>
+  onSelectionChange: (next: Set<string>) => void
+  bulkDeleteHandler: () => void
+  views?: SavedView[]
+  activeView?: string
+  onViewChange?: (id: string) => void
+}
+
+function RegistryListPageOpTable<T extends { id: string }>({
+  title,
+  subtitle,
+  newHref,
+  newLabel,
+  moduleKey,
+  trashCount,
+  legacyColumns,
+  rows,
+  pagination,
+  isLoading,
+  search,
+  onSearchChange,
+  sortBy,
+  sortDir,
+  onSort,
+  onPageChange,
+  selection,
+  onSelectionChange,
+  bulkDeleteHandler,
+  views,
+  activeView,
+  onViewChange,
+}: OpTableShellProps<T>) {
+  // Adapt legacy Column<T> shape to OpTableColumn<T> (additive properties only).
+  const opColumns: OpTableColumn<T>[] = useMemo(
+    () =>
+      legacyColumns.map((c) => ({
+        id: c.key,
+        label: c.header,
+        sortable: c.sortable ?? false,
+        ...(c.width != null ? { width: c.width } : {}),
+        ...(c.render ? { render: c.render } : {}),
+      })),
+    [legacyColumns],
+  )
+
+  const bulkActions: OpTableBulkAction[] = useMemo(
+    () => [
+      {
+        id: 'delete',
+        label: 'Elimina',
+        icon: Trash2,
+        tone: 'bad',
+        onClick: bulkDeleteHandler,
+      },
+    ],
+    [bulkDeleteHandler],
+  )
+
   return (
     <div className="flex flex-col gap-4 p-6 h-full overflow-y-auto">
       <PageHeader
@@ -117,42 +305,30 @@ export function RegistryListPage<T extends { id: string }>({
         }
       />
 
-      <TrashBannerBar count={trashData?.total ?? 0} />
+      <TrashBannerBar count={trashCount} />
 
-      <SearchBar
-        value={search}
-        onChange={(v) => { setSearch(v); setPage(1) }}
-      />
-
-      <DataTable
-        data={data?.data ?? []}
-        columns={columns}
-        pagination={pagination}
+      <OperationalTable<T>
+        rows={rows}
+        columns={opColumns}
+        {...(views ? { views } : {})}
+        {...(activeView != null ? { activeView } : {})}
+        {...(onViewChange ? { onViewChange } : {})}
+        search={search}
+        onSearchChange={onSearchChange}
+        searchPlaceholder="Cerca…"
         sortBy={sortBy}
         sortDir={sortDir}
-        selectedIds={selected}
-        isLoading={isLoading}
-        onSort={handleSort}
-        onPageChange={setPage}
-        onSelectionChange={setSelected}
-        onRowClick={(row) => window.location.assign(`/${moduleKey.replace('_', '-')}/${row.id}`)}
-      />
-
-      <BulkActionBar
-        selectedCount={selected.size}
-        actions={bulkActions}
-        onClear={() => setSelected(new Set())}
-      />
-
-      <ConfirmModal
-        open={deleteTarget !== null}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
-        title={`Elimina ${title.toLowerCase()}`}
-        description="L'elemento verrà spostato nel cestino. Potrai ripristinarlo in seguito."
-        confirmLabel="Elimina"
-        variant="danger"
-        isLoading={deleteMutation.isPending}
+        onSort={onSort}
+        selection={selection}
+        onSelectionChange={onSelectionChange}
+        bulkActions={bulkActions}
+        {...(pagination ? { pagination } : {})}
+        onPageChange={onPageChange}
+        {...(isLoading != null ? { isLoading } : {})}
+        emptyMessage="Nessun elemento trovato"
+        onRowClick={(row) =>
+          window.location.assign(`/${moduleKey.replace('_', '-')}/${row.id}`)
+        }
       />
     </div>
   )
