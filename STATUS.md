@@ -6,6 +6,13 @@
 
 ---
 
+## 🚧 In-flight (PROMPT_DS_LIFT, May 2 — to be folded into a D6 recap)
+
+- **Test baseline correction**: the 473 figure in the Session B commit message is the real baseline; the 385 measured in PROMPT_DS_LIFT pre-flight was flaky due to the Windows vitest tmp dir bug dropping 3 @mes/api files. From D1 onward we count from 473.
+- **Architectural decision (D3)**: 10 RegistryListPage callsites still on the legacy DataTable path. Migration to `useOperationalTable=true` is opt-in and deferred to future PROMPTs. Items is the only canary on the new path (and it migrated directly, not via RegistryListPage, because Items has bespoke type-tab logic). The flag's API surface is in place so the 10 standard pages can opt in incrementally.
+
+---
+
 ## 📜 Project history (timeline)
 
 - **April 27** — PROMPT_1 Foundation drafted
