@@ -17,18 +17,29 @@ import { seedItems } from './pneumatic-data/items'
 import { seedRecipes } from './pneumatic-data/recipes'
 import { seedSkills } from './pneumatic-data/skills'
 import { seedOperators } from './pneumatic-data/operators'
+import { seedCauseCodes } from './pneumatic-data/cause-codes'
+import { seedFaultCodes } from './pneumatic-data/fault-codes'
+import { seedAttentionPoints } from './pneumatic-data/attention-points'
+import { seedWorkOrderDraft } from './pneumatic-data/work-orders'
 
 async function main(): Promise<void> {
   console.log('🌱 Seeding Pneumatic Air (PROMPT_PNE_2)...')
   const ctx = emptyContext('') // plantId is filled by seedPlantHierarchy
 
+  // D1 — foundation
   await seedPlantHierarchy(prisma, ctx)
   await seedItems(prisma, ctx)
   await seedRecipes(prisma, ctx) // depends on items + devices
   await seedSkills(prisma, ctx)
   await seedOperators(prisma, ctx) // depends on skills
 
-  console.log('✅ Pneumatic Air seed (D1) complete.')
+  // D2 — auxiliary entities + WO draft
+  await seedCauseCodes(prisma, ctx)
+  await seedFaultCodes(prisma, ctx) // CauseCode rows with category=recovery_fault (S1 workaround)
+  await seedAttentionPoints(prisma, ctx)
+  await seedWorkOrderDraft(prisma, ctx) // depends on items + operators
+
+  console.log('✅ Pneumatic Air seed (D2) complete.')
 }
 
 main()
