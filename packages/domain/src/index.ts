@@ -96,3 +96,17 @@ export type {
   ClonedPhase,
   WorkflowSnapshotPayload,
 } from './rules/workflow-snapshot.rules'
+
+// workflow-palette rules (D1 of PROMPT_3d)
+export {
+  STEP_CATEGORIES,
+  STEP_KINDS,
+  getStepCategoryDescriptor,
+  getStepKindDescriptor,
+} from './rules/workflow-palette.rules'
+export type {
+  StepCategoryId,
+  StepKindId,
+  StepCategoryDescriptor,
+  StepKindDescriptor,
+} from './rules/workflow-palette.rules'

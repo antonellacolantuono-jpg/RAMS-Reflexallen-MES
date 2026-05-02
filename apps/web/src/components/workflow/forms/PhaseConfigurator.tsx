@@ -7,7 +7,6 @@ import { z } from 'zod'
 import { Field, Input, Select } from '@mes/ui'
 import { useWorkflowStore } from '../store'
 
-// PhaseCategory list mirrors the WorkflowPalette PHASE_ITEMS — keep in sync.
 const PHASE_CATEGORIES = [
   'inbound',
   'setup',

@@ -7,7 +7,6 @@ import { z } from 'zod'
 import { Field, Input, Select } from '@mes/ui'
 import { useWorkflowStore } from '../store'
 
-// GroupCategory list mirrors the WorkflowPalette GROUP_ITEMS — keep in sync.
 const GROUP_CATEGORIES = [
   'assembly',
   'device_execution',
