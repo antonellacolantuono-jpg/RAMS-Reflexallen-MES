@@ -82,5 +82,55 @@ describe('WorkOrderEventsGateway', () => {
         assignedAt: 't',
       }),
     ).not.toThrow()
+    expect(() =>
+      gateway.emitDeviceCycleStarted({
+        deviceSerialNumber: 'DEV-LEAK-001',
+        stepExecutionId: 'se-1',
+        expectedDurationSec: 45,
+        startedAt: 't',
+      }),
+    ).not.toThrow()
+  })
+
+  it('emitDeviceCycleStarted broadcasts on device:cycle:started (PROMPT_PNE_3 D1)', () => {
+    const { gateway, emit, to } = makeGateway()
+    const payload = {
+      deviceSerialNumber: 'DEV-LEAK-001',
+      stepExecutionId: 'se-leak-1',
+      expectedDurationSec: 45,
+      startedAt: '2026-05-02T10:00:00.000Z',
+      recipe: { testPressureBar: 6.0 },
+    }
+    gateway.emitDeviceCycleStarted(payload)
+    expect(to).not.toHaveBeenCalled()
+    expect(emit).toHaveBeenCalledOnce()
+    expect(emit).toHaveBeenCalledWith('device:cycle:started', payload)
+  })
+
+  it('emitDeviceCycleProgress broadcasts on device:cycle:progress (PROMPT_PNE_3 D1)', () => {
+    const { gateway, emit, to } = makeGateway()
+    const payload = {
+      deviceSerialNumber: 'DEV-LEAK-001',
+      stepExecutionId: 'se-leak-1',
+      elapsedSec: 12.5,
+      telemetry: { phase: 'hold', pressureBar: 6.02, leakRateMbarMin: 0.08 },
+    }
+    gateway.emitDeviceCycleProgress(payload)
+    expect(to).not.toHaveBeenCalled()
+    expect(emit).toHaveBeenCalledWith('device:cycle:progress', payload)
+  })
+
+  it('emitDeviceCycleComplete broadcasts on device:cycle:complete (PROMPT_PNE_3 D1)', () => {
+    const { gateway, emit, to } = makeGateway()
+    const payload = {
+      deviceSerialNumber: 'DEV-LEAK-001',
+      stepExecutionId: 'se-leak-1',
+      outcome: 'PASS' as const,
+      durationSec: 45,
+      result: { leakRateMbarMin: 0.32, pressureBar: 0 },
+    }
+    gateway.emitDeviceCycleComplete(payload)
+    expect(to).not.toHaveBeenCalled()
+    expect(emit).toHaveBeenCalledWith('device:cycle:complete', payload)
   })
 })

@@ -21,6 +21,7 @@ import { BoxesModule } from './modules/boxes/boxes.module'
 import { AutoGenRulesModule } from './modules/auto-gen-rules/auto-gen-rules.module'
 import { AutoGenEngineModule } from './modules/auto-gen-engine/auto-gen-engine.module'
 import { WorkflowsModule } from './modules/workflows/workflows.module'
+import { MockDevicesModule } from './modules/mock-devices/mock-devices.module'
 import { AppController } from './app.controller'
 
 @Module({
@@ -47,6 +48,7 @@ import { AppController } from './app.controller'
     AutoGenRulesModule,
     AutoGenEngineModule,
     WorkflowsModule,
+    MockDevicesModule,
   ],
   controllers: [AppController],
 })

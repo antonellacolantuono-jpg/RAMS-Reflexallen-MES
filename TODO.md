@@ -2,7 +2,7 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-02 (PROMPT_PNE_2 D4 — closed TODO-031; opened TODO-041, TODO-042)
+> **Last updated**: 2026-05-02 (PROMPT_PNE_3 pre-flight — opened TODO-043)
 
 ---
 
@@ -16,6 +16,23 @@
 ---
 
 ## 🟠 High priority (should fix before MVP — May 8-9)
+
+### TODO-043 — PROMPT_PNE_3: wire SimulatorRegistry into step-execution dispatch (deferred)
+
+**Discovered**: 2026-05-02 (during PROMPT_PNE_3 pre-flight — § 8 surprise budget trigger)
+**Status**: 🟡 DEFERRED to PROMPT_PNE_4 by design (Option 3b chosen for PNE_3 scope).
+**File**: `apps/api/src/modules/work-orders/step-execution.service.ts` + new `device-step-executor.ts` (or equivalent dispatch helper to be created in PNE_4 D1)
+**Symptom**: PROMPT_PNE_3 § 3.4 assumed `apps/api/src/modules/work-orders/step-execution/device-step-executor.ts` already existed (presumed shipped by PROMPT_5_FULL D3). It does NOT. The actual `step-execution.service.ts` is purely XState-driven: operator events (`COMPLETE_OK` / `COMPLETE_NOK` / `RECOVER` / `MARK_SCRAPPED`) transition a state machine; the service never calls a "device client" or any device abstraction. So the real-device-execution branch the prompt expected to wrap with mocks does not exist anywhere in the codebase. Creating that branch from scratch is out of PROMPT_PNE_3's scope (8-12h budget; surprise budget § 8 explicitly calls this trigger).
+**Resolution chosen for PROMPT_PNE_3**: PROMPT_PNE_3 ships standalone simulator services + REST endpoints under `/api/internal/simulators/*` + DemoToggle UI in apps/web + WO debug FastForward endpoint that drives state machine transitions directly (no simulator dispatch). Simulators are reachable via REST + emit WS events but do NOT yet auto-fire when an operator advances a `device_run` step in the HMI.
+**Acceptance criterion (when revisited in PROMPT_PNE_4)**:
+- New helper `device-step-executor.ts` (or method on `StepExecutionService`) that, when an operator advances a `device_run` step, dispatches to: (a) the SimulatorRegistry from PROMPT_PNE_3 if `DEMO_MODE=true` AND device is one of the 3 mock devices, OR (b) a real-device client otherwise (to be designed in F2).
+- Adapter contract: simulator returns the same `StepExecutionResult` shape so the state machine cannot tell mock from real.
+- HMI Leak/Camera specialized screens (PNE_4 main scope) subscribe to the WS events the simulator already emits.
+- Existing `applyTransition` flow in `step-execution.service.ts` extended (or wrapped) without breaking the 24 api tests.
+**Estimated effort**: 4-6 hours (1-2h for the dispatch branch + 2-4h for HMI specialized integration which is PNE_4 main scope anyway)
+**Blocker for**: HMI Leak/Camera test specialized rendering with auto-cycle (PNE_4). Not blocking demo today since PNE_3 ships DemoToggle + FastForward as standalone debug surfaces.
+
+---
 
 ### TODO-017 — PROMPT_5_FULL: real Argon2id PIN auth + JWT cookies + /api/auth endpoints
 

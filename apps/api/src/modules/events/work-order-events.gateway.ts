@@ -40,6 +40,29 @@ export interface WoAssignedPayload {
   assignedAt: string
 }
 
+export interface DeviceCycleStartedPayload {
+  deviceSerialNumber: string
+  stepExecutionId: string
+  expectedDurationSec: number
+  startedAt: string
+  recipe?: Record<string, unknown>
+}
+
+export interface DeviceCycleProgressPayload {
+  deviceSerialNumber: string
+  stepExecutionId: string
+  elapsedSec: number
+  telemetry: Record<string, unknown>
+}
+
+export interface DeviceCycleCompletePayload {
+  deviceSerialNumber: string
+  stepExecutionId: string
+  outcome: 'PASS' | 'MARGINAL' | 'FAIL'
+  durationSec: number
+  result: Record<string, unknown>
+}
+
 @Injectable()
 @WebSocketGateway({
   cors: { origin: ['http://localhost:3001', 'http://localhost:3002'] },
@@ -134,6 +157,29 @@ export class WorkOrderEventsGateway {
     if (!operatorId) return { ok: false, error: 'operatorId required' }
     void socket.leave(`op:${operatorId}`)
     return { ok: true, room: `op:${operatorId}` }
+  }
+
+  /**
+   * PROMPT_PNE_3 D1 — broadcast device cycle lifecycle events. Used by the
+   * mock device simulators (DEV-LEAK-001, DEV-CAMERA-001, DEV-CRIMP-001) and
+   * later by the real-device path. Broadcast (not room-scoped) so any
+   * subscribed client — DemoToggle UI in apps/web, HMI Leak Test screen — can
+   * pick them up. Production hardening (per-device or per-WO room scope) can
+   * follow when authentication + multi-tenant scoping is firmed up.
+   */
+  emitDeviceCycleStarted(payload: DeviceCycleStartedPayload): void {
+    if (!this.server) return
+    this.server.emit('device:cycle:started', payload)
+  }
+
+  emitDeviceCycleProgress(payload: DeviceCycleProgressPayload): void {
+    if (!this.server) return
+    this.server.emit('device:cycle:progress', payload)
+  }
+
+  emitDeviceCycleComplete(payload: DeviceCycleCompletePayload): void {
+    if (!this.server) return
+    this.server.emit('device:cycle:complete', payload)
   }
 }
 
