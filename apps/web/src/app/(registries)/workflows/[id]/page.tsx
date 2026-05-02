@@ -94,7 +94,7 @@ export default function WorkflowEditorPage() {
           <button
             type="button"
             onClick={() => openAddPhaseDrawer()}
-            className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700"
+            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-2"
           >
             + Aggiungi Fase
           </button>

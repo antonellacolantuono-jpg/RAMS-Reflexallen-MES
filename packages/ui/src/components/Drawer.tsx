@@ -110,7 +110,9 @@ export function Drawer({
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
 
         {footerNode && (
-          <div className="border-t border-neutral-200 px-5 py-4 shrink-0">{footerNode}</div>
+          <div className="border-t border-neutral-200 px-5 py-4 shrink-0 flex justify-end gap-2">
+            {footerNode}
+          </div>
         )}
       </div>
     </div>,

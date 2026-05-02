@@ -121,7 +121,7 @@ export function AddStepDialog() {
           <button
             type="button"
             onClick={handleSave}
-            className="rounded-md bg-primary-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-primary-700"
+            className="rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent-2"
           >
             Salva Step
           </button>

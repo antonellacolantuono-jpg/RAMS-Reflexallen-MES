@@ -63,4 +63,29 @@ describe('Drawer', () => {
     )
     expect(screen.getByRole('button', { name: 'Annulla' })).toBeInTheDocument()
   })
+
+  it('lays out footer buttons with flex justify-end gap so a primary submit sits next to cancel', () => {
+    render(
+      <Drawer
+        open
+        title="T"
+        actions={
+          <>
+            <button type="button">Annulla</button>
+            <button type="button">Conferma</button>
+          </>
+        }
+      >
+        <p>x</p>
+      </Drawer>,
+    )
+    const cancel = screen.getByRole('button', { name: 'Annulla' })
+    const confirm = screen.getByRole('button', { name: 'Conferma' })
+    const footer = cancel.parentElement
+    expect(footer).not.toBeNull()
+    expect(footer).toBe(confirm.parentElement)
+    expect(footer?.className).toContain('flex')
+    expect(footer?.className).toContain('justify-end')
+    expect(footer?.className).toContain('gap-2')
+  })
 })
