@@ -5,7 +5,6 @@ import {
   Modal,
   Field,
   Input,
-  Select,
   useToast,
 } from '@mes/ui'
 import {
@@ -17,9 +16,34 @@ import {
 } from '@mes/domain'
 import { useWorkflowStore } from './store'
 import { ResourceTabs } from './configurator/ResourceTabs'
+import {
+  ActionConfig,
+  type ActionConfigState,
+} from './configurator/ActionConfig'
+import {
+  defaultManual,
+  defaultAutomatic,
+  defaultGuided,
+  defaultParallel,
+  defaultSubFlow,
+  defaultDecision,
+  defaultInformation,
+  defaultSetupTeardown,
+} from '../../lib/step-validation-schemas'
 
 function toggleId(prev: string[], id: string): string[] {
   return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+}
+
+const defaultActionConfig: ActionConfigState = {
+  manual: defaultManual,
+  automatic: defaultAutomatic,
+  guided: defaultGuided,
+  parallel: defaultParallel,
+  sub_flow: defaultSubFlow,
+  decision: defaultDecision,
+  information: defaultInformation,
+  setupTeardown: defaultSetupTeardown,
 }
 
 export function AddStepDialog() {
@@ -30,8 +54,6 @@ export function AddStepDialog() {
   const toast = useToast()
 
   const [name, setName] = useState('')
-  const [instructions, setInstructions] = useState('')
-  const [durationStr, setDurationStr] = useState('')
   const [kindId, setKindId] = useState<StepKindId>('manual')
 
   // Resource selections (lifted into the dialog so ResourceTabs can read+write
@@ -46,12 +68,16 @@ export function AddStepDialog() {
     string[]
   >([])
 
+  // Per-form Action Config state (D3 — kind/category-specific). One slice per
+  // form key; the dialog forwards the relevant slice + setter into ActionConfig.
+  const [actionConfig, setActionConfig] = useState<ActionConfigState>(
+    defaultActionConfig,
+  )
+
   // Reset form whenever the dialog opens with a new context.
   useEffect(() => {
     if (dialog.open) {
       setName('')
-      setInstructions('')
-      setDurationStr('')
       setKindId(dialog.preselectedKind ?? 'manual')
       setSelectedMaterialIds([])
       setSelectedToolIds([])
@@ -59,6 +85,7 @@ export function AddStepDialog() {
       setSelectedSkillIds([])
       setSelectedRecipeId(null)
       setSelectedAttentionPointIds([])
+      setActionConfig(defaultActionConfig)
     }
   }, [dialog.open, dialog.preselectedKind])
 
@@ -88,19 +115,54 @@ export function AddStepDialog() {
     return 'identification'
   }
 
+  // Resolve the duration string from whichever Action Config form is active
+  // (Manual/Guided/Parallel/SetupTeardown surface their own durationStr;
+  // Automatic uses cycleTimeSec in seconds).
+  const resolveDurationSec = (category: string): number | null => {
+    const formKey =
+      category === 'decision'
+        ? 'decision'
+        : category === 'information'
+          ? 'information'
+          : category === 'setup' || category === 'teardown'
+            ? 'setupTeardown'
+            : kindId
+    const raw =
+      formKey === 'manual'
+        ? actionConfig.manual.durationStr
+        : formKey === 'automatic'
+          ? actionConfig.automatic.cycleTimeSec
+          : formKey === 'guided'
+            ? actionConfig.guided.durationStr
+            : formKey === 'parallel'
+              ? actionConfig.parallel.durationDuringDeviceCycleSec
+              : formKey === 'setupTeardown'
+                ? actionConfig.setupTeardown.durationStr
+                : ''
+    if (raw === '' || raw == null) return null
+    const n = typeof raw === 'number' ? raw : Number(raw)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+
+  // Resolve the per-form instructions (Manual/Guided own this).
+  const resolveInstructions = (): string | null => {
+    if (kindId === 'manual') return actionConfig.manual.instructions.trim() || null
+    if (kindId === 'guided') return actionConfig.guided.instructions.trim() || null
+    return null
+  }
+
   const handleSave = () => {
     if (!name.trim()) {
       toast.show('Nome obbligatorio', 'warn')
       return
     }
     const category = resolveStepCategory()
-    const durationSec = durationStr ? Number(durationStr) : null
     addStepNodeToGroup(dialog.groupId!, {
       label: name.trim(),
       category,
       kind: kindId,
-      durationSec: durationSec && !Number.isNaN(durationSec) ? durationSec : null,
-      instructions: instructions.trim() || null,
+      durationSec: resolveDurationSec(category),
+      instructions: resolveInstructions(),
     })
     toast.show(`Step "${name.trim()}" aggiunto`, 'ok')
     closeAddStepDialog()
@@ -218,7 +280,7 @@ export function AddStepDialog() {
 
         <aside
           data-pane="action-config"
-          className="flex flex-col gap-3 rounded-md border border-neutral-200 bg-white p-3"
+          className="flex flex-col gap-3 overflow-y-auto rounded-md border border-neutral-200 bg-white p-3"
         >
           <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
             Action Configuration
@@ -230,48 +292,38 @@ export function AddStepDialog() {
               placeholder="es. Verifica torque iniziale"
             />
           </Field>
-          {(kindId === 'manual' || kindId === 'guided') && (
-            <Field label="Istruzioni operatore">
-              <textarea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                rows={4}
-                placeholder="Indicare istruzioni passo-passo"
-                className="w-full rounded-2 border border-line bg-paper px-3 py-2 text-base text-ink placeholder:text-ink-4 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-            </Field>
-          )}
-          {(kindId === 'manual' || kindId === 'guided' || kindId === 'parallel') && (
-            <Field label="Durata standard (sec)">
-              <Input
-                type="number"
-                min={0}
-                value={durationStr}
-                onChange={(e) => setDurationStr(e.target.value)}
-                placeholder="es. 45"
-              />
-            </Field>
-          )}
-          {kindId === 'automatic' && (
-            <Field
-              label="Dispositivo + ricetta"
-              hint="Configurazione completa nel PROMPT_PNE_1"
-            >
-              <Select disabled value="">
-                <option value="">— da configurare in PNE_1 —</option>
-              </Select>
-            </Field>
-          )}
-          {kindId === 'sub_flow' && (
-            <Field
-              label="Sotto-flusso collegato"
-              hint="Selezione completa nel PROMPT_PNE_1"
-            >
-              <Select disabled value="">
-                <option value="">— da configurare in PNE_1 —</option>
-              </Select>
-            </Field>
-          )}
+          <ActionConfig
+            kindId={kindId}
+            category={resolveStepCategory()}
+            selectedDeviceIds={selectedDeviceIds}
+            selectedToolIds={selectedToolIds}
+            selectedRecipeId={selectedRecipeId}
+            state={actionConfig}
+            onChangeManual={(v) =>
+              setActionConfig((s) => ({ ...s, manual: v }))
+            }
+            onChangeAutomatic={(v) =>
+              setActionConfig((s) => ({ ...s, automatic: v }))
+            }
+            onChangeGuided={(v) =>
+              setActionConfig((s) => ({ ...s, guided: v }))
+            }
+            onChangeParallel={(v) =>
+              setActionConfig((s) => ({ ...s, parallel: v }))
+            }
+            onChangeSubFlow={(v) =>
+              setActionConfig((s) => ({ ...s, sub_flow: v }))
+            }
+            onChangeDecision={(v) =>
+              setActionConfig((s) => ({ ...s, decision: v }))
+            }
+            onChangeInformation={(v) =>
+              setActionConfig((s) => ({ ...s, information: v }))
+            }
+            onChangeSetupTeardown={(v) =>
+              setActionConfig((s) => ({ ...s, setupTeardown: v }))
+            }
+          />
           {kindDescriptor && (
             <p className="mt-1 text-[10px] text-neutral-500">
               Tipo selezionato:{' '}
