@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Modal,
-  EmptyState,
-  Tabs,
   Field,
   Input,
   Select,
@@ -18,17 +16,11 @@ import {
   type StepKindId,
 } from '@mes/domain'
 import { useWorkflowStore } from './store'
+import { ResourceTabs } from './configurator/ResourceTabs'
 
-const RESOURCE_TABS = [
-  { id: 'materials', label: 'Materials' },
-  { id: 'tools', label: 'Tools' },
-  { id: 'devices', label: 'Devices' },
-  { id: 'skills', label: 'Skills' },
-  { id: 'recipes', label: 'Recipes' },
-  { id: 'attention-points', label: 'Attention Points' },
-] as const
-
-type ResourceTabId = (typeof RESOURCE_TABS)[number]['id']
+function toggleId(prev: string[], id: string): string[] {
+  return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+}
 
 export function AddStepDialog() {
   const dialog = useWorkflowStore((s) => s.addStepDialog)
@@ -41,7 +33,18 @@ export function AddStepDialog() {
   const [instructions, setInstructions] = useState('')
   const [durationStr, setDurationStr] = useState('')
   const [kindId, setKindId] = useState<StepKindId>('manual')
-  const [activeResourceTab, setActiveResourceTab] = useState<ResourceTabId>('materials')
+
+  // Resource selections (lifted into the dialog so ResourceTabs can read+write
+  // and so the Save handler can persist them — single-FK fields end up in
+  // node.data, multi-select arrays are session-only per TODO-040).
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([])
+  const [selectedToolIds, setSelectedToolIds] = useState<string[]>([])
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([])
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([])
+  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null)
+  const [selectedAttentionPointIds, setSelectedAttentionPointIds] = useState<
+    string[]
+  >([])
 
   // Reset form whenever the dialog opens with a new context.
   useEffect(() => {
@@ -50,7 +53,12 @@ export function AddStepDialog() {
       setInstructions('')
       setDurationStr('')
       setKindId(dialog.preselectedKind ?? 'manual')
-      setActiveResourceTab('materials')
+      setSelectedMaterialIds([])
+      setSelectedToolIds([])
+      setSelectedDeviceIds([])
+      setSelectedSkillIds([])
+      setSelectedRecipeId(null)
+      setSelectedAttentionPointIds([])
     }
   }, [dialog.open, dialog.preselectedKind])
 
@@ -179,17 +187,31 @@ export function AddStepDialog() {
           <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
             Resource Selection
           </h3>
-          <Tabs
-            tabs={RESOURCE_TABS.map((t) => ({ id: t.id, label: t.label }))}
-            value={activeResourceTab}
-            onChange={(id) => setActiveResourceTab(id as ResourceTabId)}
-          />
-          <div className="flex-1 rounded-md border border-dashed border-neutral-200 bg-neutral-50/50 p-6">
-            <EmptyState
-              kind="no-data"
-              title="Selezione risorse — vedi PROMPT_PNE_1"
-              body="Materiali, attrezzi, dispositivi, skill, ricette e attention point saranno collegabili dal prossimo PROMPT."
-              compact
+          <div className="min-h-0 flex-1">
+            <ResourceTabs
+              selectedMaterialIds={selectedMaterialIds}
+              selectedToolIds={selectedToolIds}
+              selectedDeviceIds={selectedDeviceIds}
+              selectedSkillIds={selectedSkillIds}
+              selectedRecipeId={selectedRecipeId}
+              selectedAttentionPointIds={selectedAttentionPointIds}
+              onToggleMaterial={(id) =>
+                setSelectedMaterialIds((p) => toggleId(p, id))
+              }
+              onToggleTool={(id) => setSelectedToolIds((p) => toggleId(p, id))}
+              onToggleDevice={(id) =>
+                setSelectedDeviceIds((p) => toggleId(p, id))
+              }
+              onToggleSkill={(id) => setSelectedSkillIds((p) => toggleId(p, id))}
+              onToggleAttentionPoint={(id) =>
+                setSelectedAttentionPointIds((p) => toggleId(p, id))
+              }
+              onSelectRecipe={(id) => setSelectedRecipeId(id)}
+              onClearMaterials={() => setSelectedMaterialIds([])}
+              onClearTools={() => setSelectedToolIds([])}
+              onClearDevices={() => setSelectedDeviceIds([])}
+              onClearSkills={() => setSelectedSkillIds([])}
+              onClearAttentionPoints={() => setSelectedAttentionPointIds([])}
             />
           </div>
         </section>

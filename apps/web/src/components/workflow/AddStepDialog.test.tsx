@@ -1,8 +1,28 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ToastProvider } from '@mes/ui'
 import { AddStepDialog } from './AddStepDialog'
 import { useWorkflowStore } from './store'
+
+vi.mock('../../lib/sdk', () => ({
+  sdk: {
+    items: { list: vi.fn().mockResolvedValue({ data: [], total: 0, page: 1, limit: 200, totalPages: 0 }) },
+    tools: { list: vi.fn().mockResolvedValue({ data: [], total: 0, page: 1, limit: 200, totalPages: 0 }) },
+    equipment: { list: vi.fn().mockResolvedValue({ data: [], total: 0, page: 1, limit: 200, totalPages: 0 }) },
+  },
+}))
+
+function withProviders(node: React.ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  })
+  return (
+    <QueryClientProvider client={client}>
+      <ToastProvider>{node}</ToastProvider>
+    </QueryClientProvider>
+  )
+}
 
 function resetStore() {
   useWorkflowStore.setState({
@@ -38,11 +58,7 @@ describe('AddStepDialog', () => {
   })
 
   it('does not render when closed and renders 3-column shell when opened', () => {
-    const { rerender, container } = render(
-      <ToastProvider>
-        <AddStepDialog />
-      </ToastProvider>,
-    )
+    const { rerender, container } = render(withProviders(<AddStepDialog />))
 
     // Closed by default — nothing rendered.
     expect(container.querySelector('[data-add-step-dialog="grid"]')).toBeNull()
@@ -54,11 +70,7 @@ describe('AddStepDialog', () => {
         preselectedKind: 'manual',
       })
     })
-    rerender(
-      <ToastProvider>
-        <AddStepDialog />
-      </ToastProvider>,
-    )
+    rerender(withProviders(<AddStepDialog />))
 
     expect(screen.getByText('Aggiungi Step')).toBeInTheDocument()
     expect(screen.getByText('Step Kind')).toBeInTheDocument()
@@ -80,9 +92,14 @@ describe('AddStepDialog', () => {
     expect(grid).not.toBeNull()
     expect(grid?.querySelectorAll('[data-pane]')).toHaveLength(3)
 
-    // Resource tabs placeholder references PROMPT_PNE_1.
+    // PROMPT_PNE_1 D1: ResourceTabs is mounted in the resources pane (replaces
+    // the old "Selezione risorse — vedi PROMPT_PNE_1" placeholder). Materials
+    // is the default-active tab.
     expect(
-      screen.getByText('Selezione risorse — vedi PROMPT_PNE_1'),
-    ).toBeInTheDocument()
+      document.querySelector('[data-resource-tabs="root"]'),
+    ).not.toBeNull()
+    expect(
+      document.querySelector('[data-resource-tabs-content="materials"]'),
+    ).not.toBeNull()
   })
 })
