@@ -153,6 +153,20 @@
 
 ## 🟡 Medium priority (good to have)
 
+### TODO-038 — Workflow-root metadata editing (tags + defaultWorkCenters)
+
+**Discovered**: 2026-05-02 (during PROMPT_3d D4 — Inspector 3-tab refactor)
+**File**: `apps/web/src/components/workflow/inspector/MetadataTab.tsx` + `apps/web/src/app/(registries)/workflows/[id]/page.tsx`
+**Symptom**: PROMPT_3d §3.5 prescribed editable `tags` (csv) and `defaultWorkCenters` (multi-select) for the **workflow root** metadata view. D4's MetadataTab is read-only and only renders metadata for selected canvas nodes (phase / group / step). The workflow root is not a canvas node today (it's the page-level `workflow` object loaded via `useQuery`), so MetadataTab cannot reach those fields. Editable surface deferred.
+**Acceptance criterion**:
+- Either (a) add a synthetic "workflow root selected" state (e.g., when nothing else is selected, the Inspector shows workflow-root metadata) with an editable form for `tags` + `defaultWorkCenters`, OR (b) hoist workflow-root metadata editing into the page topbar / a dedicated header strip near the PageHeader. Approach (b) is closer to mockup intent (workflow-level meta belongs to the header band, not the side inspector).
+- New SDK endpoint or extension to existing `sdk.workflows.update(id, { tags, defaultWorkCenters })` if not already supported.
+- Audit log entry on save (per ADR-014).
+**Estimated effort**: 2-3 hours (form + endpoint plumbing + tests).
+**Blocker for**: nothing in MVP (the schema fields remain editable via API; just no UI). Owner: F2 / PROMPT_7 (registry detail + workflow detail polish). Could pull earlier if Reflex Allen demo needs to surface these on stage.
+
+---
+
 ### TODO-036 — Decision-step onOk/onNok target fields missing on Step schema
 
 **Discovered**: 2026-05-02 (during PROMPT_3d D3 — canvas refactor)

@@ -8,7 +8,7 @@ import { PageHeader, StatusBadge } from '@mes/ui'
 import { sdk } from '../../../../lib/sdk'
 import { WorkflowCanvas } from '../../../../components/workflow/WorkflowCanvas'
 import { WorkflowPalette } from '../../../../components/workflow/WorkflowPalette'
-import { StepConfigurator } from '../../../../components/workflow/forms/StepConfigurator'
+import { WorkflowInspector } from '../../../../components/workflow/WorkflowInspector'
 import { ValidationPanel } from '../../../../components/workflow/ValidationPanel'
 import { WorkflowValidationProvider } from '../../../../components/workflow/validation-context'
 import { ApproveVersionModal } from '../../../../components/workflow/versioning/ApproveVersionModal'
@@ -158,14 +158,14 @@ export default function WorkflowEditorPage() {
 
           <PanelResizeHandle className="w-1 bg-neutral-200 hover:bg-primary-400 transition-colors cursor-col-resize" />
 
-          {/* Configurator pane — 25% */}
+          {/* Inspector pane — 25% */}
           <Panel defaultSize={25} minSize={20}>
-            <div className="h-full flex flex-col bg-[var(--paper-2)] overflow-y-auto">
-              <div className="px-3 py-2 hairline-b">
-                <span className="uppercase-label">Configuratore</span>
+            <div className="h-full flex flex-col bg-[var(--paper-2)] overflow-hidden">
+              <div className="px-3 py-2 hairline-b shrink-0">
+                <span className="uppercase-label">Inspector</span>
               </div>
-              <div className="flex-1 flex flex-col">
-                <StepConfigurator />
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <WorkflowInspector />
               </div>
             </div>
           </Panel>

@@ -1,17 +1,17 @@
 'use client'
 
 import { useWorkflowStore } from '../store'
-import { ProductionStepForm } from './ProductionStepForm'
-import { QualityControlStepForm } from './QualityControlStepForm'
-import { ScanStepForm } from './ScanStepForm'
-import { LogisticsStepForm } from './LogisticsStepForm'
-import { SetupStepForm } from './SetupStepForm'
-import { RecoveryStepForm } from './RecoveryStepForm'
-import { DecisionStepForm } from './DecisionStepForm'
-import { InformationStepForm } from './InformationStepForm'
-import { TeardownStepForm } from './TeardownStepForm'
-import { PhaseConfigurator } from './PhaseConfigurator'
-import { GroupConfigurator } from './GroupConfigurator'
+import { ProductionStepForm } from '../forms/ProductionStepForm'
+import { QualityControlStepForm } from '../forms/QualityControlStepForm'
+import { ScanStepForm } from '../forms/ScanStepForm'
+import { LogisticsStepForm } from '../forms/LogisticsStepForm'
+import { SetupStepForm } from '../forms/SetupStepForm'
+import { RecoveryStepForm } from '../forms/RecoveryStepForm'
+import { DecisionStepForm } from '../forms/DecisionStepForm'
+import { InformationStepForm } from '../forms/InformationStepForm'
+import { TeardownStepForm } from '../forms/TeardownStepForm'
+import { PhaseConfigurator } from '../forms/PhaseConfigurator'
+import { GroupConfigurator } from '../forms/GroupConfigurator'
 
 const STEP_CATEGORY = {
   PRODUCTION: 'production',
@@ -25,7 +25,7 @@ const STEP_CATEGORY = {
   RECOVERY: 'recovery',
 } as const
 
-function EmptyState({ message }: { message: string }) {
+function EmptyMessage({ message }: { message: string }) {
   return (
     <div className="flex-1 flex items-center justify-center text-neutral-400 text-xs p-4 text-center">
       {message}
@@ -33,18 +33,24 @@ function EmptyState({ message }: { message: string }) {
   )
 }
 
-export function StepConfigurator() {
+/**
+ * PropertiesTab — extracts the existing form-router from
+ * forms/StepConfigurator.tsx verbatim so the 9 step forms + Phase + Group
+ * configurators continue to work unchanged. PROMPT_3d D4 wraps it in a Tabs
+ * container; behaviour, validation and save flow are untouched.
+ */
+export function PropertiesTab() {
   const selectedNodeId = useWorkflowStore((s) => s.selectedNodeId)
   const selectedNodeType = useWorkflowStore((s) => s.selectedNodeType)
   const nodes = useWorkflowStore((s) => s.nodes)
 
   if (!selectedNodeId) {
-    return <EmptyState message="Seleziona un nodo per configurarlo" />
+    return <EmptyMessage message="Seleziona un nodo per configurarlo" />
   }
 
   const node = nodes.find((n) => n.id === selectedNodeId)
   if (!node) {
-    return <EmptyState message="Nodo non trovato" />
+    return <EmptyMessage message="Nodo non trovato" />
   }
 
   if (selectedNodeType === 'phaseNode') {
@@ -56,7 +62,7 @@ export function StepConfigurator() {
   }
 
   if (selectedNodeType !== 'stepNode') {
-    return <EmptyState message="Tipo di nodo non supportato" />
+    return <EmptyMessage message="Tipo di nodo non supportato" />
   }
 
   const category = node.data['category'] as string | undefined
@@ -82,7 +88,7 @@ export function StepConfigurator() {
       return <RecoveryStepForm nodeId={node.id} data={node.data} />
     default:
       return (
-        <EmptyState
+        <EmptyMessage
           message={`Configuratore non disponibile per la categoria "${category ?? '—'}".`}
         />
       )
