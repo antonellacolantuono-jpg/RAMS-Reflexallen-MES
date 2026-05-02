@@ -153,6 +153,38 @@
 
 ## 🟡 Medium priority (good to have)
 
+### TODO-036 — Decision-step onOk/onNok target fields missing on Step schema
+
+**Discovered**: 2026-05-02 (during PROMPT_3d D3 — canvas refactor)
+**File**: `packages/prisma/schema.prisma` (`Step` model) + `apps/web/src/components/workflow/WorkflowCanvas.tsx` (`buildGraph` edge emission)
+**Symptom**: PROMPT_3d §3.3 calls for explicit decision-edge rendering in the workflow canvas — when a step has category `decision`, two edges should render: `onOk` (success branch → next phase / next step) and `onNok` (failure branch → recovery sub-flow). The current `Step` Prisma model has no fields to capture these targets, so D3 ships without explicit decision-edge rendering. Sequential edges between decision steps and their immediate next sibling continue to render unchanged.
+**Acceptance criterion**:
+- Schema change: `Step.onOkTargetId String?` + `Step.onNokTargetId String?` (or polymorphic — could target a step OR a phase). Migration required. Explicit product confirmation needed before touching schema.
+- `buildGraph` in `WorkflowCanvas.tsx` emits 2 additional edges per decision step (with edge type `decision-ok` / `decision-nok`); new edge components rendered with green / red tones (per CanvasEdge `tone='ok'` / `'bad'` mapping).
+- DecisionStepForm (already exists) extends with onOk/onNok target selectors.
+- Validation: a decision step without populated targets emits a workflow validation error.
+**Estimated effort**: 3-4 hours (schema + migration + buildGraph + edge components + form fields + validation)
+**Blocker for**: nothing in MVP. Owner: F2 (PROMPT_7) or earlier if PROMPT_PNE_2 seed needs decision branches for recovery flows. Wait for product confirmation before schema work.
+
+---
+
+### TODO-037 — @mes/ui CanvasEdge cannot drop directly into React Flow as a custom edge
+
+**Discovered**: 2026-05-02 (during PROMPT_3d D3 — edge restyle)
+**File**: `packages/ui/src/components/canvas/edge.tsx` + `apps/web/src/components/workflow/edges/SequentialEdge.tsx`
+**Symptom**: PROMPT_3d §3.3 D3 said "Replace edge type 'sequential' with `<CanvasEdge>` from `@mes/ui`". The DS_LIFT `CanvasEdge` component takes `from`/`to` endpoint props (standalone use) and renders its own positioning. React Flow custom edges, by contrast, must accept `EdgeProps` (sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, etc.) and use React Flow's path helpers (`getBezierPath`, `getSmoothStepPath`). The two APIs are not directly compatible. D3 keeps `SequentialEdge` as a React Flow custom edge but visually aligned to CanvasEdge (same stroke colour `var(--ink-3)`, same width 1.25px, same bezier curve).
+**Acceptance criterion** (option A — harmonize):
+- Add an `EdgeProps`-compatible variant export from `@mes/ui` (e.g., `CanvasEdgeReactFlow`) that accepts React Flow-style props and internally calls `getBezierPath` / `getSmoothStepPath` then renders a path with the DS_LIFT tones + arrow markers.
+- Web app's `SequentialEdge` is replaced by importing this from `@mes/ui` directly.
+**Acceptance criterion** (option B — document asymmetry):
+- Add a section to `docs/CONVENTIONS.md` (or design tokens doc) noting that `@mes/ui` Canvas Edge is for STANDALONE diagrams (dashboard widgets, mini-flow renders), NOT React Flow integration. Workflow editor uses local React Flow custom edges that mirror the CanvasEdge visual specification.
+- Update `STATUS.md` reference list with the asymmetry as an architectural decision.
+**Recommendation**: option B (document asymmetry) for MVP — the visual outcome is equivalent; option A is engineering polish for F2/F3.
+**Estimated effort**: option A 2-3 hours (new variant + tests); option B 30 min (docs).
+**Blocker for**: nothing. Polish.
+
+---
+
 ### TODO-027 — PROMPT_4_PHASE_2: wire AutoGenEngine to entity creation flows
 
 **Discovered**: 2026-05-01 (during PROMPT_4 scope decision — Q1 / Strategia A)

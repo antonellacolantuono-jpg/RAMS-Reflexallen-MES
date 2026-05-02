@@ -5,13 +5,13 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
-  Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useViewport,
 } from '@xyflow/react'
 import type { Node, Edge } from '@xyflow/react'
+import { Pencil, MousePointer2, Plus, Workflow as WorkflowIcon } from 'lucide-react'
 import type { WorkflowModel } from '@mes/sdk'
 import { sdk } from '../../lib/sdk'
 import { useWorkflowStore } from './store'
@@ -22,13 +22,19 @@ import { StepNode } from './nodes/StepNode'
 import { SequentialEdge } from './edges/SequentialEdge'
 import { CanvasContextMenu, type CanvasContextMenuState } from './CanvasContextMenu'
 import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
-import { useToast } from '@mes/ui'
+import {
+  CanvasToolbar,
+  CanvasStateBar,
+  ZoomControls,
+  useToast,
+} from '@mes/ui'
 import {
   isStepCategoryAllowedInGroup,
   mapPaletteCategoryToStepCategory,
   type StepCategoryId,
   type StepKindId,
 } from '@mes/domain'
+import { applyPhaseColumnsLayout } from './canvas-layout'
 
 const nodeTypes = {
   phaseNode: PhaseNode,
@@ -217,7 +223,7 @@ function CanvasInner({
     openAddStepDialog,
   } = useWorkflowStore()
   const toast = useToast()
-  const { screenToFlowPosition, setCenter } = useReactFlow()
+  const { screenToFlowPosition, setCenter, zoomIn, zoomOut, fitView } = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
@@ -284,7 +290,7 @@ function CanvasInner({
 
   useEffect(() => {
     const { nodes: rawNodes, edges: rawEdges } = buildGraph(workflow)
-    const laid = applyDagreLayout(rawNodes, rawEdges)
+    const laid = applyPhaseColumnsLayout(rawNodes)
     setNodes(laid)
     setEdges(rawEdges)
   }, [workflow, setNodes, setEdges])
@@ -423,16 +429,66 @@ function CanvasInner({
   )
 
   const isEmpty = nodes.length === 0
+  const { zoom } = useViewport()
+  const zoomPercent = Math.round(zoom * 100)
+  const isDirty = useWorkflowStore((s) => s.isDirty)
+
+  const stateBarTone: 'ok' | 'warn' | 'neutral' =
+    saveStatus === 'saving'
+      ? 'warn'
+      : saveStatus === 'saved'
+        ? 'ok'
+        : isDirty
+          ? 'warn'
+          : 'neutral'
+  const stateBarStatus =
+    saveStatus === 'saving'
+      ? 'Salvataggio…'
+      : saveStatus === 'saved' && lastSavedAt
+        ? `Salvato ${lastSavedAt}`
+        : isDirty
+          ? 'Modifiche non salvate'
+          : 'Nessuna modifica'
+  const stepCount = nodes.filter((n) => n.type === 'stepNode').length
+  const counts = `${nodes.length} nodi · ${edges.length} archi · ${stepCount} step`
+
+  const toolbarTools = [
+    { id: 'select', icon: MousePointer2, label: 'Seleziona', active: true },
+    {
+      id: 'pan',
+      icon: WorkflowIcon,
+      label: 'Pan',
+      onClick: () => {
+        // React Flow pan is on by default with middle-mouse / space — this
+        // toggle is a placeholder for an explicit pan mode in F2.
+      },
+    },
+    {
+      id: 'add',
+      icon: Plus,
+      label: 'Aggiungi',
+      onClick: () => {
+        toast.show('Aggiungi: usa il pulsante "Aggiungi Fase" sul topbar (D5)', 'info')
+      },
+    },
+    {
+      id: 'annotate',
+      icon: Pencil,
+      label: 'Annota',
+      onClick: () => {
+        toast.show('Annotazioni — disponibile in F2', 'info')
+      },
+    },
+  ]
 
   return (
     <div className="relative w-full h-full">
-      {saveStatus !== 'idle' && (
-        <div className="absolute top-2 right-2 z-10 text-[10px] text-neutral-500 bg-white/80 backdrop-blur-sm px-2 py-1 rounded shadow-sm pointer-events-none">
-          {saveStatus === 'saving' && 'Salvataggio...'}
-          {saveStatus === 'saved' && lastSavedAt && `Salvato alle ${lastSavedAt}`}
-        </div>
-      )}
-      <div className="w-full h-full" onDragOver={onDragOver} onDrop={onDrop}>
+      <div
+        className="w-full h-full"
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        data-canvas="phase-columns"
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -456,17 +512,25 @@ function CanvasInner({
             })
           }}
           fitView
+          minZoom={0.25}
+          maxZoom={2}
         >
-          <Background />
-          <Controls />
-          <MiniMap />
+          <Background gap={16} size={0.6} color="var(--ink-3)" />
         </ReactFlow>
       </div>
+      <CanvasToolbar tools={toolbarTools} />
+      <CanvasStateBar tone={stateBarTone} status={stateBarStatus} counts={counts} />
+      <ZoomControls
+        zoomPercent={zoomPercent}
+        onZoomIn={() => zoomIn()}
+        onZoomOut={() => zoomOut()}
+        onFit={() => fitView()}
+      />
       <CanvasContextMenu state={contextMenu} onClose={() => setContextMenu(null)} />
       {isEmpty && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <p className="text-neutral-400 text-xs text-center">
-            Trascina una Fase dalla palette per iniziare
+            Aggiungi una Fase dal topbar per iniziare
           </p>
         </div>
       )}

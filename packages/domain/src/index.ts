@@ -121,3 +121,12 @@ export type {
   GroupCategory,
   SchemaStepCategory,
 } from './rules/workflow-compatibility.rules'
+
+// workflow-layout rules (D3 of PROMPT_3d)
+export { layoutPhaseColumns } from './rules/workflow-layout.rules'
+export type {
+  LayoutNode,
+  LayoutNodeKind,
+  LayoutPosition,
+  LayoutOptions,
+} from './rules/workflow-layout.rules'
