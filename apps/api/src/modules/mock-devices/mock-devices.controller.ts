@@ -1,11 +1,11 @@
-// PROMPT_PNE_3 D1 — REST endpoints for the mock device demo controls.
+// PROMPT_PNE_3 D2 — REST endpoints for the mock device demo controls.
+//
+// Routes live under /api/internal/* (debug-only namespace) per user spec to
+// distinguish demo/debug surfaces from the production REST surface.
 //
 // Gated on DEMO_MODE=true. When DEMO_MODE is unset or false, every endpoint
 // returns 404 (route invisible to production callers). Production builds MUST
 // refuse to start with DEMO_MODE unset — see main.ts boot guard.
-//
-// Auth: mirrors the rest of the API (JwtAuthGuard). Demo-mode does NOT mean
-// "no auth" — it just means the simulators are wired in.
 
 import {
   BadRequestException,
@@ -22,14 +22,18 @@ import {
 import { JwtAuthGuard } from '../auth/jwt.guard'
 import { DemoControllerService } from './demo-controller.service'
 import { MockLeakTesterService } from './mock-leak-tester.service'
+import { MockCameraTesterService } from './mock-camera-tester.service'
+import { MockCrimpPressService } from './mock-crimp-press.service'
 import { ALL_OUTCOMES, type DeviceOutcome, type MockDevice } from './types'
 
-@Controller('mock-devices')
+@Controller('internal/mock-devices')
 @UseGuards(JwtAuthGuard)
 export class MockDevicesController {
   constructor(
     private readonly demo: DemoControllerService,
     private readonly leakTester: MockLeakTesterService,
+    private readonly cameraTester: MockCameraTesterService,
+    private readonly crimpPress: MockCrimpPressService,
   ) {}
 
   @Get()
@@ -38,15 +42,15 @@ export class MockDevicesController {
     return { devices: this.allDevices().map((d) => d.getStatus()) }
   }
 
-  @Get(':deviceCode/status')
+  @Get(':deviceCode')
   status(@Param('deviceCode') deviceCode: string) {
     this.ensureDemoMode()
     return { device: this.resolveDevice(deviceCode).getStatus() }
   }
 
-  @Post(':deviceCode/next-outcome')
+  @Post(':deviceCode/override-next')
   @HttpCode(HttpStatus.OK)
-  setNextOutcome(@Param('deviceCode') deviceCode: string, @Body() body: unknown) {
+  overrideNext(@Param('deviceCode') deviceCode: string, @Body() body: unknown) {
     this.ensureDemoMode()
     const device = this.resolveDevice(deviceCode)
     const outcome = parseOutcomeBody(body, device.supportedOutcomes)
@@ -57,9 +61,9 @@ export class MockDevicesController {
     }
   }
 
-  @Post(':deviceCode/start-test')
+  @Post(':deviceCode/start-cycle')
   @HttpCode(HttpStatus.ACCEPTED)
-  startTest(@Param('deviceCode') deviceCode: string, @Body() body: unknown) {
+  startCycle(@Param('deviceCode') deviceCode: string, @Body() body: unknown) {
     this.ensureDemoMode()
     const device = this.resolveDevice(deviceCode)
     const stepExecutionId = parseStepExecutionId(body)
@@ -78,7 +82,7 @@ export class MockDevicesController {
   }
 
   private allDevices(): MockDevice[] {
-    return [this.leakTester]
+    return [this.leakTester, this.cameraTester, this.crimpPress]
   }
 
   private resolveDevice(deviceCode: string): MockDevice {
