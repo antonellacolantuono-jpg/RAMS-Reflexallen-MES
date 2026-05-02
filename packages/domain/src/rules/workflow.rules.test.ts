@@ -5,6 +5,7 @@ import {
   canTransition,
   extractErrorNodeIds,
   groupErrorsByNodeId,
+  issueToNodeId,
 } from './workflow.rules'
 import type {
   WorkflowStructure,
@@ -484,5 +485,27 @@ describe('canTransition', () => {
 
   it('unknown → approved is invalid', () => {
     expect(canTransition('unknown', 'approved')).toBe(false)
+  })
+})
+
+describe('issueToNodeId', () => {
+  it('extracts the node id for phase / group / step scoped errors', () => {
+    expect(
+      issueToNodeId({ field: 'phase.p-123.groups', message: 'no groups' }),
+    ).toBe('p-123')
+    expect(
+      issueToNodeId({ field: 'group.g-abc.steps', message: 'no steps' }),
+    ).toBe('g-abc')
+    expect(
+      issueToNodeId({ field: 'step.s-42.skillId', message: 'unknown skill' }),
+    ).toBe('s-42')
+  })
+
+  it('returns null for workflow-level or unparsable error fields', () => {
+    expect(
+      issueToNodeId({ field: 'phases', message: 'workflow must have a phase' }),
+    ).toBeNull()
+    expect(issueToNodeId({ field: '', message: '' })).toBeNull()
+    expect(issueToNodeId({ field: 'foo.bar.baz', message: 'unknown' })).toBeNull()
   })
 })

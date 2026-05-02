@@ -36,6 +36,19 @@ export interface AddStepDialogState {
   preselectedCategory: StepCategoryId | null
 }
 
+export interface AddPhaseDrawerState {
+  open: boolean
+}
+
+export interface AddGroupModalState {
+  open: boolean
+  phaseId: string | null
+}
+
+export interface ValidateDrawerState {
+  open: boolean
+}
+
 interface WorkflowCanvasStore {
   nodes: Node[]
   edges: Edge[]
@@ -47,6 +60,10 @@ interface WorkflowCanvasStore {
   dragSource: PaletteDragSource | null
   // Add Step shell dialog state (D2 — full shell, full content in PNE_1).
   addStepDialog: AddStepDialogState
+  // Add Phase / Add Group / Validate dialog states (D5).
+  addPhaseDrawer: AddPhaseDrawerState
+  addGroupModal: AddGroupModalState
+  validateDrawer: ValidateDrawerState
   // Callbacks registered by WorkflowCanvas so the configurator forms can
   // mutate the canvas's local React Flow state and trigger the auto-save
   // debounce without forms importing the canvas component.
@@ -100,6 +117,30 @@ interface WorkflowCanvasStore {
       instructions?: string | null
     },
   ) => string
+  // Append a new phase node (column) at the end + chain edge from previous.
+  addPhaseNode: (payload: {
+    label: string
+    category: string
+    isCycleBased: boolean
+    tags?: string[]
+  }) => string
+  // Append a new group node under the given phase + chain edge from prev sibling.
+  addGroupNodeToPhase: (
+    phaseId: string,
+    payload: {
+      label: string
+      category: string
+      supportsParallel: boolean
+      supportsRecovery: boolean
+    },
+  ) => string
+  // D5 dialog actions.
+  openAddPhaseDrawer: () => void
+  closeAddPhaseDrawer: () => void
+  openAddGroupModal: (phaseId: string) => void
+  closeAddGroupModal: () => void
+  openValidateDrawer: () => void
+  closeValidateDrawer: () => void
 }
 
 function newId(): string {
@@ -123,6 +164,9 @@ export const useWorkflowStore = create<WorkflowCanvasStore>((set, get) => ({
     preselectedKind: null,
     preselectedCategory: null,
   },
+  addPhaseDrawer: { open: false },
+  addGroupModal: { open: false, phaseId: null },
+  validateDrawer: { open: false },
   canvasSetNodes: null,
   triggerAutoSave: null,
   scrollToNode: null,
@@ -300,6 +344,92 @@ export const useWorkflowStore = create<WorkflowCanvasStore>((set, get) => ({
     const newEdge: Edge = {
       id: `e-${groupId}-${id}`,
       source: groupId,
+      target: id,
+      type: 'sequential',
+    }
+    set({
+      nodes: updater(nodes),
+      edges: [...edges, newEdge],
+      isDirty: true,
+    })
+    canvasSetNodes?.(updater)
+    triggerAutoSave?.()
+    return id
+  },
+  addPhaseNode: (payload) => {
+    const { nodes, edges, canvasSetNodes, triggerAutoSave } = get()
+    get().pushHistory()
+    const id = newId()
+    const phaseNodes = nodes.filter((n) => n.type === 'phaseNode')
+    const order = phaseNodes.length + 1
+    const newNode: Node = {
+      id,
+      type: 'phaseNode',
+      position: { x: 0, y: 0 },
+      data: {
+        label: payload.label,
+        category: payload.category,
+        order,
+        isCycleBased: payload.isCycleBased,
+        ...(payload.tags && payload.tags.length > 0 ? { tags: payload.tags } : {}),
+      },
+    }
+    const updater = (ns: Node[]) => [...ns, newNode]
+    const lastPhase = phaseNodes.at(-1)
+    const newEdges: Edge[] = lastPhase
+      ? [
+          {
+            id: `e-${lastPhase.id}-${id}`,
+            source: lastPhase.id,
+            target: id,
+            type: 'sequential',
+          },
+        ]
+      : []
+    set({
+      nodes: updater(nodes),
+      edges: [...edges, ...newEdges],
+      isDirty: true,
+    })
+    canvasSetNodes?.(updater)
+    triggerAutoSave?.()
+    return id
+  },
+  openAddPhaseDrawer: () => set({ addPhaseDrawer: { open: true } }),
+  closeAddPhaseDrawer: () => set({ addPhaseDrawer: { open: false } }),
+  openAddGroupModal: (phaseId) => set({ addGroupModal: { open: true, phaseId } }),
+  closeAddGroupModal: () => set({ addGroupModal: { open: false, phaseId: null } }),
+  openValidateDrawer: () => set({ validateDrawer: { open: true } }),
+  closeValidateDrawer: () => set({ validateDrawer: { open: false } }),
+  addGroupNodeToPhase: (phaseId, payload) => {
+    const { nodes, edges, canvasSetNodes, triggerAutoSave } = get()
+    const phase = nodes.find((n) => n.id === phaseId && n.type === 'phaseNode')
+    if (!phase) return ''
+    get().pushHistory()
+    const id = newId()
+    const siblingGroups = nodes.filter(
+      (n) => n.type === 'groupNode' && n.data['parentId'] === phaseId,
+    )
+    const order = siblingGroups.length + 1
+    const newNode: Node = {
+      id,
+      type: 'groupNode',
+      position: { x: 0, y: 0 },
+      data: {
+        label: payload.label,
+        category: payload.category,
+        order,
+        parentId: phaseId,
+        supportsParallel: payload.supportsParallel,
+        supportsRecovery: payload.supportsRecovery,
+      },
+    }
+    const updater = (ns: Node[]) => [...ns, newNode]
+    const lastSibling = siblingGroups.at(-1)
+    const sourceEdgeFrom = lastSibling?.id ?? phaseId
+    const newEdge: Edge = {
+      id: `e-${sourceEdgeFrom}-${id}`,
+      source: sourceEdgeFrom,
       target: id,
       type: 'sequential',
     }

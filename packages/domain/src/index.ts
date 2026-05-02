@@ -36,6 +36,7 @@ export {
   canTransition,
   extractErrorNodeIds,
   groupErrorsByNodeId,
+  issueToNodeId,
 } from './rules/workflow.rules'
 export type {
   ValidationError,

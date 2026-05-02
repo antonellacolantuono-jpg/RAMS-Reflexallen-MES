@@ -15,6 +15,10 @@ import { ApproveVersionModal } from '../../../../components/workflow/versioning/
 import { DeprecateVersionModal } from '../../../../components/workflow/versioning/DeprecateVersionModal'
 import { VersionHistorySidebar } from '../../../../components/workflow/versioning/VersionHistorySidebar'
 import { AddStepDialog } from '../../../../components/workflow/AddStepDialog'
+import { AddPhaseDrawer } from '../../../../components/workflow/AddPhaseDrawer'
+import { AddGroupModal } from '../../../../components/workflow/AddGroupModal'
+import { ValidateDrawer } from '../../../../components/workflow/ValidateDrawer'
+import { useWorkflowStore } from '../../../../components/workflow/store'
 
 export default function WorkflowEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -22,6 +26,14 @@ export default function WorkflowEditorPage() {
   const [approveOpen, setApproveOpen] = useState(false)
   const [deprecateOpen, setDeprecateOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const addPhaseDrawer = useWorkflowStore((s) => s.addPhaseDrawer)
+  const closeAddPhaseDrawer = useWorkflowStore((s) => s.closeAddPhaseDrawer)
+  const openAddPhaseDrawer = useWorkflowStore((s) => s.openAddPhaseDrawer)
+  const addGroupModal = useWorkflowStore((s) => s.addGroupModal)
+  const closeAddGroupModal = useWorkflowStore((s) => s.closeAddGroupModal)
+  const validateDrawer = useWorkflowStore((s) => s.validateDrawer)
+  const closeValidateDrawer = useWorkflowStore((s) => s.closeValidateDrawer)
+  const openValidateDrawer = useWorkflowStore((s) => s.openValidateDrawer)
 
   const { data: workflow, isLoading } = useQuery({
     queryKey: ['workflows', id],
@@ -79,6 +91,20 @@ export default function WorkflowEditorPage() {
               {versionStatus}
             </StatusBadge>
           )}
+          <button
+            type="button"
+            onClick={() => openAddPhaseDrawer()}
+            className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700"
+          >
+            + Aggiungi Fase
+          </button>
+          <button
+            type="button"
+            onClick={() => openValidateDrawer()}
+            className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          >
+            Valida
+          </button>
           {versionStatus === 'draft' && (
             <button
               type="button"
@@ -203,6 +229,19 @@ export default function WorkflowEditorPage() {
         </>
       )}
       <AddStepDialog />
+      <AddPhaseDrawer
+        open={addPhaseDrawer.open}
+        onClose={closeAddPhaseDrawer}
+      />
+      <AddGroupModal
+        open={addGroupModal.open}
+        onClose={closeAddGroupModal}
+        phaseId={addGroupModal.phaseId}
+      />
+      <ValidateDrawer
+        open={validateDrawer.open}
+        onClose={closeValidateDrawer}
+      />
     </div>
     </WorkflowValidationProvider>
   )

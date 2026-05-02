@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { cn } from '../utils/cn'
 
-export type EmptyStateKind = 'select' | 'no-data' | 'no-results' | 'error'
+export type EmptyStateKind = 'select' | 'no-data' | 'no-results' | 'error' | 'success'
 
 export interface EmptyStateCTA {
   label: string
@@ -59,6 +59,8 @@ function Illust({ kind }: { kind: EmptyStateKind }) {
       return <DataSvg />
     case 'error':
       return <ErrorSvg />
+    case 'success':
+      return <SuccessSvg />
   }
 }
 
@@ -109,6 +111,28 @@ function ErrorSvg() {
     <svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden>
       <path d="M32 8L4 56h56L32 8z" stroke="var(--bad)" strokeWidth="1.5" strokeLinejoin="round" />
       <path d="M32 28v12M32 48v.5" stroke="var(--bad)" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function SuccessSvg() {
+  return (
+    <svg
+      width="64"
+      height="64"
+      viewBox="0 0 64 64"
+      fill="none"
+      aria-hidden
+      data-empty-state-illust="success"
+    >
+      <circle cx="32" cy="32" r="22" stroke="var(--ok)" strokeWidth="1.5" />
+      <path
+        d="M22 32l7 7 14-14"
+        stroke="var(--ok)"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }

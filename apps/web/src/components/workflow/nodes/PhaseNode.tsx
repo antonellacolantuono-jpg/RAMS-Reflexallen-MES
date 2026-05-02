@@ -1,5 +1,7 @@
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps, Node } from '@xyflow/react'
+import { Plus } from 'lucide-react'
+import { useWorkflowStore } from '../store'
 import { NodeErrorBadge } from './NodeErrorBadge'
 
 export type PhaseNodeData = {
@@ -38,6 +40,7 @@ export function PhaseNode({ id, data }: NodeProps<PhaseNodeType>) {
     }
   const icon = PHASE_ICONS[data.category] ?? '◼'
   const phaseCode = `PH-${String(data.order).padStart(2, '0')}`
+  const openAddGroupModal = useWorkflowStore((s) => s.openAddGroupModal)
 
   return (
     <div
@@ -61,6 +64,18 @@ export function PhaseNode({ id, data }: NodeProps<PhaseNodeType>) {
               </span>
             )}
             <NodeErrorBadge nodeId={id} />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                openAddGroupModal(id)
+              }}
+              title="Aggiungi gruppo"
+              aria-label="Aggiungi gruppo"
+              className="rounded bg-white/70 hover:bg-white border border-current/30 p-0.5 text-neutral-600 hover:text-primary-700"
+            >
+              <Plus size={11} />
+            </button>
           </span>
         </div>
         <div className="mt-1 flex items-start gap-2">

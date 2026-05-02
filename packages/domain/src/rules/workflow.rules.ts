@@ -148,6 +148,19 @@ export function extractErrorNodeIds(result: ValidationResult): ErrorNodeIds {
 }
 
 /**
+ * Resolves a single ValidationError to the node id it points at, or `null`
+ * for workflow-level errors (e.g., "phases" → no specific node). Used by
+ * the ValidateDrawer click-to-navigate helper to scroll the offending node
+ * into view.
+ */
+export function issueToNodeId(error: ValidationError): string | null {
+  const match = /^(phase|group|step)\.([^.]+)/.exec(error.field)
+  if (!match) return null
+  const id = match[2]
+  return id ?? null
+}
+
+/**
  * Returns the per-error messages indexed by the node id they refer to.
  * Used by inline badges/tooltips on canvas nodes.
  */

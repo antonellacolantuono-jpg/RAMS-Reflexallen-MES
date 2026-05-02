@@ -13,9 +13,14 @@ export interface CanvasContextMenuState {
 export interface CanvasContextMenuProps {
   state: CanvasContextMenuState | null
   onClose: () => void
+  onAddGroupRequested?: ((phaseId: string) => void) | undefined
 }
 
-export function CanvasContextMenu({ state, onClose }: CanvasContextMenuProps) {
+export function CanvasContextMenu({
+  state,
+  onClose,
+  onAddGroupRequested,
+}: CanvasContextMenuProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const deleteNode = useWorkflowStore((s) => s.deleteNode)
   const duplicateNode = useWorkflowStore((s) => s.duplicateNode)
@@ -41,6 +46,7 @@ export function CanvasContextMenu({ state, onClose }: CanvasContextMenuProps) {
 
   const isStep = state.nodeType === 'stepNode'
   const isGroup = state.nodeType === 'groupNode'
+  const isPhase = state.nodeType === 'phaseNode'
 
   return (
     <div
@@ -49,6 +55,19 @@ export function CanvasContextMenu({ state, onClose }: CanvasContextMenuProps) {
       className="fixed z-50 min-w-[180px] rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
       style={{ top: state.y, left: state.x }}
     >
+      {isPhase && onAddGroupRequested && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onAddGroupRequested(state.nodeId)
+            onClose()
+          }}
+          className="block w-full px-3 py-1.5 text-left text-sm text-neutral-800 hover:bg-neutral-100"
+        >
+          Aggiungi Gruppo
+        </button>
+      )}
       {isGroup && (
         <button
           type="button"

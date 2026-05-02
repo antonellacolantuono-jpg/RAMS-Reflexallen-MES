@@ -49,4 +49,25 @@ describe('EmptyState', () => {
     expect(container.firstChild).toHaveClass('p-6')
     expect(container.firstChild).not.toHaveClass('p-12')
   })
+
+  it('renders the success illustration when kind="success"', () => {
+    const { container } = render(
+      <EmptyState
+        kind="success"
+        title="Workflow valido"
+        body="Pronto per la pubblicazione"
+      />,
+    )
+    const illust = container.querySelector('[data-empty-state-illust="success"]')
+    expect(illust).not.toBeNull()
+    expect(screen.getByText('Workflow valido')).toBeInTheDocument()
+    expect(screen.getByText('Pronto per la pubblicazione')).toBeInTheDocument()
+  })
+
+  it('paints the success illustration with the ok tone (var(--ok))', () => {
+    const { container } = render(<EmptyState kind="success" title="OK" />)
+    const illust = container.querySelector('[data-empty-state-illust="success"]')
+    const stroked = illust?.querySelectorAll('[stroke="var(--ok)"]')
+    expect(stroked && stroked.length).toBeGreaterThanOrEqual(2)
+  })
 })

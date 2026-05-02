@@ -221,6 +221,7 @@ function CanvasInner({
     registerCanvasCallbacks,
     unregisterCanvasCallbacks,
     openAddStepDialog,
+    openAddGroupModal,
   } = useWorkflowStore()
   const toast = useToast()
   const { screenToFlowPosition, setCenter, zoomIn, zoomOut, fitView } = useReactFlow()
@@ -526,7 +527,11 @@ function CanvasInner({
         onZoomOut={() => zoomOut()}
         onFit={() => fitView()}
       />
-      <CanvasContextMenu state={contextMenu} onClose={() => setContextMenu(null)} />
+      <CanvasContextMenu
+        state={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onAddGroupRequested={(phaseId) => openAddGroupModal(phaseId)}
+      />
       {isEmpty && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <p className="text-neutral-400 text-xs text-center">
