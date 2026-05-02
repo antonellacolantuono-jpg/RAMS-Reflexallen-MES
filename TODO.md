@@ -473,6 +473,22 @@ WARNING  no output files found for task @mes/storage#build. Please check your `o
 
 ---
 
+### TODO-033 — P7/P9: write adapter audit-log API row → AuditTimelineEntry
+
+**Discovered**: 2026-05-02 (during PROMPT_DS_LIFT D5 — AuditTimeline primitive lift)
+**File**: future `apps/web/src/lib/audit-log-adapter.ts` + first AuditTimeline callsite in P7 (registry detail) or P9 (WO Detail BO)
+**Symptom**: D5 ships `AuditTimeline` as a UI primitive in @mes/ui with its own `AuditTimelineEntry` shape: `{ id, at: Date, actor, action, entity?, diff?: AuditDiffLine[], tone? }`. The existing `AuditEntry` type (from `ActivityFeed.tsx`, used by `items/[id]/page.tsx`) has a different shape — `{ changedBy, createdAt, ... }` — closer to the API audit_log row shape. Both types coexist **intentionally**: AuditTimeline is the new primitive for richer detail views (with diffs and tone-coloured timeline dots), ActivityFeed is the legacy compact list. Wiring AuditTimeline to real audit-log API rows requires an adapter.
+**Acceptance criterion**:
+- New util `mapAuditLogRowToTimelineEntry(row)` in `apps/web/src/lib/audit-log-adapter.ts` (or similar) that maps the SDK audit-log row shape to `AuditTimelineEntry`. Inputs come from `sdk.auditLog.list(...)` (define endpoint if not present); output drives AuditTimeline.
+- `tone` mapping: state changes → ok, overrides → warn, NCR/scrap → bad, comments → info, system events → neutral.
+- `diff` mapping: when the row's `before` and `after` JSON columns contain materialised changes, derive `AuditDiffLine[]` per top-level key; skip empty diffs.
+- First callsite (P7 registry detail OR P9 WO Detail) renders the new AuditTimeline driven by the adapter; verify with at least 5 audit-log rows in seed data.
+- **Do NOT delete** any `ActivityFeed` callsites in `items/[id]/page.tsx` (or anywhere else) until the adapter is wired and the new AuditTimeline rendering is tested. Both types coexist intentionally during the migration window.
+**Estimated effort**: 1-2 hours (adapter + first callsite + test).
+**Blocker for**: nothing currently. Lights up the AuditTimeline primitive once detail pages need richer audit views than ActivityFeed provides.
+
+---
+
 ### TODO-032 — Audit existing useToast() callsites after Toast.tsx no-op stub fix
 
 **Discovered**: 2026-05-02 (during PROMPT_DS_LIFT D1 — Toast component audit)

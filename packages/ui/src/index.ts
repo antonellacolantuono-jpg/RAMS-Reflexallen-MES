@@ -85,6 +85,20 @@ export type { AlertBannerProps, AlertBannerTone } from './components/alert-banne
 export { LiveAlert } from './components/live-alert'
 export type { LiveAlertProps, LiveAlertTone } from './components/live-alert'
 
+export { DetailHeader } from './components/detail-header'
+export type { DetailHeaderProps } from './components/detail-header'
+
+export { DetailBody } from './components/detail-body'
+export type { DetailBodyProps } from './components/detail-body'
+
+export { AuditTimeline } from './components/audit-timeline'
+export type {
+  AuditTimelineProps,
+  AuditTimelineEntry,
+  AuditDiffLine,
+  AuditTone,
+} from './components/audit-timeline'
+
 export { Skeleton } from './components/Skeleton'
 export type { SkeletonProps } from './components/Skeleton'
 
@@ -98,7 +112,7 @@ export { KPI } from './components/KPI'
 export type { KPIProps, KPITone, KPITrend } from './components/KPI'
 
 export { Tabs } from './components/Tabs'
-export type { TabsProps, Tab } from './components/Tabs'
+export type { TabsProps, Tab, TabDot } from './components/Tabs'
 
 export { Field } from './components/Field'
 export type { FieldProps } from './components/Field'
