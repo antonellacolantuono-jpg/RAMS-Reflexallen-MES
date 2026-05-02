@@ -22,6 +22,7 @@ import { seedFaultCodes } from './pneumatic-data/fault-codes'
 import { seedAttentionPoints } from './pneumatic-data/attention-points'
 import { seedWorkOrderDraft, releaseWorkOrder } from './pneumatic-data/work-orders'
 import { seedWorkflowV1 } from './pneumatic-data/workflow-v1'
+import { seedWorkflowV0Empty } from './pneumatic-data/workflow-v0-empty'
 
 async function main(): Promise<void> {
   console.log('🌱 Seeding Pneumatic Air (PROMPT_PNE_2)...')
@@ -44,7 +45,10 @@ async function main(): Promise<void> {
   const { workflowVersionId } = await seedWorkflowV1(prisma, ctx)
   await releaseWorkOrder(prisma, ctx, workOrderId, workflowVersionId)
 
-  console.log('✅ Pneumatic Air seed (D3) complete.')
+  // D4 — empty workflow scaffold (UX validation)
+  await seedWorkflowV0Empty(prisma, ctx)
+
+  console.log('✅ Pneumatic Air seed (D4) complete.')
 }
 
 main()

@@ -2,7 +2,7 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-01 (PROMPT_3b_FULL Session A — closed TODO-008, TODO-013, TODO-014)
+> **Last updated**: 2026-05-02 (PROMPT_PNE_2 D4 — closed TODO-031; opened TODO-041, TODO-042)
 
 ---
 
@@ -152,6 +152,39 @@
 ---
 
 ## 🟡 Medium priority (good to have)
+
+### TODO-042 — PROMPT_PNE_2 § 1 summary said "19 steps" but enumeration totals 34 step rows (documentation hygiene only)
+
+**Discovered**: 2026-05-02 (during PROMPT_PNE_2 D3 implementation)
+**File**: `prompts/PROMPT_PNE_2.md` § 1 summary
+**Symptom**: PROMPT_PNE_2 § 1 says workflow v1 has "4 phases / 4 groups / 19 steps". The per-step enumeration in § 3.2 totals **26 main-path steps** (Phase 1 = 8, Phase 2 = 9, Phase 3 = 4, Phase 4 = 5) **+ 8 inline recovery steps** (B2 4 + C2 4) = **34 step rows**. The "19" figure was an informal undercount in the summary block — the enumerated step list is the authoritative source.
+**Acceptance criterion** (documentation only):
+- Future PROMPT spec rewrites should reconcile the abstract figure in § 1 summaries with the per-step enumeration in § 3.2 detail blocks. Same lesson applies to other PROMPT specs (PROMPT_PNE_3 / PNE_4 currently being drafted).
+- No code action — the seeded data is correct (34 rows verified by `seed:pneumatic` output and `workflow-v1.test.ts`).
+**Estimated effort**: 0 (documentation hygiene; lesson for spec-author).
+**Blocker for**: nothing.
+
+---
+
+### TODO-041 — Split FaultCode from CauseCode (currently colocated under category='recovery_fault')
+
+**Discovered**: 2026-05-02 (during PROMPT_PNE_2 D1 pre-flight — § 5 STOP discovery)
+**File**: `packages/prisma/schema.prisma` (no `FaultCode` model exists today) + `packages/prisma/seed/pneumatic-data/fault-codes.ts` (workaround using CauseCode rows) + future `apps/api/src/modules/fault-codes/` + future `apps/web/src/.../FaultCodePicker.tsx` (HMI Recovery dropdown)
+**Symptom**: PROMPT_PNE_2 § 5 pre-flight grep for `model FaultCode` returns 0 matches. CauseCode is the only "code" model in the schema. The PROMPT specifies 10 fault codes (5 LK-* leak + 5 CM-* camera) for the recovery flows, but there is no first-class FaultCode entity to host them. PROMPT § 4 says schema migrations are out of scope, so PNE_2 D2 seeded the 10 fault codes as `CauseCode` rows with `category='recovery_fault'` and `phase='leak'|'camera'`. Severity (absent in CauseCode schema) encoded in description text. Phase scope encoded redundantly in `phase` column AND in the `LK-*`/`CM-*` code prefix.
+**Why this matters**: works fine for the demo path because the data is queryable by category. But:
+- HMI Recovery dropdowns must filter `CauseCode where category=recovery_fault and phase=leak` instead of selecting from a `FaultCode[]` collection — extra category-filtering logic on every read.
+- Workflow Step lacks `Step.recoveryFaultCodes[]` FK → recovery diagnosis steps reference fault codes by code-string in `instructions` text (loose-coupling).
+- Future fault codes for non-recovery scenarios (e.g., setup-time tooling faults) would need yet another category value, blurring the CauseCode taxonomy further.
+- Adding any phase beyond leak/camera (e.g., `pack`, `assy`) would require extending BOTH the `phase` enum AND the code prefix vocabulary — currently undocumented.
+**Acceptance criterion**:
+- Schema change: new `FaultCode` model with `code`, `name`, `phase` (or `recoveryGroupId` FK), `severity` (info|warning|critical), `suggestedAction` text, `plantId`. Migration moves the 10 PNE rows from `CauseCode` (category=recovery_fault) to `FaultCode` (with severity from description text → severity column). Explicit product confirmation needed before touching schema.
+- Add `Step.recoveryFaultCodes` M:N relation. Diagnosis steps in inline-recovery groups (B2 + C2) reference fault codes via FK instead of via `instructions` text.
+- HMI Recovery component: dropdown queries `FaultCode where phase=leak|camera` directly.
+- Migration plan: lift 10 rows from category='recovery_fault' on CauseCode → new FaultCode table; preserve codes/names/phase; parse severity from description text; drop the workaround comments from seed file headers.
+**Estimated effort**: 4-6 hours backend (schema + migration + module + tests) + 2-3 hours frontend (HMI Recovery dropdown wire). Future-fault-code-vocabulary policy decision needed at the same time.
+**Blocker for**: HMI Recovery (PROMPT_PNE_4 D3) IF the dropdown UI semantics expect first-class FaultCode entity. If text-based reference works (search-as-you-type with prefix filter), can defer to F2 / PROMPT_7. Owner: F2 / PROMPT_7 default; pull earlier if PNE_4 Recovery dropdown design says otherwise.
+
+---
 
 ### TODO-040 — AddStepDialog multi-select arrays + per-form Action Config session-only / lossy on reload
 
@@ -544,16 +577,25 @@ WARNING  no output files found for task @mes/storage#build. Please check your `o
 
 ### TODO-031 — Turborepo cache restores @mes/prisma dist/ but not generated Prisma client
 
-**Discovered**: 2026-05-02 (during PROMPT_DS_LIFT pre-flight check)
-**File**: `packages/prisma/package.json` (build script) + `turbo.json`
-**Symptom**: `pnpm build` from a fresh clone or after a turbo cache restore fails on `@mes/api#build` with ~30 errors of the form `Property 'X' does not exist on type 'PrismaService'` (where X is `stepExecution`, `workflow`, `workflowVersion`, `$transaction`, etc.). Root cause: `@mes/prisma` package builds with `prisma generate && tsc`. Turbo caches `dist/` but the Prisma client is generated to `node_modules/.pnpm/@prisma+client@*/node_modules/@prisma/client` (outside the package's normal output). When turbo restores `dist/` from cache, the generated client is missing. Manual workaround: `pnpm --filter @mes/prisma generate` before `pnpm build`.
-**Acceptance criterion** (chosen approach: **option b — turbo dependency**):
-- Configure `turbo.json` so `@mes/api#build` (and any other consumer of `@mes/prisma`) declares an explicit dependency on the Prisma generation step. Most likely shape: split `@mes/prisma`'s build into two tasks (`prisma:generate` + `build`) and add `dependsOn: ["@mes/prisma#prisma:generate"]` on dependent builds; turbo then re-runs generate when its inputs (`schema.prisma`) change. Alternative: extend `@mes/prisma#build` `outputs` glob to include the generated client path so cache restores it correctly.
-- Rejected option a (`postinstall` hook): runs on every `pnpm install` regardless of need — slows CI and local installs unnecessarily.
-- Rejected option c (manual workaround): keeps the friction in pre-flight forever.
-- After fix: `pnpm install && pnpm build` from a clean clone or after `pnpm clean` succeeds 12/12 with no manual `pnpm --filter @mes/prisma generate` step.
-**Estimated effort**: 30-60 min (turbo experimentation + verification on clean clone)
-**Blocker for**: dev onboarding ergonomics. Not blocking work but adds friction on every fresh clone / cache invalidation.
+**Status**: ✅ **CLOSED by PROMPT_PNE_2 D4** (2026-05-02, commit pending).
+**Resolution**: Added explicit `@mes/prisma#generate` task to `turbo.json` with `cache: false` + `inputs: ["schema.prisma"]`, and added it to the `build` pipeline's `dependsOn`. Now any package whose `build` depends on the Prisma client transitively waits on the generate step before its own build runs. The `cache: false` on generate ensures it runs every build (cheap — ~600ms) but downstream packages still cache their builds correctly.
+**Validation evidence (literal, May 2)**:
+```
+turbo.json @mes/prisma#generate task added (cache: false, inputs: schema.prisma)
+build pipeline gains dependsOn ["@mes/prisma#generate"]
+
+Simulated clean state (per user instructions):
+  1. mv node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma → .prisma.backup
+  2. pnpm build → "Tasks: 13 successful, 13 total | Cached: 12 cached, 13 total" (generate runs fresh, downstreams cached)
+  3. ls .prisma → client/ ✓ regenerated
+  4. pnpm --filter @mes/prisma seed:pneumatic → ✓ runs end-to-end (proves runtime client works)
+  5. rm -rf .prisma.backup → cleaned
+```
+All 4 acceptance criteria met:
+1. ✅ turbo.json has new `@mes/prisma#generate` task definition
+2. ✅ Simulated clean state regenerates Prisma client transparently via `pnpm build`
+3. ✅ Documented in STATUS as architectural decision (PROMPT_PNE_2 closure section)
+4. ✅ Moved from open to closed in this entry
 
 ---
 

@@ -35,7 +35,7 @@ This pivot accepts **~3-4 week MVP slip** (mid-July → end of July / early Augu
 | F1.1 | DS_LIFT (closed) | 14 patterns lifted to `@mes/ui` (foundation, view, op-table, card, detail, plant-map, canvas) + showcase | 18h actual (closed 2026-05-02) | done |
 | F1.2 | PROMPT_3d (closed) | Palette ungated, drag-drop step-on-group, canvas phase-columns horizontal, inspector 3-tab Properties/Metadata/Audit, AddPhase/AddGroup/AddStep/Validate dialogs, Visual/Parallel toggle, WorkflowTopBar | ~16h actual (closed 2026-05-02) | done |
 | F1.3 | PROMPT_PNE_1 (closed) | Step configurator with 6 tabs Materials/Tools/Devices/Skills/Recipes/Attention Points, multi-select + search, Recipe-Device coupling, 8 Action Config forms, Save flow wired | ~10h actual (closed 2026-05-02) | done |
-| F1.4 | **PROMPT_PNE_2** Pneumatic Air seed (double) | Prisma seed: items, recipes, devices, materials, fault codes, cause codes, attention points + 2 workflows ("v1 Demo" pre-configured 4 phases/4 groups/19 steps + "v0 Empty" resources only) + 1 WO ready to release | 6-10h | 10-11 May |
+| F1.4 | PROMPT_PNE_2 (closed) | Prisma seed: 1 area / 4 WCs / 4 WSs / 3 devices + 5 items + 1 BoxType + 3 recipes + 4 skills + 2 operators + 6 cause codes + 10 fault codes (CauseCode workaround S1) + 3 APs + 2 workflows ("v1 Demo" pre-configured 4 phases/6 groups/**34 steps** incl. inline recovery groups B2+C2 + "v0 Empty" scaffold) + 1 WO released with WorkflowSnapshot. Closes TODO-031. Opens TODO-041, TODO-042. | ~6h actual (closed 2026-05-02) | done |
 | F1.5 | **PROMPT_PNE_3** Mock device simulator | DEV-LEAK-001 service mock (45s cycle, RCP-LEAK-PNE-12-001 v2, threshold 0.5 mbar/min, demo toggle PASS/FAIL/MARGINAL). DEV-CAMERA-001 (8s, 4 ROIs). WebSocket events for live HMI updates | 8-12h | 12-13 May |
 | F1.6 | **PROMPT_PNE_4** HMI specialized + label/scrap fidelity | HMI Leak Test split layout (top device + bottom 3 parallel slots side-by-side), HMI Camera Test, recovery flow UI fidelity, scrap UI fidelity (cause code + photo mock + counters), label print mock (toast + SVG preview) | 12-16h | 14-17 May |
 | | **F1 totals** | | **48-70h** | **5-17 May** |
@@ -145,7 +145,7 @@ If smoke fails, do NOT merge. Reopen the branch and fix before merging.
 
 Carried forward from PROMPT_DS_LIFT closure.
 
-- **TODO-031** — Prisma client cache gap. Turbo restores `dist/` but not generated Prisma client. Fix path: `turbo.json` `dependsOn` split (NOT postinstall hook). Owner: PROMPT_PNE_2 (touches Prisma seed, can address there).
+- ~~**TODO-031**~~ — ✅ closed by PROMPT_PNE_2 D4 (2026-05-02). Added `@mes/prisma#generate` task with `cache: false` to turbo.json and made it a `dependsOn` for the build pipeline. Validated against simulated clean state (.prisma client moved → pnpm build → regenerated transparently).
 - **TODO-032** — Audit `useToast()` callsites in `apps/web` and `apps/hmi`. Toast moved from no-op stub to full impl in DS_LIFT D1; existing callsites now produce visible toasts. Verify no UX regression. Owner: opportunistic, Antonella spot-check during F1.
 - **TODO-033** — Adapter API audit-log row → `AuditTimelineEntry` shape. Both `AuditEntry` (legacy ActivityFeed) and `AuditTimelineEntry` (new) coexist. AuditTab in PROMPT_3d D4 wires a stub returning []. Full adapter owner: PROMPT_7 / F2.2.
 
@@ -158,7 +158,12 @@ Opened during PROMPT_3d (F1.2):
 - **TODO-038** — Workflow-root metadata editing (`tags` + `defaultWorkCenters`). MetadataTab in D4 is read-only on canvas-node selection; workflow-level fields belong in the topbar / page header. Owner: PROMPT_7 / F2.2.
 - **TODO-039** — Design token migration. `bg-primary-*` / `bg-success-*` / `text-primary-*` unmapped in apps/web tailwind config — pre-existing pages render unstyled buttons. PROMPT_3d D5 hotfix only fixed the 4 dialogs. Recommend Option A (extend tailwind config). Owner: PROMPT_7 / F2.2.
 
-New TODOs to be opened during F1 will be tracked per-PROMPT.
+Opened during PROMPT_PNE_1 (F1.3):
+- **TODO-040** — AddStepDialog multi-select arrays (`materialIds`/`attentionPointIds`) + per-form Action Config blob session-only / lossy on reload. Schema migration required (`Step.config Json?` + M:N tables). Owner: F2 / PROMPT_7.
+
+Opened during PROMPT_PNE_2 (F1.4):
+- **TODO-041** — Split FaultCode from CauseCode (currently colocated under category='recovery_fault'). Schema migration required. Owner: F2 / PROMPT_7 default; pull earlier if PROMPT_PNE_4 HMI Recovery dropdown design needs first-class FaultCode entity.
+- **TODO-042** — PROMPT_PNE_2 § 1 summary said "19 steps" but enumeration totals 34 step rows. Documentation hygiene only — no code action.
 
 ---
 
@@ -193,6 +198,7 @@ What to communicate to Reflex Allen before demo:
 |---|---|---|
 | 2026-04-27 | ROADMAP v1.x initial (9 PROMPTs in 3 horizontal phases) | Claude Code + Antonella |
 | 2026-05-02 | ROADMAP v2 pivot to Pneumatic First (5 new F1 PROMPTs, F2/F3 reordered) | this document |
+| 2026-05-02 | F1.4 PROMPT_PNE_2 closed (4 D increments, +18 tests cumul 655, opens TODO-041/042 closes TODO-031) | this document |
 
 ---
 

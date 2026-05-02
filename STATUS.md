@@ -1,8 +1,137 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 2, 2026 (PROMPT_PNE_1 D1-D4 closed — F1.3 100% complete)
+> **Last update**: May 2, 2026 (PROMPT_PNE_2 D1-D4 closed — F1.4 100% complete)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ PROMPT_PNE_2 — Pneumatic Air seed (double workflow + WO) — 100% complete (May 2, 2026)
+
+F1.4 of ROADMAP v2 (Pneumatic First). Seeds the dev SQLite DB with the Pneumatic Air production reality so demo path is one-command-ready (`pnpm --filter @mes/prisma seed:pneumatic`). Idempotent. Coexists with the baseline seed (`pnpm db:seed`) — different unique codes throughout.
+
+### Test count
+
+- **Baseline (post PROMPT_PNE_1 D4)**: 637
+- **Final**: **655** (api 249 / domain 197 / ui 119 / **prisma 18** / schemas 29 / cache 8 / queue 5 / storage 6 / web 24)
+- **Delta**: **+18 tests** (target floor +12 → ≥649, ideal +16 → ≥653; achieved +18 = +6 above floor, +2 above ideal)
+
+### D1-D4 breakdown
+
+| Increment | Scope | Test delta | Cumul | Commit |
+|---|---|---|---|---|
+| D1 | Plant hierarchy (1 area / 4 WCs / 4 WSs / 3 devices) + 5 items + 1 BoxType + 3 recipes (4 versions) + 4 skills + 2 operators (Mario Rossi 1234, Anna Verdi 5678 — argon2id) + vitest setup for `@mes/prisma` | +5 | 642 | `57b40e1` |
+| D2 | 6 cause codes + 10 fault codes (CauseCode workaround S1) + 3 attention points + WO-2026-PNE-0042 draft (Mario Rossi proposed) | +4 | 646 | `6529541` |
+| D3 | Workflow v1 (4 phases / 6 groups / 34 steps incl. inline recovery B2 + C2) + WO release transition (draft → released, assignment → accepted, snapshot 18958 chars JSON, 34 StepExecution rows) | +6 | 652 | `94d9ab2` |
+| D4 | Workflow v0 (Empty) scaffold + status enum mapping helper + TODO-031 turbo fix + STATUS / ROADMAP / TODO closure | +3 | **655** | _this commit_ |
+
+### Architectural decisions (kept after D4)
+
+1. **S1 — FaultCode model is MISSING from `packages/prisma/schema.prisma`** (§ 5 STOP discovered in D1 pre-flight, user-confirmed workaround):
+   - 10 fault codes seeded as `CauseCode` rows with `category='recovery_fault'`.
+   - Phase scope (`leak`/`camera`) encoded BOTH in `phase` column AND in `LK-*`/`CM-*` code prefix (redundant for HMI Recovery dropdown lookup).
+   - Severity (absent in CauseCode schema) encoded in description text as `Severity: high|medium|low`.
+   - Recovery diagnosis steps reference fault codes by code-string in `instructions` text (no `Step.recoveryFaultCodes[]` FK).
+   - Tracked by **TODO-041** (split FaultCode into first-class model in F2 / PROMPT_7). Future fault codes for other phases (PACK/ASSY/etc.) would need to extend the phase enum AND prefix vocabulary — decide explicitly when promoting.
+
+2. **S2 — Recovery sub-flows modeled as INLINE groups** (existing TODO-036, user-confirmed):
+   - PROMPT_PNE_2 § 3.2 specified `wf-leak-recovery-pne` and `wf-camera-recovery-pne` as separate Workflows linked from decision steps; the schema lacks `Step.onNokTargetWorkflowId` so this is impossible without migration (out of scope per § 4).
+   - Workaround: Group **B2 — Leak Recovery (inline)** under Phase 2 + Group **C2 — Camera Recovery (inline)** under Phase 3, both with `supportsRecovery=true` and 4 steps (diagnosis → 2 retries → scrap).
+   - Decision steps (`STEP-LEAK-007` and `[3.3]`) reference the recovery group by name in their `instructions` text (text-based loose-coupling).
+   - Final shape: 4 phases / **6 groups** (4 main + 2 inline recovery) / **34 step rows** (8 + 9 + 4 + 4 + 4 + 5).
+
+3. **S3 — `parallelStepsBufferSec` field MISSING on Group/Step** (user-confirmed):
+   - PROMPT § 3.2 specifies `parallelStepsBufferSec: 5` for Group B1's device-execution; the schema has no such column.
+   - Workaround: encode `parallelStepsBufferSec: 5` in `STEP-LEAK-003.instructions` text. Tracked by existing **TODO-040** dependency (workflow step `config Json?` column).
+
+4. **S4 — `WorkOrderAssignment` schema has no workstation FK**:
+   - PROMPT § 3.2 says WO is "assigned to WS-LEAK-01 + WS-ASSY-01 + WS-CAMERA-01 + WS-PACK-01"; schema only has `(workOrderId, operatorId)` per assignment row.
+   - Workaround: workstation context is implicit via the workflow's step→deviceId chain (each step's device's equipmentNode ancestry resolves to a workstation). Single `WorkOrderAssignment` row created for Mario Rossi (operator). Anna Verdi seeded as a usable login but not assigned to this WO (PROMPT spec lists only Mario in `assignedOperators`).
+
+5. **PROMPT § 1 "19 steps" undercount vs § 3.2 enumeration of 26+8=34**:
+   - Trust the per-step enumeration in § 3.2 (informal undercount in § 1 summary). Documented for future PROMPT spec rewrites — see **TODO-042** doc-hygiene entry.
+
+6. **WorkflowSnapshot creation bypasses release service** (mirrors baseline `WF-PNEU-CURE-DEMO` pattern in `seed.ts:498-696`):
+   - Release service (`apps/api/src/modules/work-orders/release.service.ts`) requires API request context (operator session, audit user) unavailable in a seed.
+   - Seed manually clones the WorkflowVersion tree via `cloneWorkflowTree` from `@mes/domain` (added as workspace dep on `@mes/prisma`), JSON-serializes to `WorkflowSnapshot.snapshotData`, creates 34 `StepExecution` rows with `status=pending` + `startedAt=releasedAt`. Idempotent: snapshot is `@unique` on workOrderId; per-step executions checked via `findFirst`.
+
+7. **Vitest 2.1.x Windows parallel-runner flake — per-package strategies are NOT uniform** (expansion of STATUS lesson 54 originally documented as @mes/ui-only):
+   - Discovered during PROMPT_PNE_2 D1 + D3 that the flake also affects `@mes/domain` (drops 2-3 of 15 test files randomly) and `@mes/ui` (drops 2 of 29 randomly — confirmed run 1 = 119/29, run 2 = 107/27).
+   - Per-package mitigation table:
+     | Package | Strategy | Notes |
+     |---|---|---|
+     | `@mes/prisma` | `pool=forks` + `singleFork=true` | Pure Node, no DOM. Set in vitest.config.ts |
+     | `@mes/ui` | Default parallel runner; re-run on flake | `singleFork` BREAKS jsdom DOM cleanup between tests |
+     | `@mes/domain` | `singleFork` works; default also works most runs but flakes 2-3 files randomly | No DOM |
+     | `@mes/web` | Default works because `afterEach(cleanup)` was added in PROMPT_PNE_1 D4 | jsdom cleanup workaround |
+     | `@mes/api`, `@mes/schemas`, `@mes/cache`, `@mes/queue`, `@mes/storage` | Default works | Stable on these |
+   - Standardizing across all packages estimated 1-2h backend (F2 polish opportunity, not in PROMPT_PNE_2 scope).
+
+8. **Skill code prefix corrected vs initial plan**: plan agent claimed baseline used `SKILL-` prefix; verification of `seed.ts:33-42` showed BARE codes (`EXT, ASSY, QC, TEST, ...`). PNE_2 seed uses bare codes too — `IDENTIFICATION` is the only net-new (3 baseline-shared: ASSY, QC, TEST).
+
+9. **Operator-name conflict spurious**: plan agent claimed existing seed had Mario Rossi / Anna Verdi at OP-002/OP-003. Verification showed Marco Rossi / Laura Ferrari / Giovanni Bianchi / Sara Conti. Net-new badges (1234/5678) + net-new names → no conflict, no name suffix needed.
+
+### TODOs closed by PROMPT_PNE_2
+
+- **TODO-031** — Turbo dependsOn fix for Prisma client cache gap. Closed (validated below).
+
+### TODOs opened by PROMPT_PNE_2
+
+- **TODO-041** — Split FaultCode from CauseCode (currently colocated under category='recovery_fault'). Owner: F2 / PROMPT_7 (or earlier if HMI Recovery PROMPT_PNE_4 needs proper FK semantics).
+- **TODO-042** — PROMPT_PNE_2 § 1 summary said "19 steps" but enumeration totals 34 step rows. Documentation hygiene only — no code action.
+
+### TODO-031 fix — validation evidence
+
+```
+turbo.json @mes/prisma#generate task added (cache: false, inputs: schema.prisma)
+build pipeline gains dependsOn ["@mes/prisma#generate"]
+
+Simulated clean state procedure (per user instructions):
+  1. mv node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma → .prisma.backup
+  2. pnpm build → "Tasks: 13 successful, 13 total | Cached: 12 cached, 13 total" (generate runs fresh, downstreams cached)
+  3. ls .prisma → client/ ✓ regenerated
+  4. pnpm --filter @mes/prisma seed:pneumatic → ✓ runs end-to-end (proves runtime client works)
+  5. rm -rf .prisma.backup → cleaned
+```
+
+All 4 acceptance criteria met. TODO-031 closed.
+
+### Verification commands (final, May 2 2026)
+
+```
+pnpm install                              # clean (729 packages, 25.4s)
+pnpm --filter @mes/prisma db:reset / db:push  # fresh SQLite
+pnpm --filter @mes/prisma db:seed         # baseline (5 WOs, 3 templates, demo workflow)
+pnpm --filter @mes/prisma seed:pneumatic  # 1st run — creates all PNE entities + 34 step executions
+pnpm --filter @mes/prisma seed:pneumatic  # 2nd run — idempotent, 0 new step executions
+pnpm build                                # 13/13 successful (was 12 — generate is the new task)
+pnpm lint                                 # 3/3 (0 warnings, FULL TURBO cache)
+pnpm --filter @mes/api      test          # 249/249 pass
+pnpm --filter @mes/domain   test          # 197/197 pass (default config; flake mitigated by re-run if hit)
+pnpm --filter @mes/ui       test          # 119/119 pass (default; flake confirmed — re-run on miss)
+pnpm --filter @mes/prisma   test          # 18/18 pass (15 files; singleFork bypasses Windows tmp-race)
+pnpm --filter @mes/schemas  test          # 29/29
+pnpm --filter @mes/cache    test          # 8/8
+pnpm --filter @mes/queue    test          # 5/5
+pnpm --filter @mes/storage  test          # 6/6
+pnpm --filter @mes/web      test          # 24/24
+```
+
+### Manual smoke (DoD § A-F)
+
+Verified end-to-end on May 2, 2026:
+
+- ✅ A — Fresh DB: `rm dev.db && db:push` → schema applied
+- ✅ B — Baseline seed: `db:seed` → MOCK_DATA_PNEUMATIC_AIR loaded (Plant + 4 baseline ops + 5 WOs + WF-PNEU-CURE-DEMO + 3 templates)
+- ✅ C — PNE seed 1st run: 1 area / 4 WCs / 4 WSs / 3 devices / 5 items / 1 BoxType / 3 recipes (4 versions) / 4 skills / 2 operators / 6 cause codes / 10 fault codes / 3 APs / 1 WO (released) / 1 workflow v1 (4 phases / 6 groups / 34 steps) / 1 workflow v0 (empty) / 1 snapshot / 34 step executions
+- ✅ D — PNE seed 2nd run: idempotent, 0 new step executions, snapshot reused, all upserts no-op
+- ✅ E — TODO-031 turbo fix validated: `.prisma/client` removed → `pnpm build` → regenerated transparently → seed runs
+- ⏭️ F — UI smoke deferred to user pre-merge per CLAUDE.md PHASE 4. Suggested checks per ROADMAP § 4.6:
+  - `Remove-Item -Recurse -Force apps\web\.next; pnpm dev`
+  - `localhost:3001/workflows` → verify `wf-pneumatic-air-680-v1` (Active/approved) + `wf-pneumatic-air-680-v0` (Draft) appear in list
+  - Open v1 detail → 4 phases + 6 groups + 34 steps render
+  - Open v0 detail → empty canvas with palette ungated (PROMPT_3d palette behavior)
+  - `localhost:3001/work-orders` → `WO-2026-PNE-0042` in `released` state, qty 100, Mario Rossi (badge 1234) assigned
 
 ---
 
