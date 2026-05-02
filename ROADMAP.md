@@ -1,168 +1,192 @@
-# RAMS-Reflexallen-MES — Roadmap MVP completo
+# RAMS Reflexallen MES — ROADMAP v2 (Pneumatic First)
 
-> **Versione**: 1.0 — **Creata**: 02/05/2026
-> **Spec compliance**: v1.2
-> **Repo HEAD ref**: `c8f2284` (PROMPT_3b_FULL Session B chiuso)
-> **Strategia**: Scenario B con PROMPT_DS-LIFT in testa (vedi audit Pre-MVP del 02/05/2026)
+> **Version**: 2.0
+> **Pivot date**: 2026-05-02
+> **Replaces**: ROADMAP.md v1.x
+> **Strategy**: deliver a complete, mockup-faithful Pneumatic Air vertical flow in code reality, then resume horizontal MES build.
 
 ---
 
-## Stato corrente (chiuso)
+## 1. Why the pivot
 
-| PROMPT | Stato | Tests | Data chiusura |
+The original ROADMAP (v1.x) chained 9 PROMPTs in 3 horizontal phases (F1 foundation alignment → F2 operative tier 1 → F3 line-specific). Calendar landed MVP late June.
+
+After audit on 2026-05-02 of mockup vs code (workflow editor: gated palette vs direct, vertical tree canvas vs phase-columns, single-tab inspector vs 3-tab) and customer alignment with Reflex Allen, the strategic priority shifted:
+
+**New goal**: deliver one complete vertical flow (Pneumatic Air, line they already produce) in code reality, mockup-faithful, by **18-22 May 2026**, suitable for live customer demo.
+
+The horizontal MES build (Andon, Plant Overview, all registry CRUD, Scheduling, Industrial Ops generales, CFRP, Safety Devices) resumes after the Pneumatic Air demo, in F2 and F3.
+
+This pivot accepts **~3-4 week MVP slip** (mid-July → end of July / early August) in exchange for:
+- A demonstrable customer-validated flow at end of May
+- Mockup-fidelity validated in production code, not in Figma
+- Real-world feedback before building line-specific F3 modules
+
+---
+
+## 2. Phase structure v2
+
+### F1 — Pneumatic Air vertical (NEW)
+
+5 PROMPTs sequential. Goal: configure → execute → demo Pneumatic Air end-to-end.
+
+| # | PROMPT | Scope summary | Effort | Calendar |
+|---|---|---|---|---|
+| F1.1 | DS_LIFT (closed) | 14 patterns lifted to `@mes/ui` (foundation, view, op-table, card, detail, plant-map, canvas) + showcase | 18h actual (closed 2026-05-02) | done |
+| F1.2 | **PROMPT_3d** Workflow Editor UX-lift | Palette ungated, drag-drop step-on-group, canvas phase-columns horizontal, inspector 3-tab Properties/Metadata/Audit, Visual/Parallel toggle | 14-20h | 5-7 May |
+| F1.3 | **PROMPT_PNE_1** Resource Selection | Step configurator with 6 tabs Materials/Tools/Devices/Skills/Recipes/Attention Points, multi-select + search | 8-12h | 8-9 May |
+| F1.4 | **PROMPT_PNE_2** Pneumatic Air seed (double) | Prisma seed: items, recipes, devices, materials, fault codes, cause codes, attention points + 2 workflows ("v1 Demo" pre-configured 4 phases/4 groups/19 steps + "v0 Empty" resources only) + 1 WO ready to release | 6-10h | 10-11 May |
+| F1.5 | **PROMPT_PNE_3** Mock device simulator | DEV-LEAK-001 service mock (45s cycle, RCP-LEAK-PNE-12-001 v2, threshold 0.5 mbar/min, demo toggle PASS/FAIL/MARGINAL). DEV-CAMERA-001 (8s, 4 ROIs). WebSocket events for live HMI updates | 8-12h | 12-13 May |
+| F1.6 | **PROMPT_PNE_4** HMI specialized + label/scrap fidelity | HMI Leak Test split layout (top device + bottom 3 parallel slots side-by-side), HMI Camera Test, recovery flow UI fidelity, scrap UI fidelity (cause code + photo mock + counters), label print mock (toast + SVG preview) | 12-16h | 14-17 May |
+| | **F1 totals** | | **48-70h** | **5-17 May** |
+
+**F1 demo target**: 18-20 May 2026 (Reflex Allen Pneumatic Air vertical demo, in code reality, mockup-faithful).
+
+### F2 — Horizontal MES shell (DEFERRED from original F1)
+
+Resume horizontal build after Pneumatic Air demo.
+
+| # | PROMPT | Scope summary | Effort | Calendar (post-demo) |
+|---|---|---|---|---|
+| F2.1 | PROMPT_6 | Andon dashboard (KpiHero giants + WCCard grid + LiveAlert feed) + Plant Overview (PlantMap with workstations + zones + click-through to Andon) | 12-16h | 21-26 May |
+| F2.2 | PROMPT_7 | 11 registry detail/edit/new pages (operators, equipment, tools, recipes, skills, cause-codes, attention-points, BOM, box-types, boxes, devices) + WO List back-office + WO Detail back-office (DetailHeader + 7-tab body) | 14-20h | 27 May - 3 June |
+| F2.3 | PROMPT_3c | Workflow editor Live Preview State-Driven (11 states interactive on selected step) | 6-10h | 4-5 June |
+| F2.4 | i18n setup | next-intl routing IT/EN, locale switcher, all hardcoded strings extracted (estimate covers F1 surface + new F2 pages; F3 covered by per-PROMPT extraction) | 8-12h optional | 6-8 June (skippable) |
+| | **F2 totals** | | **40-58h** | **21 May - 8 June** |
+
+### F3 — Operative Tier 1 + Line-specific (REORDERED)
+
+| # | PROMPT | Scope summary | Effort | Calendar |
+|---|---|---|---|---|
+| F3.1 | PROMPT_8 | Scheduling FULL: WO Assignment 5-states + Shift + ShiftHandover + Skills coverage + Planner Board + Dispatch List | 24-32h | 9-16 June |
+| F3.2 | PROMPT_9 | Equipment Mgmt rich + WO Detail rich: Equipment 8-states XState + MaintenanceOrder + ToolWear + 7-tab equipment detail + WO Detail timer multi-level + reservations | 28-36h | 17-25 June |
+| F3.3 | PROMPT_10 | Industrial Ops: Multi-output cycles + Sample tracking + FAI block + Quality Hold + Continuous production + WIP container + Subassembly nested BOM | 24-32h | 26 June - 4 July |
+| F3.4 | PROMPT_11 | CFRP Module: Mold + Prepreg roll out-time + CureCycleRun telemetry + NDT result + vacuum test | 26-32h | 5-12 July |
+| F3.5 | PROMPT_12 | Safety Devices Module: ReflectanceTest ECE-R104 + Homologation cert + AgingTest + Lamination | 22-28h | 13-19 July |
+| F3.6 | PROMPT_13 | Audit/Genealogy/Skills Matrix: Audit Trail UI filter + Genealogy bidirectional graph + Skills Matrix operator × skill | 14-18h | 20-24 July |
+| | **F3 totals** | | **138-178h** | **9 June - 24 July** |
+
+---
+
+## 3. Total trajectory
+
+| Phase | Effort | Calendar | Outcome |
 |---|---|---|---|
-| PROMPT_1 Foundation | ✅ 100% | ~70 | 27/04 |
-| PROMPT_2 Registries (lists) | ✅ 100% | ~160 cum | 28/04 |
-| PROMPT_3a Workflow Designer canvas | ✅ 100% | ~216 cum | 29/04 |
-| PROMPT_3b_REDUCED | ✅ 100% | — | 30/04 mattina |
-| PROMPT_5_LITE | ✅ 100% | — | 30/04 pomeriggio |
-| PROMPT_5_FULL D1-D6 (HMI) | ✅ 100% | ~370 | 01/05 sera |
-| PROMPT_4 AutoGenEngine + 7 resolvers | ✅ 100% | ~431 | 01/05 tarda sera |
-| PROMPT_3b_FULL Session A | ✅ 100% | 443 | 01/05 notte |
-| PROMPT_3b_FULL Session B | ✅ 100% | **473** | 02/05 |
+| F1 | 48-70h (excl. closed DS_LIFT) | 5-17 May | Pneumatic Air vertical demo-ready |
+| F2 | 40-58h | 21 May - 8 June | Horizontal shell aligned, demo intermedia |
+| F3 | 138-178h | 9 June - 24 July | MVP complete |
+| **Total residual** | **226-306h** | **5 May - 24 July** | **Ship 24-31 July 2026** |
 
-**Totale ore Claude Code consumate**: ~stima 80-100h (dato non tracciato esplicitamente).
-**Foundation status**: solida — auth, schema, 13 list pages, workflow designer 4-pane, 9/9 step categories, auto-gen engine, HMI 8 step renderers + recovery + box ops, audit backend, genealogy backend, mock device simulator.
+Slip vs original ROADMAP v1: ~3-4 weeks. Driven by mockup fidelity standard (decided in conversation 2026-05-02) and Pneumatic vertical priority.
 
 ---
 
-## Gap noti (input dell'audit)
+## 4. Decisions taken at pivot
 
-**Asse funzionale** — extension `.md` non implementate:
-- 🔴 SCHEDULING_ASSIGNMENT (8 entità: WOAssignment + Shift + ShiftAssignment + Handover)
-- 🔴 INDUSTRIAL_OPERATIONS (Multi-output + Sample + FAI + Quality Hold + Continuous + WIP + Subassembly)
-- 🔴 EQUIPMENT_MANAGEMENT rich (state machine 8-stati + MaintenanceOrder + ToolWear + Calendar + 7-tab detail)
-- 🔴 CFRP_MODULE (Mold + Prepreg + CureCycleRun + telemetry + NDT + vacuum test)
-- 🔴 SAFETY_DEVICES_MODULE (ReflectanceTest + Homologation + Aging + Lamination)
-- 🟡 Audit/Genealogy UI (backend ok, UI mancante)
+Recorded for traceability.
 
-**Asse UI** — 19 schermate Suite mockup:
-- 🔴 Plant Overview (Screen 01) — non esiste, home `/` è una DS Showcase di sviluppo
-- 🔴 Work Orders List + Detail back-office (Screen 02-03) — non esistono `/work-orders/*` in `apps/web`
-- 🔴 Andon Dashboard (Screen 19) — non esiste
-- 🔴 Skills Matrix (Screen 08) — solo list flat
-- 🔴 Devices registry (Screen 11) — non esiste in BO
-- 🟡 8 list registry — scaffolding tabular base, manca Operational Table v0.7 pattern
-- ❓ 11 registries `[id]/edit/new` = 404 (solo `items` e `workflows` hanno detail completo)
-- ✅ 6 schermate allineate (Workflow Editor + 5 HMI core)
+### 4.1 Mockup fidelity standard
 
-**Gap Design System** — 14 pattern documentati nel handoff DS, mancanti in `@mes/ui`:
-- Drawer / Modal / ToastProvider / PriorityBadge
-- TreeNode / EmptyState / ViewSwitcher / SplitView
-- Operational Table v0.7 suite (8 sub-componenti)
-- RegistryTile / KpiHero / WCCard / PhaseChip / AlertBanner / LiveAlert
-- DetailHeader / DetailBody / AuditTrail UI / TabStates
-- Plant Map / Canvas suite
+**Decision**: Workflow editor (F1.2) and HMI Leak Test specialized (F1.6) must be mockup-faithful (non-negotiable for customer-facing demo). Other surfaces are mockup-aligned in spirit but not pixel-perfect; polish gradually post-MVP.
 
-**Gap stack** — `i18n` non implementato (next-intl assente, stringhe hardcoded IT).
+**Rationale**: faithfulness on customer-facing screens drives trust at demo; pixel-perfect on internal screens (registry detail, audit log viewer) is polish, not value.
 
----
+### 4.2 Double seed Pneumatic Air
 
-## Roadmap residua — 3 fasi sequenziali
+**Decision**: F1.4 (PROMPT_PNE_2) seeds two workflows:
+- "Pneumatic Air M12 680mm v1 (Demo)" — pre-configured 4 phases, 4 groups, 19 steps with all resources wired
+- "Pneumatic Air M12 680mm v0 (Empty)" — only resources seeded (item, recipes, devices, materials, fault codes), workflow blank for user to construct manually as UX validation
 
-### FASE 1 — Foundation alignment (target: fine maggio 2026)
+**Rationale**: v1 fast demo path; v0 lets Antonella validate workflow editor UX on a real production case.
 
-Obiettivo: chiudere il gap UI strutturale, allineare ogni list/detail al DS, dotare il MES di una shell demo coerente con il PDF Suite consegnato al cliente.
+### 4.3 Label print mock for MVP
 
-| # | PROMPT | Scope | Effort | Dipendenze | Cumul |
-|---|---|---|---|---|---|
-| **F1.1** | **PROMPT_DS_LIFT** | Porta 14+ pattern handoff in `@mes/ui` (vedi `prompts/PROMPT_DS_LIFT.md`) | 18-24h | — | 24h |
-| F1.2 | PROMPT_6 Andon + Plant Overview | Andon Dashboard (KpiHero + WCCard + AlertBanner + LiveAlert) + Plant Overview homepage (PlantMap SVG + workstations grid + Active Issues feed via Socket.IO) | 12-16h | F1.1 | 40h |
-| F1.3 | PROMPT_7 Registry detail + WO BO | (a) `/work-orders` list + `/work-orders/[id]` detail con 7 tab; (b) detail/edit/new per i 11 registry mancanti (EmptyState patterns, TreeNode per equipment); (c) refactor RegistryListPage → OperationalTable | 14-20h | F1.1 | 60h |
-| F1.4 | PROMPT_3c Live Preview | Workflow Editor: state-driven preview 11 stati interattivi (vedi `screens-3-workflow.jsx:547` AutogenDiff) | 6-10h | F1.1 | 70h |
-| F1.5 | i18n setup base | next-intl + estrazione stringhe IT/EN nelle pagine attuali | 6-10h | — | 80h |
-| | | **F1 totale** | **56-80h** | | |
+**Decision**: F1.6 implements label print as a UX mock (toast + floating SVG preview 3 sec), no physical printer integration. ZPL + network printer protocol deferred to V2 (post-MVP).
 
-**Gate F1**: demo verticale "Brake Caliper Assembly" eseguibile end-to-end da Plant Overview → WO release → HMI execution → Andon. Test count target ≥ 540.
+**Rationale**: MVP scope is "demo flow end-to-end", not "physical printer integration with customer hardware". V2 work for production deployment.
 
----
+### 4.4 Label content language (default IT)
 
-### FASE 2 — Operativo Tier 1 (target: fine giugno 2026)
+**Decision**: Mock label content in Italian (default for Reflex Allen). Bilingual IT/EN deferred to F2.4 (i18n setup).
 
-Obiettivo: il MES diventa utilizzabile da planner, QA, manutenzione. Coverage spec v1.2 sui domini core.
+### 4.5 Workflow editor backward-compat
 
-| # | PROMPT | Scope | Effort | Dipendenze | Cumul |
-|---|---|---|---|---|---|
-| **F2.1** | PROMPT_8 Scheduling FULL | Implementa `extensions/SCHEDULING_ASSIGNMENT.md`: WorkOrderAssignment entity (5-stati lifecycle) + Shift + ShiftAssignment + ShiftHandover + Skills coverage check + override flow + Planner Board UI (3-col operators/today/unassigned) + Dispatch List HMI ordinata per priority/due | 24-32h | F1 | 104h |
-| F2.2 | PROMPT_9 Equipment Mgmt + WO Detail rich | (a) `extensions/EQUIPMENT_MANAGEMENT.md`: Equipment state machine 8-stati XState + MaintenanceOrder lifecycle + ToolWear (3 threshold) + Maintenance calendar grid + 7-tab Equipment detail (Info/StateMachine/Maintenance/Tools/Performance/Calibration/Documents); (b) WO Detail rich: multi-level timer 3-livelli WO/Phase/Part + phase progress 6-fasi + reservations + Schedule sidebar + Assignment widget | 28-36h | F2.1 | 140h |
-| F2.3 | PROMPT_10 Industrial Ops + Quality | `extensions/INDUSTRIAL_OPERATIONS.md`: Multi-output cycles (1:N) + Continuous production mode + Sample taking + First Article Inspection (FAI) workflow blocking + Quality Hold/Release dashboard + WIP container kanban + Subassembly nested BOM + backflush automatic | 24-32h | F2.2 | 172h |
-| | | **F2 totale** | **76-100h** | | |
+**Decision**: PROMPT_3d refactor must preserve existing test workflows (e.g., WF-TEST-001 already in DB). Migration if needed: convert legacy palette gating to new direct-palette state without data loss.
 
-**Gate F2**: scenario "planner assegna 5 WO a 3 operatori in 2 turni con skills coverage check" funzionante. FAI + Quality Hold testabili. Test count target ≥ 700.
+### 4.6 Operational practice — `.next` cache
+
+**Decision**: After every PROMPT merge that touches `apps/web` or `apps/hmi` Next.js pages, contributor must clear `.next` cache before next `pnpm dev`:
+
+```powershell
+Remove-Item -Recurse -Force apps\web\.next, apps\hmi\.next -ErrorAction SilentlyContinue
+pnpm dev
+```
+
+**Rationale**: Next.js dev mode incrementally caches module resolution; large rewrites can produce stale "Module not found" errors that build cleans don't reproduce. Standard practice prevents wasted diagnostic time.
+
+### 4.7 Operational practice — `pnpm install` after PROMPT merge
+
+**Decision**: After every PROMPT merge that adds new dependencies to any `apps/*/package.json` or `packages/*/package.json`, contributor must run `pnpm install` locally before `pnpm dev`. Lockfile being correct on the branch does NOT mean local node_modules is updated.
+
+**Rationale**: PROMPTs run in Claude Code's environment where `pnpm install` is implicit; locally it must be re-run. Documented to prevent recurrence of D6 lucide-react diagnostic episode.
+
+### 4.8 Smoke test pre-merge
+
+**Decision**: After every major PROMPT closes, contributor (Antonella) performs visual smoke test on key affected pages before merging the branch to main:
+- Verify no Build Error red banner
+- Verify expected UI elements render (e.g., tabs, columns, buttons)
+- Verify console has no obvious errors (when accessible)
+
+If smoke fails, do NOT merge. Reopen the branch and fix before merging.
 
 ---
 
-### FASE 3 — Line-specific Reflex Allen (target: fine luglio 2026)
+## 5. Open TODOs at pivot date
 
-Obiettivo: i moduli specifici delle linee Reflex Allen (CFRP Compositi + Safety Devices) rendono il MES line-aware.
+Carried forward from PROMPT_DS_LIFT closure.
 
-| # | PROMPT | Scope | Effort | Dipendenze | Cumul |
-|---|---|---|---|---|---|
-| F3.1 | PROMPT_11 CFRP Module | `extensions/CFRP_MODULE.md`: Mold registry (cycle counter auto + lifecycle 5-stati) + PrepregRoll out-time tracker (cumulative, multi-state frozen/refrigerated/out/expired) + CureCycleRun long-running (4-8h autoclave) + telemetry archive (background job 30s) + NDTResult + vacuum bag tightness test + workflow CFRP specializzato | 26-32h | F2.2 | 204h |
-| F3.2 | PROMPT_12 Safety Devices Module | `extensions/SAFETY_DEVICES_MODULE.md`: ReflectanceTest (ECE-R104 thresholds) + Colorimetry (CIE-Lab) + HomologationCertificate mgmt + ECE-R104 marking generation + AgingTestSpecimen long-running (QUV chamber + salt spray) + LaminationRecord + cross-cut adhesion ASTM D3359 | 22-28h | F2.3 | 232h |
-| F3.3 | PROMPT_13 Audit/Genealogy/Skills | (a) Audit Trail UI viewer filtrabile per entity (gap §16.2); (b) Genealogy bidirezionale grafica forward+backward (gap §16.3); (c) Skills Matrix operatori×skills view (Screen 08 design) | 14-18h | F1 | 250h |
-| | | **F3 totale** | **62-78h** | | |
+- **TODO-031** — Prisma client cache gap. Turbo restores `dist/` but not generated Prisma client. Fix path: `turbo.json` `dependsOn` split (NOT postinstall hook). Owner: PROMPT_PNE_2 (touches Prisma seed, can address there).
+- **TODO-032** — Audit `useToast()` callsites in `apps/web` and `apps/hmi`. Toast moved from no-op stub to full impl in DS_LIFT D1; existing callsites now produce visible toasts. Verify no UX regression. Owner: opportunistic, Antonella spot-check during F1.
+- **TODO-033** — Adapter API audit-log row → `AuditTimelineEntry` shape. Both `AuditEntry` (legacy ActivityFeed) and `AuditTimelineEntry` (new) coexist. Adapter to be wired when Audit tab activates in WO Detail (PROMPT_7 / F2.2).
 
-**Gate F3**: linea CFRP simulabile end-to-end con Mold cycles + cure cycle telemetry recording + NDT pass/fail. Linea Safety Devices con ECE-R104 reflectance test + marking generation. Audit trail UI navigabile. Test count target ≥ 900.
+New TODOs to be opened during F1 will be tracked per-PROMPT.
 
 ---
 
-## Calendario realistico
+## 6. Demo guidance
 
-Assumendo **28-30h Claude Code/settimana**:
+When Pneumatic Air is ready (target 18-20 May), the demo script is:
 
-| Periodo | Fase | Output |
+1. Open `/workflows/wf-pneumatic-air-680-v1` (the seedeed v1 Demo) in workflow editor — show 4 phases, 19 steps, resources wired.
+2. (Optional) Open `/workflows/wf-pneumatic-air-680-v0` (Empty) and demonstrate live UX of building a phase + group + step from palette ungated, drag-drop step kind onto group.
+3. Switch to HMI tablet view, login operator (mock), select WS-LEAK-01 workstation.
+4. Pick WO-2026-PNE-0042 from dispatch.
+5. BOM check screen → confirm.
+6. Through Final Assembly steps (skip with "Fast forward" debug button to piece 23).
+7. Leak Test screen → operator clicks Start on device + 3 parallel slots → demonstrate concurrent execution.
+8. Switch demo toggle → simulate FAIL → enter recovery flow → fault code "Hose connection loose" → re-test PASS → continue.
+9. Camera Test screen → simpler 8s cycle.
+10. Packaging screen → scan tubes → label print mock toast → seal box.
+11. WO completion summary screen.
+
+Total demo duration: 15-25 minutes guided.
+
+What to communicate to Reflex Allen before demo:
+- "Andon dashboard, Plant Overview, registry detail editors are in next sprint (F2)."
+- "Physical printer integration is V2."
+- "All values shown (leak rate, ROI scores, OEE) are simulated by mock device service for demo; real device integration follows customer device specs."
+
+---
+
+## 7. Change log
+
+| Date | Change | Author |
 |---|---|---|
-| 03-22 maggio 2026 (3 sett) | F1 | Shell demo allineata DS, registry rich, WO BO, Andon |
-| 23 maggio - 22 giugno (4 sett) | F2 | Scheduling, Equipment rich, Industrial Ops |
-| 23 giugno - 25 luglio (4-5 sett) | F3 | CFRP, Safety Devices, Audit UI |
-
-**Demo Reflex Allen suggerita in 3 step**:
-1. Fine F1 (~22 maggio): "questo è il MES come l'avete visto nei mockup"
-2. Fine F2 (~22 giugno): "questo è il MES che il planner usa davvero"
-3. Fine F3 (~25 luglio): "questo è il MES specifico per le tue linee CFRP + Safety"
+| 2026-04-27 | ROADMAP v1.x initial (9 PROMPTs in 3 horizontal phases) | Claude Code + Antonella |
+| 2026-05-02 | ROADMAP v2 pivot to Pneumatic First (5 new F1 PROMPTs, F2/F3 reordered) | this document |
 
 ---
 
-## Convenzioni operative per ogni PROMPT
-
-Mutuate dalle PROMPT chiuse:
-
-1. **Format file**: `prompts/PROMPT_NN_NAME.md` con header version, change log
-2. **Sessions / increments**: ogni PROMPT spezzato in D1-D6 (o Session A/B se molto grosso)
-3. **Gates di accettazione obbligatori al chiusura**:
-   - `pnpm install` clean
-   - `pnpm build` 12/12 successful
-   - `pnpm lint` clean (no nuovi warning)
-   - `pnpm test` con delta target dichiarato (es. +25 tests)
-   - Smoke runtime: `pnpm dev` e check route principali 200
-4. **Verification commit message format**:
-   ```
-   PROMPT_NN_NAME: <one-line scope> (commit <sha>, +N tests, M total, PROMPT_NN_NAME XX% complete)
-   ```
-5. **TODO tracking**: numerazione continua TODO-NNN nel file `TODO.md` root
-6. **Status update**: aggiornare `STATUS.md` post-merge
-7. **Spec compliance check**: ogni nuova entità/state machine deve avere riferimento a sezione MASTER_SPEC o extension `.md`
-
----
-
-## Variazioni accettabili al piano
-
-- **Swap F3.1/F3.2**: CFRP e Safety Devices sono indipendenti, ordine swap-pabile in base a priorità Reflex Allen
-- **Tagli i18n** (F1.5): se demo Reflex Allen è solo in italiano, taglia. Riprendi in V2
-- **Demo intermedia anticipata**: se Reflex Allen vuole vedere prima del 22 maggio, fai una demo "shell" a metà F1 con solo PROMPT_DS_LIFT + PROMPT_6 chiusi (~40h, ~2 sett dal kick-off)
-- **Spec drift v1.3**: se emergono nuovi requirement Reflex Allen, accodare in F3 o creare F4
-
-## Variazioni NON accettabili
-
-- DS-LIFT NON può saltare. Senza, il debito visivo si moltiplica.
-- F1 → F2 → F3 sequenza: dipendenze tecniche reali, non swap-pabile.
-- Nessun PROMPT può chiudere con build rotto, lint warning nuovi, o test count regressivo.
-
----
-
-## Change log
-
-| Versione | Data | Modifiche |
-|---|---|---|
-| 1.0 | 2026-05-02 | Roadmap iniziale post-audit Pre-MVP. 9 PROMPT residui pianificati. |
+**Owner**: Antonella Colantuono
+**Project**: RAMS Reflexallen MES
+**Repo**: github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
