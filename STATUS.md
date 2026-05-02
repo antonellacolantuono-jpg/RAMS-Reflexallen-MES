@@ -243,3 +243,9 @@ PROMPT_6   ░░░░░░░░░░░░   0% (handoff Claude Design read
 ```
 
 **MVP target 8-12 May confirmed realistic.**
+
+
+## Smoke verifications
+
+- 2026-05-02 13:30: smoke /items canary verified by user (Antonella). 6 type tabs visible (Tutti/PF/Semi/MP/Comp/Cons), layout correct, search/sort/multi-select rendering OK. /operators and /equipment legacy paths render correctly without tabs (backward-compat preserved). PROMPT_DS_LIFT D3 confirmed runtime-stable on Windows + Chrome.
+
