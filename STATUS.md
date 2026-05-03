@@ -1,8 +1,76 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 3, 2026 (PROMPT_DESIGN_ALIGNMENT closed — full app aligned to Claude Design mockups, 898 tests)
+> **Last update**: May 3, 2026 (PROMPT_3c batch 1 — Live Preview operator's-eye sidebar shipped, 944 tests)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ PROMPT_3c — Workflow Editor Live Preview (batch 1) — shipped (May 3, 2026)
+
+Per MASTER_SPECIFICATION § 14.5, the workflow editor now renders an operator's-eye sidebar that mirrors the HMI StepCard for the currently selected step. Engineers can click through the 11 spec states (FLUSSO OK: idle, ready, in_progress, paused, complete, retry — FLUSSO KO: error, failed, warning, timeout, offline) without releasing a Work Order or logging into the HMI, collapsing the iteration loop from ~5 min to ~2 sec.
+
+### Scope delivered
+
+| Component | File | Notes |
+|---|---|---|
+| State catalogue | `apps/web/src/components/workflow/livePreview/states.ts` | 11 states across two flow groups; static map to the 11 HMI `StepExecutionStatus` values so visual parity is testable |
+| Mock data engine | `apps/web/src/components/workflow/livePreview/mockData.ts` | `nodeToPreviewData(node)` adapter + `mockStateFields(state, stepId)` deterministic FNV-1a hash → `(durationSec, attemptCount, blockedNote)` |
+| Operator-eye renderer | `apps/web/src/components/workflow/LivePreviewStepCard.tsx` | Mirror of `apps/hmi/src/components/StepCard.tsx` visual logic (status maps / glyphs / tones / callouts). Stateless, read-only, 300ms transitions. |
+| Sidebar container | `apps/web/src/components/workflow/StepLivePreview.tsx` | Subscribes to Zustand store, renders state chips bar + card; resets to `idle` on selection change |
+| 5th pane wiring | `apps/web/src/app/(registries)/workflows/[id]/page.tsx` | Toggleable `react-resizable-panels` `<Panel>` next to Inspector; "Anteprima" toolbar button mirrors the existing "Storico" pattern; defaults ON for discoverability |
+
+### Architectural decisions
+
+1. **Adapter, not cross-app import** — HMI's `StepCard` consumes runtime `WorkOrderStep` data; the editor only has workflow AST nodes, and tsconfig paths don't bridge `apps/hmi` → `apps/web`. Mirroring the visual logic in a new `LivePreviewStepCard` keeps the app boundary clean and lets HMI continue evolving its execution-data shape independently. The 11 mirror-parity test cases in `LivePreviewStepCard.test.tsx` are the canary if the HMI visual contract drifts.
+
+2. **Deterministic mock data via FNV-1a hash of `stepId`** — Runtime fields the AST doesn't carry (durationSec, attemptCount, blockedNote) are synthesized per `(state, stepId)` so the preview is reproducible across re-renders. No randomness, no flicker. Lightweight inline hash avoids the cost (and async surface) of `crypto.subtle`.
+
+3. **Toggleable 5th pane, not tabbed inspector** — Reuses the existing `react-resizable-panels` infrastructure (Validation / Palette / Canvas / Inspector / **Preview** / optional History). Engineers can compare form edits and the preview side-by-side, which a tabbed inspector would force into separate views. Default ON ensures the feature is discovered without onboarding.
+
+4. **Chip-driven only for v1** — The spec § 14.5 also calls for clicking action buttons inside the preview to simulate state transitions; that needs a small state machine and ~80 LOC + tests. Deferred to v1.1; current version is read-only with chip-controlled state, which already covers the "what does failure look like" feedback loop.
+
+### Test count
+
+- **Baseline (PROMPT_DESIGN_ALIGNMENT close + PROMPT_7 D4)**: 909 (api 296 / domain 197 / ui 181 / web 97 / hmi 56 / schemas 39 / prisma 24 / cache 8 / storage 6 / queue 5)
+- **Final**: **944** (api 296 / domain 197 / ui 181 / **web 132** / hmi 56 / schemas 39 / prisma 24 / cache 8 / storage 6 / queue 5)
+- **Delta**: **+35 tests** (web only — 3 new test files: `mockData.test.ts` 11 / `LivePreviewStepCard.test.tsx` 18 / `StepLivePreview.test.tsx` 6). Zero regressions in any other package.
+
+### Verification (May 3, 2026)
+
+- ✅ `pnpm --filter @mes/web type-check` clean (exit 0)
+- ✅ `pnpm --filter @mes/web lint` clean (no warnings or errors)
+- ✅ `pnpm test` — **17 tasks successful**, 944 tests passing (full Turborepo run)
+- ✅ `pnpm build` — **13 tasks successful**, 33+ web routes generated, `/workflows/[id]` route 143 kB / 269 kB First Load JS
+- ⏳ Manual smoke deferred — chip-driven preview + toggle button verified by tests; in-browser confirmation can run as part of demo dress rehearsal
+
+### Files changed
+
+```
+apps/web/src/components/workflow/livePreview/states.ts                     (NEW)
+apps/web/src/components/workflow/livePreview/mockData.ts                   (NEW)
+apps/web/src/components/workflow/livePreview/mockData.test.ts              (NEW)
+apps/web/src/components/workflow/LivePreviewStepCard.tsx                   (NEW)
+apps/web/src/components/workflow/LivePreviewStepCard.test.tsx              (NEW)
+apps/web/src/components/workflow/StepLivePreview.tsx                       (NEW)
+apps/web/src/components/workflow/StepLivePreview.test.tsx                  (NEW)
+apps/web/src/app/(registries)/workflows/[id]/page.tsx                      (toggle + 5th pane)
+STATUS.md                                                                  (this entry)
+TODO.md                                                                    (TODO-061 added)
+```
+
+### TODOs opened by PROMPT_3c batch 1
+
+- **TODO-061** — Seed `Step.data.recoveryConfig.preRetryStepIds` for STEP-LEAK-003 + STEP-CAM-002. Surfaced during PROMPT_7 D4 closure manual smoke. Tier 3 polish; effort ~30 min.
+
+### Out of scope (later PROMPT_3c batches)
+
+- WorkflowSnapshot integration (depends on WO release flow)
+- Performance benchmarks for canvas at 100+ nodes
+- Playwright E2E (Vitest + RTL only here)
+- Per-action-type specialized renderers (SCAN_QR mock, DEVICE_RUN telemetry)
+- Action-button-driven state simulation in the preview
+- Responsive floating-drawer mode <1280px (per spec § 14.4)
 
 ---
 

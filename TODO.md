@@ -2,12 +2,12 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-03 (Sound HMI Quick Win deferred at kickoff — opened TODO-057; PROMPT_7 D4 recon — opened TODO-058)
+> **Last updated**: 2026-05-03 (PROMPT_3c batch 1 closure — opened TODO-061 for STEP-LEAK-003 / STEP-CAM-002 preRetryStepIds seed gap)
 >
 > **Tier guidance** (post DESIGN_ALIGNMENT closure, May 3 2026):
 > - **Tier 1 (critical pre-MVP)**: TODO-017 (Argon2id PIN auth + JWT cookies), TODO-021 (WO release flow), TODO-018 (full 11-state step machine), TODO-019 (parallel ops), TODO-020 (recovery 4-stage)
 > - **Tier 2 (important pre-MVP)**: TODO-008/010/011/012 (workflow editor polish), TODO-022 (real persistence), TODO-023 (Socket.IO real-time), TODO-049/050 (BoM/Recipe persistence gaps)
-> - **Tier 3 (post-MVP polish)**: TODO-001/002/003/004/005/006 (legacy registry/cosmetic), TODO-024/025/026/029/030 (HMI/canvas polish), TODO-052/053/054 (Equipment tree, Skills matrix, Operator-Skill editor — surfaced from D3 Batch 7.2), TODO-056 (multi-level timer aggregation), TODO-057 (HMI audio feedback), TODO-058 (recoveryMachine dynamic attempt_N)
+> - **Tier 3 (post-MVP polish)**: TODO-001/002/003/004/005/006 (legacy registry/cosmetic), TODO-024/025/026/029/030 (HMI/canvas polish), TODO-052/053/054 (Equipment tree, Skills matrix, Operator-Skill editor — surfaced from D3 Batch 7.2), TODO-056 (multi-level timer aggregation), TODO-057 (HMI audio feedback), TODO-058 (recoveryMachine dynamic attempt_N), TODO-061 (preRetryStepIds seed gap for STEP-LEAK-003 / STEP-CAM-002)
 > - **Documentation hygiene only**: TODO-007/015/016/027/028/031/032/033/036/037/038/039/041/042/044/045
 
 ---
@@ -317,6 +317,23 @@
 **Estimated effort**: 2-4h (machine refactor + tests + frontend integration verify + audit any callers of `MAX_RECOVERY_ATTEMPTS` constant across the repo).
 **Priority**: Tier 3 polish (post-MVP). Non-blocking for the 18-22 May demo — the seeded workflow uses `maxAttempts: 2` which the current machine handles natively. Pull earlier only if a process engineer needs >2 attempts for a real production workflow.
 **Blocker for**: nothing in MVP. Demo path is unaffected.
+
+---
+
+### TODO-061 — Seed Step.data.recoveryConfig.preRetryStepIds for STEP-LEAK-003 + STEP-CAM-002
+
+**Discovered**: 2026-05-03 (PROMPT_7 D4 closure manual smoke skipped due to seed gap; surfaced again at PROMPT_3c batch 1 close)
+**Status**: 🟢 PENDING — backend wire-up shipped in commit `12e5f2a`, but the seed never populates `preRetryStepIds`, so the HMI runtime renders an empty pre-retry list and the visual block stays hidden.
+**File**:
+- MOD `packages/prisma/seed/pneumatic-air.ts` (or whichever seed module owns STEP-LEAK-003 and STEP-CAM-002 — verify) — set `step.data.recoveryConfig.preRetryStepIds` to the workflow step IDs that operators must re-run before retrying the failing step (e.g. for STEP-LEAK-003 the pre-retry usually loops back to the leak-prep / fixture-clean steps; confirm with the process engineer).
+- VERIFY `apps/hmi/src/components/RecoveryFlow.tsx` reads `step.data.recoveryConfig.preRetryStepIds` at runtime (already verified — D4 closure).
+**Acceptance criterion**:
+- Seed `pnpm --filter @mes/prisma seed:pneumatic` populates non-empty `preRetryStepIds` on STEP-LEAK-003 and STEP-CAM-002.
+- HMI runtime test: trigger recovery on STEP-LEAK-003 → recovery panel renders the seeded pre-retry step list (not empty).
+- Add 1 vitest snapshot or assertion in `apps/hmi/src/components/RecoveryFlow.test.tsx` (or equivalent) that hits the seeded pre-retry path.
+**Estimated effort**: ~30 min (seed file edit + test).
+**Priority**: Tier 3 polish (post-MVP). Backend wire-up is verified by tests; this is purely demo-data fidelity. Not blocking the 18-22 May demo because the recovery flow itself works — the operator just doesn't see the pre-retry list until the seed is fixed.
+**Blocker for**: nothing in MVP. Demo path is unaffected unless we want to demo the pre-retry UX.
 
 ---
 

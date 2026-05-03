@@ -10,6 +10,7 @@ import { WorkflowCanvas } from '../../../../components/workflow/WorkflowCanvas'
 import { WorkflowPalette } from '../../../../components/workflow/WorkflowPalette'
 import { WorkflowInspector } from '../../../../components/workflow/WorkflowInspector'
 import { ValidationPanel } from '../../../../components/workflow/ValidationPanel'
+import { StepLivePreview } from '../../../../components/workflow/StepLivePreview'
 import { WorkflowValidationProvider } from '../../../../components/workflow/validation-context'
 import { ApproveVersionModal } from '../../../../components/workflow/versioning/ApproveVersionModal'
 import { DeprecateVersionModal } from '../../../../components/workflow/versioning/DeprecateVersionModal'
@@ -27,6 +28,10 @@ export default function WorkflowEditorPage() {
   const [approveOpen, setApproveOpen] = useState(false)
   const [deprecateOpen, setDeprecateOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  // PROMPT_3c — Live Preview sidebar (operator's-eye view of selected step).
+  // Defaults ON so engineers discover the feature; same toggle pattern as
+  // the existing "Storico" Version History pane.
+  const [previewOpen, setPreviewOpen] = useState(true)
   const addPhaseDrawer = useWorkflowStore((s) => s.addPhaseDrawer)
   const closeAddPhaseDrawer = useWorkflowStore((s) => s.closeAddPhaseDrawer)
   const addGroupModal = useWorkflowStore((s) => s.addGroupModal)
@@ -115,6 +120,14 @@ export default function WorkflowEditorPage() {
           )}
           <button
             type="button"
+            onClick={() => setPreviewOpen((v) => !v)}
+            className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            data-testid="toggle-live-preview"
+          >
+            {previewOpen ? 'Nascondi anteprima' : 'Anteprima'}
+          </button>
+          <button
+            type="button"
             onClick={() => setHistoryOpen((v) => !v)}
             className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
           >
@@ -176,6 +189,15 @@ export default function WorkflowEditorPage() {
               </div>
             </div>
           </Panel>
+
+          {previewOpen && (
+            <>
+              <PanelResizeHandle className="w-1 bg-neutral-200 hover:bg-primary-400 transition-colors cursor-col-resize" />
+              <Panel defaultSize={22} minSize={18}>
+                <StepLivePreview />
+              </Panel>
+            </>
+          )}
 
           {historyOpen && (
             <>
