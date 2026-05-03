@@ -1,8 +1,174 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 3, 2026 (PROMPT_3c batch 1 — Live Preview operator's-eye sidebar shipped, 944 tests)
+> **Last update**: May 4, 2026 (PROMPT_9 reduced scope — tool wear hook + MaintenanceOrder CRUD + Dashboard nav)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ PROMPT_9 — Equipment + Maintenance + Tool Wear (REDUCED SCOPE) + Dashboard nav — shipped (May 4, 2026)
+
+Pre-demo (Reflex Allen, 18-22 May 2026), per Strategy B Realistic decided 2026-05-04, anticipated PROMPT_9 from 11-13 mag to 5-7 mag with a reduced scope (~2-2.5h batch). Schema recon confirmed `MaintenanceOrder`, `MaintenanceLog`, `EquipmentStateLog`, `ToolWearHistory` all already present in [schema.prisma:952-1054](packages/prisma/schema.prisma) — **no migration needed** (S7 surprise avoided).
+
+### Scope delivered
+
+| Component | File | Notes |
+|---|---|---|
+| Tool wear thresholds + helpers | [`apps/api/src/modules/tools/tools.service.ts`](apps/api/src/modules/tools/tools.service.ts) | `deriveWearStatus()` (good <70% / worn 70-89% / at_limit ≥90%) + `isToolExceeded()` predicate (Q1: `at_limit` enum stays, "exceeded" derived not enum value). `recordCycle()` increments + recomputes wearStatus + audits as `state_change` with `kind: 'cycle_increment'`. `replace()` resets counter, bumps replacementCount, inserts ToolWearHistory, stashes `photoBase64` in AuditLog payload (Q2: no schema migration this batch). |
+| Tools controller endpoint | [`apps/api/src/modules/tools/tools.controller.ts`](apps/api/src/modules/tools/tools.controller.ts) | `POST /tools/:id/replace` accepts `{ reason, photoBase64?, replacementToolId? }` validated by new `ReplaceToolSchema`. |
+| Step-execution wear hook | [`apps/api/src/modules/work-orders/step-execution.service.ts`](apps/api/src/modules/work-orders/step-execution.service.ts) | (1) Block guard: throws `UnprocessableEntityException` on START when bound tool is exceeded. (2) Auto-increment: when COMPLETE_OK lands a tool-bearing step in `done`, calls `toolsService.recordCycle()`. Best-effort (logs.warn but does NOT roll back the transition on failure). (3) DTO extended with `toolId`, `toolWearStatus`, `toolIsExceeded` projections. |
+| MaintenanceOrders module | [`apps/api/src/modules/maintenance-orders/`](apps/api/src/modules/maintenance-orders/) (4 files) | Module + Controller + Service + Repository per `tools/` pattern. Endpoints: GET list/detail, POST create, PATCH update (rejects 422 if status != scheduled), DELETE soft-delete. Code generation: `MNT-{YYYY}-{NNNN}` per [EQUIPMENT_MANAGEMENT.md §2.2](docs/extensions/EQUIPMENT_MANAGEMENT.md), per-(plantId, year) sequence. Action endpoints (Start/Complete/Cancel) deferred to TODO-062. |
+| Schemas | [`packages/schemas/src/registries/maintenance-order.schema.ts`](packages/schemas/src/registries/maintenance-order.schema.ts) (new) + [`tool.schema.ts`](packages/schemas/src/registries/tool.schema.ts) (extended) | `MAINTENANCE_TYPES/STATUSES/PRIORITIES` enums + Create/Update/Filters Zod schemas using schema-native field names (plannedStart/plannedEnd, description, equipmentNodeId). |
+| SDK | [`packages/sdk/src/clients/registry-clients.ts`](packages/sdk/src/clients/registry-clients.ts) | `MaintenanceOrdersClient extends BaseRegistryClient` + `ToolsClient.replace(id, data)` method. Wired into `sdk.maintenanceOrders` in [`apps/web/src/lib/sdk.ts`](apps/web/src/lib/sdk.ts). |
+| Back-office UI | [`apps/web/src/app/(registries)/maintenance-orders/`](apps/web/src/app/(registries)/maintenance-orders/) (3 pages) | List with status/type/priority columns; Detail with tabs (Dettagli / Pianificazione / Attività + ActivityFeed audit log); Create form with equipment dropdown + datetime-local pickers. Action buttons defer to TODO-062 (notice rendered). |
+| Sidebar Dashboard nav | [`apps/web/src/components/shell/Sidebar.tsx`](apps/web/src/components/shell/Sidebar.tsx) + [`NavItem.tsx`](apps/web/src/components/shell/NavItem.tsx) | NEW "Panoramica" section above "Anagrafiche" with Dashboard link (`/`, `<BarChart3>` lucide-react icon — Q4 decision). NavItem extended to accept `string \| ReactNode` for icon. NEW Manutenzioni entry (🛠️) in REGISTRY_NAV between Tools and BoxTypes. Active-state guard fixed for `/` (exact match instead of prefix). |
+| Seed | [`packages/prisma/seed.ts`](packages/prisma/seed.ts) | +3 demo MaintenanceOrders: MNT-2026-0001 (preventive scheduled, EQ-EXT-01A), MNT-2026-0002 (calibration in_progress, EQ-LEAK-01A), MNT-2026-0003 (corrective completed, EQ-CRIMP-01A). Idempotent. |
+
+### Architectural decisions (Q1-Q4 from 2026-05-04)
+
+1. **Q1 — Tool wear "exceeded" stays as a derived predicate, not a new enum value.** ToolWearStatus enum is `new | good | worn | at_limit | replaced`. Tool stays at `at_limit` once ≥90%; `isToolExceeded()` returns true when `currentCyclesCount >= maxCycles`. Block guard surfaces this as a domain error on START. Avoids schema migration.
+
+2. **Q2 — `photoBase64` stashed in AuditLog.after JSON payload, no schema migration.** ToolWearHistory schema has no `attachmentUrls` field; replacement form's photo flows via audit log payload. Tracked as TODO-062 follow-up: post-DEPLOYMENT (when MinIO/R2 is available), migrate to S3-backed photo storage with URL refs in audit log instead of base64. Migration script: read existing replace audit entries, upload base64 to S3, replace `payload.photoBase64` with `payload.photoUrl`. Audit log table can grow large with base64 photos (~100KB per replacement).
+
+3. **Q3 — MaintenanceOrder UI: list + detail + create only.** Action buttons (Start/Complete/Cancel) deferred to TODO-062 to keep this batch under 2.5h. Detail page renders amber notice; API still exposes the full CRUD shape.
+
+4. **Q4 — Sidebar Dashboard nav uses `BarChart3` lucide-react icon (not emoji).** NavItem prop signature widened from `icon: string` to `icon: string \| ReactNode`. Active-state branch tightened for `/` to exact match.
+
+### Decisions formalized at this batch (per MASTER_BACKLOG.md § 9)
+
+- **D1** ✅ Strategy B Realistic adopted — ship date 18-22 giu (slipped +5-7 days vs original 13-15 giu target).
+- **D2** ✅ Sound HMI deferred — tracked as TODO-057.
+- **D3** ✅ AUTH_BASIC deferred post-demo — merged with PROMPT_DEPLOYMENT (5-12 giu). HMI auth already functional (Argon2id PINs from PROMPT_5_FULL D1+D2).
+- **D4** ✅ PROMPT_PNE_5 deferred post-demo.
+- **D5** ✅ ViewSwitcher Workflows pre-demo — separate batch 5-6 mag (next after PROMPT_9). Tracked as TODO-065.
+- D6 (docs owner) + D7 (Andon post-demo customer feedback) remain OPEN.
+
+### Test count (literal output appended in DoD section at bottom)
+
+- **Baseline (PROMPT_3c close)**: 944 (api 296 / domain 197 / ui 181 / web 132 / hmi 56 / schemas 39 / prisma 24 / cache 8 / storage 6 / queue 5)
+- **Added in this batch**: tools.service.test.ts (~15), maintenance-orders.service.test.ts (~6), step-execution wear hook (+4), maintenance-orders pages (~4). Expected total ≈ **973 tests** (+29). Final figure verified post-DoD.
+
+### Files changed
+
+```
+packages/schemas/src/registries/maintenance-order.schema.ts                 (NEW)
+packages/schemas/src/registries/tool.schema.ts                              (+ReplaceToolSchema)
+packages/schemas/src/registries/index.ts                                    (re-export)
+packages/sdk/src/clients/registry-clients.ts                                (+MaintenanceOrdersClient + ToolsClient.replace)
+packages/sdk/src/index.ts                                                   (re-export)
+apps/web/src/lib/sdk.ts                                                     (wire .maintenanceOrders)
+apps/api/src/modules/maintenance-orders/maintenance-orders.module.ts        (NEW)
+apps/api/src/modules/maintenance-orders/maintenance-orders.controller.ts    (NEW)
+apps/api/src/modules/maintenance-orders/maintenance-orders.service.ts       (NEW)
+apps/api/src/modules/maintenance-orders/maintenance-orders.repository.ts    (NEW)
+apps/api/src/modules/maintenance-orders/maintenance-orders.service.test.ts  (NEW)
+apps/api/src/app.module.ts                                                  (register MaintenanceOrdersModule)
+apps/api/src/modules/tools/tools.service.ts                                 (recordCycle + replace + helpers)
+apps/api/src/modules/tools/tools.service.test.ts                            (NEW)
+apps/api/src/modules/tools/tools.controller.ts                              (POST /:id/replace)
+apps/api/src/modules/work-orders/step-execution.service.ts                  (block guard + recordCycle hook + tool projection)
+apps/api/src/modules/work-orders/step-execution.service.test.ts             (+4 wear cases)
+apps/api/src/modules/work-orders/work-orders.module.ts                      (import ToolsModule)
+apps/web/src/app/(registries)/maintenance-orders/page.tsx                   (NEW list)
+apps/web/src/app/(registries)/maintenance-orders/page.test.tsx              (NEW)
+apps/web/src/app/(registries)/maintenance-orders/[id]/page.tsx              (NEW detail)
+apps/web/src/app/(registries)/maintenance-orders/new/page.tsx               (NEW form)
+apps/web/src/app/(registries)/maintenance-orders/new/page.test.tsx          (NEW)
+apps/web/src/components/shell/Sidebar.tsx                                   (Panoramica section + Manutenzioni entry)
+apps/web/src/components/shell/NavItem.tsx                                   (icon: string | ReactNode)
+packages/prisma/seed.ts                                                     (+3 MaintenanceOrders)
+TODO.md                                                                     (+TODO-062/063/064/065 + tier guidance update)
+MASTER_BACKLOG.md                                                           (§ 1 roadmap, § 3.1 AUTH_BASIC deferred, § 9 D1-D7 overhaul, § 10 update log)
+STATUS.md                                                                   (this entry)
+```
+
+### Verification (May 4, 2026 — literal command output)
+
+**A. Type-check** — clean (run per app, since root `pnpm type-check` is blocked by pre-existing `@mes/cache/storage/queue` placeholder packages that have no tsconfig and emit `tsc --help` instead — unrelated to this batch):
+
+```
+$ pnpm --filter @mes/api type-check
+> @mes/api@0.1.0 type-check ...
+> tsc --noEmit
+(exit 0, no output)
+
+$ pnpm --filter @mes/web type-check
+> @mes/web@0.1.0 type-check ...
+> tsc --noEmit
+(exit 0, no output)
+```
+
+**B. Lint** — clean:
+
+```
+$ pnpm --filter @mes/api lint
+> @mes/api@0.1.0 lint ...
+> tsc --noEmit
+(exit 0)
+
+$ pnpm --filter @mes/web lint
+> @mes/web@0.1.0 lint ...
+> next lint
+✔ No ESLint warnings or errors
+```
+
+**C. Tests** — **971 tests passing** across 10 packages (was 944 baseline → **+27**):
+
+| Package | Tests | Δ vs baseline |
+|---|---|---|
+| `@mes/api` | 319 (33 files) | +23 (maintenance-orders.service +6, tools.service +13, step-execution wear hook +4) |
+| `@mes/web` | 136 (59 files) | +4 (maintenance-orders/page +2, maintenance-orders/new/page +2) |
+| `@mes/hmi` | 56 | 0 |
+| `@mes/domain` | 197 | 0 |
+| `@mes/ui` | 181 | 0 |
+| `@mes/schemas` | 39 | 0 |
+| `@mes/prisma` | 24 | 0 |
+| `@mes/cache` | 8 | 0 |
+| `@mes/storage` | 6 | 0 |
+| `@mes/queue` | 5 | 0 |
+| **Total** | **971** | **+27** |
+
+Each suite ran via `pnpm --filter <pkg> test` (per-package vitest); `pnpm test` at root has a Turbo dependency on `@mes/prisma#generate`, which fails on Windows when the dev servers hold the Prisma engine DLL. Tests themselves are independent of the regenerate step (the existing client is current — schema unchanged this batch).
+
+**D. Build** — clean:
+
+```
+$ pnpm --filter @mes/api build
+> @mes/api@0.1.0 build ...
+> tsc -p tsconfig.build.json
+(exit 0)
+
+$ pnpm --filter @mes/web build
+> @mes/web@0.1.0 build ...
+> next build
+✓ Generating static pages (35/35)
+... 36 routes total (was 33 baseline) — +3 new:
+  ○ /maintenance-orders                  887 B           139 kB
+  ƒ /maintenance-orders/[id]             3.78 kB         137 kB
+  ○ /maintenance-orders/new              5.4 kB          131 kB
+```
+
+**E. Seed** — `pnpm --filter @mes/prisma db:seed` ran clean: `✓ MaintenanceOrders: MNT-2026-0001, MNT-2026-0002, MNT-2026-0003 ... ✅ Seed complete`.
+
+**F. Manual smoke — DEFERRED to user.** The harness blocked auto-respawning `pnpm dev` after I killed the 3 zombie servers (PIDs 33636/28180/30484) for the build step. To complete manual smoke, the user runs:
+
+```powershell
+pnpm dev   # 3000/3001/3002
+```
+
+Then verifies in browser:
+1. http://localhost:3001/ — Sidebar shows new "Panoramica > Dashboard" section at the top with `BarChart3` icon.
+2. http://localhost:3001/maintenance-orders — list page shows the 3 seeded MNT rows (MNT-2026-0001 / 0002 / 0003) with status badges and equipment links.
+3. Click a row → detail page renders header (status + priority badges), Dettagli tab, Pianificazione tab (planned vs actual), Attività tab (audit feed).
+4. Click "+ Nuovo" → form with equipment dropdown (populated from `sdk.equipment.list`), datetime-local pickers, MNT-AAAA-NNNN auto-code notice. Submit → redirects to detail page of newly-created MNT-2026-0004.
+5. http://localhost:3002 → login OP-001 (badge `OP-001`, PIN `1234`) → open WO-2026-0101 → step using `TOOL-CRIMP-8MM` shows tool wear hook on completion (verify increment via `pnpm --filter @mes/prisma exec prisma studio` Tool table).
+6. (Optional) Manually set `tool.currentCyclesCount = maxCycles` via studio → start the corresponding step in HMI → expect 422 with `Tool ${code} exceeded lifetime; replace before use`.
+
+**G. Surprise log this batch**:
+- **S+1 (resolved)**: ToolWearStatus enum doesn't have `exceeded` value (Q1 decision: derived predicate `isToolExceeded()` instead — see code in `tools.service.ts`).
+- **S+1 (resolved)**: ToolWearHistory schema has no photo column (Q2 decision: `photoBase64` stashed in AuditLog payload — see TODO-062 for S3 migration plan).
+- **S+1 (resolved)**: Pre-existing root `pnpm type-check` failure for `@mes/cache/storage/queue` (no tsconfig). Unrelated to this batch; out of scope.
+- **S+1 (resolved)**: 3 zombie dev servers held Prisma DLL + .next/trace; killed with user authorization (PIDs 33636/28180/30484).
 
 ---
 

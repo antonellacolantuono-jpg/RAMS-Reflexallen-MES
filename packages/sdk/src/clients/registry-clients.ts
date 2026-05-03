@@ -123,8 +123,47 @@ export interface ToolModel {
   createdAt: string; updatedAt: string; deletedAt?: string; version: number
   createdBy: string; updatedBy: string
 }
+export interface ReplaceToolPayload {
+  reason: string
+  photoBase64?: string
+  replacementToolId?: string
+}
 export class ToolsClient extends BaseRegistryClient<ToolModel, Record<string, unknown>, Record<string, unknown>, Record<string, unknown>> {
   constructor(client: MesClient) { super(client, '/api/tools') }
+  replace(id: string, data: ReplaceToolPayload) {
+    return this.client.post<ToolModel>(`/api/tools/${id}/replace`, data)
+  }
+}
+
+// ---- Maintenance Orders ----
+export interface MaintenanceOrderModel {
+  id: string
+  code: string
+  equipmentNodeId: string
+  type: string
+  status: string
+  priority: string
+  description: string
+  plannedStart: string
+  plannedEnd: string
+  actualStart?: string | null
+  actualEnd?: string | null
+  assignedToId?: string | null
+  startedBy?: string | null
+  completedBy?: string | null
+  cancelledBy?: string | null
+  cancelReason?: string | null
+  plantId: string
+  createdAt: string
+  updatedAt: string
+  deletedAt?: string | null
+  version: number
+  createdBy: string
+  updatedBy: string
+  equipmentNode?: { id: string; code: string; name: string } | null
+}
+export class MaintenanceOrdersClient extends BaseRegistryClient<MaintenanceOrderModel, Record<string, unknown>, Record<string, unknown>, Record<string, unknown>> {
+  constructor(client: MesClient) { super(client, '/api/maintenance-orders') }
 }
 
 // ---- Box Types ----

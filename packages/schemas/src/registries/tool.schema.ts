@@ -26,6 +26,13 @@ export const ToolFiltersSchema = z.object({
   isActive: z.coerce.boolean().default(true),
 })
 
+export const ReplaceToolSchema = z.object({
+  reason: z.string().min(1).max(500),
+  photoBase64: z.string().optional(),
+  replacementToolId: z.string().optional(),
+})
+
 export type CreateToolDto = z.infer<typeof CreateToolSchema>
 export type UpdateToolDto = z.infer<typeof UpdateToolSchema>
 export type ToolFilters = z.infer<typeof ToolFiltersSchema>
+export type ReplaceToolDto = z.infer<typeof ReplaceToolSchema>

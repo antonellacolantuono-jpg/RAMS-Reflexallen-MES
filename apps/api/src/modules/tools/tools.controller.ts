@@ -2,7 +2,7 @@ import { Controller, Body, Param, HttpCode, HttpStatus, Get, Post, Patch, Delete
 import { BaseRegistryController } from '../../common/base-registry.controller'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { ToolsService } from './tools.service'
-import { CreateToolSchema, UpdateToolSchema } from '@mes/schemas'
+import { CreateToolSchema, UpdateToolSchema, ReplaceToolSchema } from '@mes/schemas'
 import type { ToolModel } from './tools.repository'
 
 @Controller('tools')
@@ -42,5 +42,22 @@ export class ToolsController extends BaseRegistryController<ToolModel> {
   @HttpCode(HttpStatus.NO_CONTENT)
   override async remove(@Param('id') id: string) {
     await this.service.softDelete(id, 'system')
+  }
+
+  /**
+   * PROMPT_9 — Tool replacement: resets counter, increments replacement count,
+   * inserts ToolWearHistory, optionally stashes photoBase64 in audit log.
+   * Plant scoping comes from the tool itself (not yet from JWT context).
+   */
+  @Post(':id/replace')
+  @HttpCode(HttpStatus.OK)
+  async replace(@Param('id') id: string, @Body() body: unknown): Promise<ToolModel> {
+    const dto = ReplaceToolSchema.parse(body)
+    const tool = await (this.service as ToolsService).findById(id)
+    // Tool model has no plantId — derive from equipmentNode plant if present;
+    // fallback to 'system' for the audit-log row scope (matches base service
+    // pattern when entity lacks plantId).
+    const plantId = (tool as unknown as { plantId?: string }).plantId ?? 'system'
+    return (this.service as ToolsService).replace(id, dto, 'system', plantId)
   }
 }

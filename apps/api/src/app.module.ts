@@ -22,6 +22,7 @@ import { AutoGenRulesModule } from './modules/auto-gen-rules/auto-gen-rules.modu
 import { AutoGenEngineModule } from './modules/auto-gen-engine/auto-gen-engine.module'
 import { WorkflowsModule } from './modules/workflows/workflows.module'
 import { MockDevicesModule } from './modules/mock-devices/mock-devices.module'
+import { MaintenanceOrdersModule } from './modules/maintenance-orders/maintenance-orders.module'
 import { AppController } from './app.controller'
 
 @Module({
@@ -49,6 +50,7 @@ import { AppController } from './app.controller'
     AutoGenEngineModule,
     WorkflowsModule,
     MockDevicesModule,
+    MaintenanceOrdersModule,
   ],
   controllers: [AppController],
 })

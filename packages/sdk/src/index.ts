@@ -19,6 +19,7 @@ export {
   AutoGenRulesClient,
   WorkflowsClient,
   WorkOrdersClient,
+  MaintenanceOrdersClient,
 } from './clients/registry-clients.js'
 
 export type {
@@ -34,6 +35,7 @@ export type {
   CauseCodeModel,
   AttentionPointModel,
   ToolModel,
+  ReplaceToolPayload,
   BoxTypeModel,
   BoxModel,
   AutoGenRuleModel,
@@ -50,4 +52,5 @@ export type {
   WorkOrderBomLineModel,
   WorkOrderAssignmentModel,
   WorkOrderAuditEntry,
+  MaintenanceOrderModel,
 } from './clients/registry-clients.js'

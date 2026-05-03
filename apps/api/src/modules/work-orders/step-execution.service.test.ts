@@ -788,6 +788,127 @@ describe('StepExecutionService.findStepsForWorkOrder — recovery payload (D5)',
   })
 })
 
+// =====================================================================
+// PROMPT_9 — Tool wear hook + block-on-exceeded guard
+// =====================================================================
+
+describe('StepExecutionService — tool wear hook (PROMPT_9)', () => {
+  type FakeTool = {
+    id: string
+    code: string
+    currentCyclesCount: number
+    maxCycles: number | null
+    wearStatus: string
+  }
+  type FakeStepWithTool = FakeStep & { tool?: FakeTool | null; toolId?: string | null }
+
+  function makeRowWithTool(tool: FakeTool | null, status: string = 'pending'): FakeRow {
+    const step: FakeStepWithTool = makeStep({
+      category: 'production',
+      actionType: 'manual_operation',
+    })
+    step.tool = tool
+    step.toolId = tool?.id ?? null
+    return baseRow({ status, step })
+  }
+
+  function makeServiceWithTools(row: FakeRow, toolsServiceImpl: { recordCycle: ReturnType<typeof vi.fn> } | null) {
+    const updateMock = vi.fn().mockResolvedValue({})
+    const findUniqueMock = vi.fn().mockResolvedValue(row)
+    const findFirstMock = vi.fn().mockResolvedValue({ id: row.workOrderId })
+    const findManyMock = vi.fn().mockResolvedValue([row])
+    const prisma = {
+      stepExecution: { findUnique: findUniqueMock, findMany: findManyMock, update: updateMock },
+      workOrder: { findFirst: findFirstMock },
+    } as unknown as ConstructorParameters<typeof StepExecutionService>[0]
+    const auditLog = { record: vi.fn().mockResolvedValue(undefined) } as unknown as ConstructorParameters<typeof StepExecutionService>[1]
+    const events = {
+      emitStepTransition: vi.fn(),
+      emitParallelSync: vi.fn(),
+    } as unknown as ConstructorParameters<typeof StepExecutionService>[2]
+    // Pass null mock dispatcher + the (optional) tools service in the 5th slot.
+    const service = new StepExecutionService(
+      prisma,
+      auditLog,
+      events,
+      null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      toolsServiceImpl as any,
+    )
+    return { service, updateMock }
+  }
+
+  it('blocks START with UnprocessableEntity when bound tool is exceeded', async () => {
+    const row = makeRowWithTool(
+      { id: 'tool-1', code: 'TOOL-CRIMP-8MM', currentCyclesCount: 1000, maxCycles: 1000, wearStatus: 'at_limit' },
+      'pending',
+    )
+    const { service } = makeServiceWithTools(row, null)
+    await expect(
+      service.applyTransition({
+        stepExecutionId: 'se-1',
+        workOrderId: 'wo-1',
+        event: { type: 'START', by: 'op-1' },
+        changedBy: 'op-1',
+        plantId: 'plant-1',
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException)
+  })
+
+  it('allows START when tool exists but is not exceeded', async () => {
+    const row = makeRowWithTool(
+      { id: 'tool-1', code: 'TOOL-CRIMP-8MM', currentCyclesCount: 950, maxCycles: 1000, wearStatus: 'at_limit' },
+      'pending',
+    )
+    const recordCycle = vi.fn().mockResolvedValue(undefined)
+    const { service, updateMock } = makeServiceWithTools(row, { recordCycle })
+    const result = await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'START', by: 'op-1' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(result.toStatus).toBe('running')
+    expect(updateMock).toHaveBeenCalledOnce()
+    // recordCycle should NOT fire on START — only on done
+    expect(recordCycle).not.toHaveBeenCalled()
+  })
+
+  it('calls toolsService.recordCycle when tool-bearing step lands in done', async () => {
+    const row = makeRowWithTool(
+      { id: 'tool-1', code: 'TOOL-CRIMP-8MM', currentCyclesCount: 5, maxCycles: 1000, wearStatus: 'good' },
+      'running',
+    )
+    const recordCycle = vi.fn().mockResolvedValue(undefined)
+    const { service } = makeServiceWithTools(row, { recordCycle })
+    await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'COMPLETE_OK', by: 'op-1' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(recordCycle).toHaveBeenCalledOnce()
+    expect(recordCycle).toHaveBeenCalledWith('tool-1', 'op-1', 'plant-1')
+  })
+
+  it('does not call recordCycle when step has no tool', async () => {
+    const row = makeRowWithTool(null, 'running')
+    const recordCycle = vi.fn().mockResolvedValue(undefined)
+    const { service } = makeServiceWithTools(row, { recordCycle })
+    const result = await service.applyTransition({
+      stepExecutionId: 'se-1',
+      workOrderId: 'wo-1',
+      event: { type: 'COMPLETE_OK', by: 'op-1' },
+      changedBy: 'op-1',
+      plantId: 'plant-1',
+    })
+    expect(result.toStatus).toBe('done')
+    expect(recordCycle).not.toHaveBeenCalled()
+  })
+})
+
 describe('StepExecutionService.findStepsForWorkOrder — Step.data projection (PROMPT_7 D1)', () => {
   it('projects parsed Step.data JSON onto the DTO', async () => {
     const stepDataJson = JSON.stringify({

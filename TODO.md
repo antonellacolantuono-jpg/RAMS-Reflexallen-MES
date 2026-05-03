@@ -2,12 +2,12 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-03 (PROMPT_3c batch 1 closure — opened TODO-061 for STEP-LEAK-003 / STEP-CAM-002 preRetryStepIds seed gap)
+> **Last updated**: 2026-05-04 (PROMPT_9 reduced-scope closure — opened TODO-062/063/064/065 for deferred Equipment+Maintenance items, Tailwind palette tokens, registry ViewSwitcher, Workflow ViewSwitcher pre-demo)
 >
 > **Tier guidance** (post DESIGN_ALIGNMENT closure, May 3 2026):
 > - **Tier 1 (critical pre-MVP)**: TODO-017 (Argon2id PIN auth + JWT cookies), TODO-021 (WO release flow), TODO-018 (full 11-state step machine), TODO-019 (parallel ops), TODO-020 (recovery 4-stage)
 > - **Tier 2 (important pre-MVP)**: TODO-008/010/011/012 (workflow editor polish), TODO-022 (real persistence), TODO-023 (Socket.IO real-time), TODO-049/050 (BoM/Recipe persistence gaps)
-> - **Tier 3 (post-MVP polish)**: TODO-001/002/003/004/005/006 (legacy registry/cosmetic), TODO-024/025/026/029/030 (HMI/canvas polish), TODO-052/053/054 (Equipment tree, Skills matrix, Operator-Skill editor — surfaced from D3 Batch 7.2), TODO-056 (multi-level timer aggregation), TODO-057 (HMI audio feedback), TODO-058 (recoveryMachine dynamic attempt_N), TODO-061 (preRetryStepIds seed gap for STEP-LEAK-003 / STEP-CAM-002)
+> - **Tier 3 (post-MVP polish)**: TODO-001/002/003/004/005/006 (legacy registry/cosmetic), TODO-024/025/026/029/030 (HMI/canvas polish), TODO-052/053/054 (Equipment tree, Skills matrix, Operator-Skill editor — surfaced from D3 Batch 7.2), TODO-056 (multi-level timer aggregation), TODO-057 (HMI audio feedback), TODO-058 (recoveryMachine dynamic attempt_N), TODO-061 (preRetryStepIds seed gap for STEP-LEAK-003 / STEP-CAM-002), TODO-062 (PROMPT_9 deferred items: Equipment SM, MaintenanceLog, Calendar UI, Equipment OEE, Maintenance KPIs, MNT actions UI), TODO-063 (Tailwind palette tokens), TODO-064 (registry ViewSwitcher), TODO-065 (Workflow ViewSwitcher — Tier 1 PRE-DEMO, separate batch 5-6 mag)
 > - **Documentation hygiene only**: TODO-007/015/016/027/028/031/032/033/036/037/038/039/041/042/044/045
 
 ---
@@ -730,6 +730,81 @@ WARNING  no output files found for task @mes/storage#build. Please check your `o
 ---
 
 ## 🟢 Low priority (nice to have)
+
+### TODO-062 — PROMPT_9 deferred items (Equipment State Machine + MaintenanceLog history + Calendar UI + KPIs + MNT actions)
+
+**Discovered**: 2026-05-04 (PROMPT_9 reduced-scope decision)
+**Status**: 🟢 PENDING — Tier 3 polish, post-demo. Not blocking demo or 1.0 ship.
+**Files**:
+- NEW `packages/domain/src/machines/equipment.machine.ts` (XState formal, 8 states per [EQUIPMENT_MANAGEMENT.md](docs/extensions/EQUIPMENT_MANAGEMENT.md) §3.1)
+- NEW `apps/api/src/modules/maintenance-logs/` (separate from MaintenanceOrder — captures intervention details: actionsPerformed, partsReplaced, findings, recommendations)
+- NEW `apps/web/src/app/(registries)/maintenance-orders/calendar/page.tsx` (drag-drop calendar view per [EQUIPMENT_MANAGEMENT.md](docs/extensions/EQUIPMENT_MANAGEMENT.md) §6.2)
+- EXTEND `apps/web/src/app/(registries)/maintenance-orders/[id]/page.tsx` — wire **Avvia / Completa / Annulla** action buttons (currently shows "azioni... in iterazione successiva" notice)
+- NEW `apps/api/src/modules/maintenance-orders/maintenance-orders.controller.ts` — add `POST /:id/start`, `POST /:id/complete`, `POST /:id/cancel` action endpoints
+- NEW dashboard widgets: equipment-specific OEE breakdown, MTBF/MTTR/Compliance/Overdue Rate KPIs
+**Symptom**: PROMPT_9 (2026-05-04, ~2-2.5h batch) shipped tool wear hook + MaintenanceOrder CRUD + Dashboard nav. The full EQUIPMENT_MANAGEMENT.md spec includes the items above; they were explicitly out-of-scope for PROMPT_9 to keep the batch under 2.5h pre-demo.
+**NOTE on photo storage**: ToolsService.replace currently stashes `photoBase64` in the AuditLog.after JSON payload (no schema migration this batch — Q2 decision 2026-05-04). The audit log table can grow large with base64 photos (~100KB per replacement). Post-DEPLOYMENT (when MinIO/R2 is available), migrate to S3-backed photo storage with URL refs in the audit payload instead of base64. Migration script: read existing replace audit entries, upload base64 to S3, replace `payload.photoBase64` with `payload.photoUrl`.
+**Acceptance criterion**:
+- Equipment state machine formalized in XState v5 with EquipmentStateLog table populated on every transition (table already exists in schema, currently unused by the API).
+- MaintenanceLog model populated when a MaintenanceOrder transitions to `completed` (1:1 relation already in schema).
+- Maintenance Calendar UI: drag-drop reschedule, color-coded by status, click cell → open MaintenanceOrder detail.
+- MaintenanceOrder detail page: Avvia / Completa / Annulla buttons with state-machine validation (only `scheduled` → `in_progress` via Avvia, etc.).
+- Equipment OEE breakdown: 6 Big Losses chart per equipment (per [EQUIPMENT_MANAGEMENT.md](docs/extensions/EQUIPMENT_MANAGEMENT.md) §4.5).
+- Maintenance KPIs: MTBF, MTTR, Compliance %, Overdue Rate, Avg Duration, Preventive vs Corrective ratio.
+- Photo storage migrated from AuditLog.after.photoBase64 to S3 URL refs once MinIO/R2 is wired post-DEPLOYMENT.
+**Estimated effort**: ~3-4 hours additional (foundation for KPI engine post-demo).
+**Blocker for**: nothing in MVP demo. Revisit post-demo as part of KPI engine work.
+
+---
+
+### TODO-063 — Wire Tailwind palette tokens for success-* / error-* / primary-* in @mes/ui design system
+
+**Discovered**: 2026-05-04 (PROMPT_9 recon — inspection of `tools/[id]/page.tsx` wear gauge progress bar references `bg-error-500`, `bg-amber-500`, `bg-primary-500`, but they're silently no-op)
+**Status**: 🟢 PENDING — Tier 3 cosmetic, not blocking functionality.
+**File**: `packages/ui/tailwind.config.ts` (color tokens) + all consumers across registry detail pages.
+**Symptom**: Utility classes like `bg-success-50`, `text-error-500`, `bg-primary-500` don't render the intended design-token colors because the palette tokens were never wired into the shared Tailwind config.
+**Acceptance criterion**:
+- `bg-success-50/100/500/900` + `text-success-500/700` + `bg-error-*` + `text-error-*` + `bg-primary-*` + `text-primary-*` render correct colors per `docs/design-tokens.md`.
+- Visual regression test on `/dev/showcase` confirms tokens are visible.
+**Estimated effort**: ~30 min.
+**Blocker for**: nothing — current pages render with neutral fallback colors.
+
+---
+
+### TODO-064 — Wire ViewSwitcher on registry list pages (generic across 10 registries)
+
+**Discovered**: 2026-05-04 (PROMPT_9 manual smoke)
+**Status**: 🟢 PENDING — Tier 3 polish, post-demo.
+**Scope**: Items, Operators, Tools, Box Types, Recipes, Skills, Cause codes, Attention Points, Boxes, Auto-gen rules (10 registries with list/card support).
+**Excluded**: Equipment Hierarchy (TODO-052 covers ISA-95 tree), Workflows (TODO-065 covers gerarchia + card).
+**Symptom**: Spec [MASTER_SPECIFICATION.md](docs/MASTER_SPECIFICATION.md) §14.2 declares list/card modes per registry; currently only single view (table) is wired across the 10 registries.
+**Acceptance criterion**:
+- ViewSwitcher (already in `@mes/ui`) wired into `RegistryListPage` per registry; mode persisted in localStorage per moduleKey.
+- Card view template per registry (compact card grid showing key fields).
+**Estimated effort**: ~4-6 hours (ViewSwitcher wire + card template per registry).
+**Blocker for**: nothing in demo (table-only is acceptable).
+
+---
+
+### TODO-065 — Workflow editor ViewSwitcher with hierarchical table + card view (PRE-DEMO, separate batch)
+
+**Discovered**: 2026-05-04 (PROMPT_9 manual smoke; user request)
+**Status**: 🟢 PENDING — Tier 1 PRE-DEMO scope. Schedule: **5-6 mag (next batch after PROMPT_9)**.
+**Toggle modes**:
+- **Flusso** (current default — canvas drag-drop with `@xyflow/react`)
+- **Tabella** (NEW — hierarchical treetable: Phase > Group > Step with expand/collapse triangles, indented rows, columns: name, duration, type, status)
+- **Card** (NEW — vertical cards grouped by phase, each card shows step summary)
+**Behavior**:
+- User selects mode via ViewSwitcher in workflow editor toolbar; selection persisted in localStorage per registry.
+- Click step row in Tabella → `useWorkflowStore.setSelectedNode(stepId)` → Inspector + Live Preview sync.
+- Same for Card click.
+- Edit form fields in Inspector reflect in current view (table reorders if reorderable, card content updates).
+**Bonus reuse**:
+- `WorkflowHierarchyTable` component reused in WO Detail Snapshot tab + Genealogy tab (currently amber-notice placeholders) — double ROI on this work.
+**Estimated effort**: ~3-4h (separate batch AFTER PROMPT_9).
+**Blocker for**: pre-demo workflow visualization improvements; bonus closes 2 placeholder tabs in WO Detail.
+
+---
 
 ### TODO-026 — Recovery flow: per-stage StepExecution model (deferred from D5)
 

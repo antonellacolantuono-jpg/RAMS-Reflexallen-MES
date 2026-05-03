@@ -30,6 +30,7 @@ import {
   MockDeviceDispatcherService,
   type DispatchOutcomeContext,
 } from '../mock-devices/mock-device-dispatcher.service'
+import { ToolsService, isToolExceeded } from '../tools/tools.service'
 
 export interface TransitionRequest {
   stepExecutionId: string
@@ -99,6 +100,15 @@ export interface WorkOrderStepDto extends StepStateDto {
    * the column is null OR when the JSON failed to parse (defensive).
    */
   data: Record<string, unknown> | null
+  /**
+   * PROMPT_9 — tool wear projection. `toolId` is the bound tool (if any);
+   * `toolWearStatus` is the cached enum (`new|good|worn|at_limit|replaced`);
+   * `toolIsExceeded` is the derived predicate (currentCyclesCount ≥ maxCycles).
+   * HMI uses these to render wear badges and disable START on exceeded tools.
+   */
+  toolId: string | null
+  toolWearStatus: string | null
+  toolIsExceeded: boolean
 }
 
 /**
@@ -137,6 +147,14 @@ export class StepExecutionService {
     @Optional()
     @Inject(forwardRef(() => MockDeviceDispatcherService))
     private readonly mockDeviceDispatcher: MockDeviceDispatcherService | null = null,
+    /**
+     * PROMPT_9 — ToolsService injected as Optional so unit tests that don't
+     * register ToolsModule still construct the service. When present, we call
+     * `recordCycle` on every tool-bearing step that lands in `done`, and check
+     * `isToolExceeded` to block START transitions on worn-out tooling.
+     */
+    @Optional()
+    private readonly toolsService: ToolsService | null = null,
   ) {
     // Register the outcome listener once. The dispatcher fires this when a
     // simulator finishes its cycle; we translate the outcome into the matching
@@ -188,11 +206,13 @@ export class StepExecutionService {
     }
     const rows = await this.prisma.stepExecution.findMany({
       where: { workOrderId },
-      include: { step: { include: { group: true, device: true } } },
+      include: { step: { include: { group: true, device: true, tool: true } } },
       orderBy: { step: { order: 'asc' } },
     })
     return rows.map((r) => {
       const recovery = this.parseRecoveryData(r.data ?? null)
+      // PROMPT_9 — surface tool wear info on the DTO for HMI badges.
+      const tool = (r.step as { tool?: { id: string; currentCyclesCount: number; maxCycles: number | null; wearStatus: string } | null }).tool ?? null
       return {
         stepExecutionId: r.id,
         workOrderId: r.workOrderId,
@@ -218,6 +238,9 @@ export class StepExecutionService {
         // PROMPT_7 D1 — parse Step.data JSON server-side; null on missing or
         // malformed payload (never throws — see parseStepDataJson helper).
         data: parseStepDataJson(r.step.data ?? null),
+        toolId: tool?.id ?? null,
+        toolWearStatus: tool?.wearStatus ?? null,
+        toolIsExceeded: tool ? isToolExceeded({ currentCyclesCount: tool.currentCyclesCount, maxCycles: tool.maxCycles }) : false,
       }
     })
   }
@@ -259,6 +282,20 @@ export class StepExecutionService {
       inputEvent,
       req.changedBy,
     )
+
+    // PROMPT_9 — block START on a step bound to an exceeded tool. The check
+    // runs BEFORE the state-machine guard so we surface a clear domain error
+    // ("Tool exceeded; replace before use") rather than a generic invalid
+    // transition. Only START is gated — recovery flows and supervisor
+    // overrides remain free to advance the row.
+    if (event.type === 'START' && fromStatus === 'pending') {
+      const tool = (row.step as { tool?: { code: string; currentCyclesCount: number; maxCycles: number | null } | null }).tool
+      if (tool && isToolExceeded(tool)) {
+        throw new UnprocessableEntityException(
+          `Tool ${tool.code} exceeded lifetime (${tool.currentCyclesCount}/${tool.maxCycles ?? '∞'}); replace before use`,
+        )
+      }
+    }
 
     const persistedNotes = this.parseNotes(row.notes)
     const restored = this.buildRestored(
@@ -349,6 +386,25 @@ export class StepExecutionService {
       changedBy: req.changedBy,
       changedAt,
     })
+
+    // PROMPT_9 — auto-increment tool wear when a tool-bearing step lands in
+    // `done`. Errors are logged but do NOT roll back the transition (the step
+    // is already persisted; wear accounting is best-effort). Only triggered
+    // when ToolsService is wired (Optional injection — unit tests skip this).
+    if (toStatus === 'done' && this.toolsService) {
+      const tool = (row.step as { tool?: { id: string } | null }).tool
+      if (tool?.id) {
+        try {
+          await this.toolsService.recordCycle(tool.id, req.changedBy, req.plantId)
+        } catch (err) {
+          this.logger.warn(
+            `tool wear recordCycle failed for tool ${tool.id} on step ${row.id}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          )
+        }
+      }
+    }
 
     await this.maybeEmitParallelSync({
       stepExecutionId: row.id,
@@ -662,7 +718,9 @@ export class StepExecutionService {
         // Recipe directly) and the 3 mock simulators have hardcoded defaults
         // matching the PNE_2-seeded recipes — no recipe lookup needed for the
         // demo. Real-device dispatch in F2 will resolve via RecipeVersion.
-        step: { include: { group: true, device: true } },
+        // PROMPT_9 — also include `tool` so applyTransition can run the
+        // wear-block guard on START and trigger recordCycle on done.
+        step: { include: { group: true, device: true, tool: true } },
         workOrder: { select: { plantId: true, deletedAt: true } },
       },
     })

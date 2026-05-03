@@ -5,6 +5,7 @@ import { AuditLogModule } from '../audit-log/audit-log.module'
 import { EventsModule } from '../events/events.module'
 import { AutoGenEngineModule } from '../auto-gen-engine/auto-gen-engine.module'
 import { MockDevicesModule } from '../mock-devices/mock-devices.module'
+import { ToolsModule } from '../tools/tools.module'
 import { FastForwardController } from '../mock-devices/fast-forward.controller'
 import { WorkOrdersController } from './work-orders.controller'
 import { WorkOrdersService } from './work-orders.service'
@@ -27,6 +28,7 @@ import { ReleaseService } from './release.service'
     EventsModule,
     AutoGenEngineModule,
     forwardRef(() => MockDevicesModule),
+    ToolsModule,
   ],
   controllers: [
     WorkOrdersController,

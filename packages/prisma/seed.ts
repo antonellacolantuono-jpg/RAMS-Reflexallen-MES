@@ -1009,6 +1009,72 @@ async function main(): Promise<void> {
   }
   console.log('✓ Workflow templates:', templates.map((t) => t.code).join(', '))
 
+  // ── 17. MaintenanceOrders (PROMPT_9 demo) ────────────────────────────────
+  const mntDefs = [
+    {
+      code: 'MNT-2026-0001',
+      equipmentNodeCode: 'EQ-EXT-01A',
+      type: 'preventive',
+      status: 'scheduled',
+      priority: 'normal',
+      description: 'Pulizia testa estrusione + lubrificazione cuscinetti',
+      plannedStart: new Date('2026-05-15T08:00:00Z'),
+      plannedEnd: new Date('2026-05-15T11:00:00Z'),
+    },
+    {
+      code: 'MNT-2026-0002',
+      equipmentNodeCode: 'EQ-LEAK-01A',
+      type: 'calibration',
+      status: 'in_progress',
+      priority: 'high',
+      description: 'Calibrazione trasduttore pressione — certificato annuale',
+      plannedStart: new Date('2026-05-04T14:00:00Z'),
+      plannedEnd: new Date('2026-05-04T17:00:00Z'),
+    },
+    {
+      code: 'MNT-2026-0003',
+      equipmentNodeCode: 'EQ-CRIMP-01A',
+      type: 'corrective',
+      status: 'completed',
+      priority: 'urgent',
+      description: 'Sostituzione guarnizione idraulica pressa crimp (perdita olio)',
+      plannedStart: new Date('2026-04-28T09:00:00Z'),
+      plannedEnd: new Date('2026-04-28T13:00:00Z'),
+    },
+  ]
+
+  for (const mnt of mntDefs) {
+    const eq = eqNodes[mnt.equipmentNodeCode]
+    if (!eq) continue
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existing = await (prisma as any).maintenanceOrder.findFirst({
+      where: { plantId: plant.id, code: mnt.code },
+    })
+    if (!existing) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma as any).maintenanceOrder.create({
+        data: {
+          code: mnt.code,
+          equipmentNodeId: eq.id,
+          type: mnt.type,
+          status: mnt.status,
+          priority: mnt.priority,
+          description: mnt.description,
+          plannedStart: mnt.plannedStart,
+          plannedEnd: mnt.plannedEnd,
+          ...(mnt.status === 'in_progress' || mnt.status === 'completed'
+            ? { actualStart: mnt.plannedStart }
+            : {}),
+          ...(mnt.status === 'completed' ? { actualEnd: mnt.plannedEnd } : {}),
+          plantId: plant.id,
+          createdBy: SYSTEM,
+          updatedBy: SYSTEM,
+        },
+      })
+    }
+  }
+  console.log('✓ MaintenanceOrders:', mntDefs.map((m) => m.code).join(', '))
+
   console.log('\n✅ Seed complete — MOCK_DATA_PNEUMATIC_AIR loaded successfully')
 }
 

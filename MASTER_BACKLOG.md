@@ -28,10 +28,10 @@ Order of execution + status. **This is what gets done in PROMPTs**.
 | # | PROMPT | Effort CC | Calendar | Status |
 |---|---|---|---|---|
 | 1 | **PROMPT_DESIGN_ALIGNMENT** (full app + ex-PROMPT_7 D2/D3) | ~22h actual | 3-7 mag | ✅ done 2026-05-03 |
-| 2 | **PROMPT_7_RESUME** (HMI runtime recoveryConfig + pre-retry execution) | 1-2h | 7-8 mag | ⏳ next |
-| 3 | **PROMPT_3c** (Workflow Live Preview state-driven) | 1.5-2h | 8-9 mag | ⏳ |
-| 4 | **PROMPT_AUTH_BASIC** (NEW — login web + ruoli base + permission checks) | 6-7h | 9-11 mag | ⏳ TBD inserire (Tier 1) |
-| 5 | **PROMPT_9** (Equipment + Maintenance + Tool Wear + Recovery 4-stage) | 3-4h | 11-13 mag | ⏳ |
+| 2 | **PROMPT_7_RESUME** (HMI runtime recoveryConfig + pre-retry execution) | 1-2h | 7-8 mag | ✅ done 2026-05-03 |
+| 3 | **PROMPT_3c** (Workflow Live Preview state-driven) | 1.5-2h | 8-9 mag | ✅ done 2026-05-03 (commit `cac1390`) |
+| 4 | **PROMPT_9** (Equipment + Maintenance + Tool Wear) — **REDUCED SCOPE** (no Recovery 4-stage; tool wear hook + MaintenanceOrder CRUD + Dashboard nav only) | ~2-2.5h | **5-7 mag** (anticipated, was 11-13 mag) | ⏳ in flight 2026-05-04 |
+| 5 | **PROMPT_VIEWSWITCHER_WORKFLOWS** (NEW — Tabella gerarchica + Card view + ViewSwitcher; bonus reuse in WO Detail Snapshot/Genealogy tabs) | ~3-4h | 5-6 mag | ⏳ next batch after PROMPT_9 |
 | 6 | **DEMO PREP** (slide + dress rehearsal) | — (tuo) | 14-17 mag | ⏳ |
 | 7 | **🎯 DEMO REFLEX ALLEN** | — | **18-22 mag** | 🎯 |
 | 8 | Post-demo feedback absorb | — | 23-24 mag | ⏳ |
@@ -39,7 +39,7 @@ Order of execution + status. **This is what gets done in PROMPTs**.
 | 10 | **PROMPT_11** (CFRP Module) | 3-4h | 26-29 mag | ⏳ |
 | 11 | **PROMPT_12** (Safety Devices Module) | 3-4h | 30 mag - 2 giu | ⏳ |
 | 12 | **PROMPT_13** (Audit + Genealogy + Skills Matrix + KPI) | 2-3h | 3-5 giu | ⏳ |
-| 13 | **PROMPT_DEPLOYMENT** (NEW — production stack: PostgreSQL + Docker + Redis + Worker + nginx + SSL) | 18-21h | 5-12 giu | ⏳ TBD inserire (Tier 1) |
+| 13 | **PROMPT_DEPLOYMENT + AUTH_BASIC merged** (NEW — production stack: PostgreSQL + Docker + Redis + Worker + nginx + SSL **+ AUTH_BASIC merged here per D3 2026-05-04**) | 24-28h | 5-12 giu | ⏳ TBD inserire (Tier 1) |
 | 14 | **PROMPT_E2E_TESTS** (NEW — 6 critical flows Playwright) | 10h | 12-15 giu | ⏳ TBD inserire (Tier 2) |
 | 15 | **UAT finale + bug fix** | — | 15-18 giu | ⏳ |
 | 16 | **🚀 MVP SHIP** | — | **18-22 giu** (slipped da 13-15 giu se Tier 1+2 inseriti) | 🚀 |
@@ -86,7 +86,9 @@ Open numbered TODOs in the project. Last review: 2026-05-03 post DESIGN_ALIGNMEN
 
 **Senza questi NON si può shippare in produzione**.
 
-### 3.1 Auth + Permissions basic 🔴 (~6-7h)
+### 3.1 Auth + Permissions basic 🔴 (~6-7h) — **DEFERRED post-demo (D3 2026-05-04)**
+
+> **STATUS DEFERRED post-demo per D3 decision 2026-05-04** — merged into PROMPT_DEPLOYMENT (5-12 giu). Rationale: HMI auth already exists (mock functional, 4 operators seeded with Argon2id PINs from PROMPT_5_FULL D1+D2); back-office demo manageable with brief disclaimer slide. Demo Reflex Allen 18-22 mag will explicitly note "back-office auth shipping post-demo" if asked.
 
 **Why critical**: oggi web back-office è "open" (chiunque accede al planner board, può rilasciare WO, modificare workflow). HMI ha solo login operatore con badge+PIN. Nessun ruolo, nessun permission check.
 
@@ -387,42 +389,54 @@ Demo customer non lo richiede esplicitamente. Add se feedback positive.
 
 Open decisions per le quali aspetto direzione utente.
 
-### D1 — Strategy ship date (decide post PROMPT_DESIGN_ALIGNMENT D4 closure ~7-8 mag)
+| ID | Topic | Status | Decided |
+|---|---|---|---|
+| D1 | Strategy ship date (B Realistic = 18-22 giu) | ✅ DECIDED | 2026-05-04 |
+| D2 | Sound HMI deferred (TODO-057) | ✅ DECIDED | 2026-05-03 (DESIGN_ALIGNMENT D4 closure) |
+| D3 | AUTH_BASIC deferred post-demo (merged with PROMPT_DEPLOYMENT) | ✅ DECIDED | 2026-05-04 |
+| D4 | PROMPT_PNE_5 deferred post-demo | ✅ DECIDED | 2026-05-04 |
+| D5 | ViewSwitcher Workflows pre-demo (NEW Q5) | ✅ DECIDED | 2026-05-04 |
+| D6 | Documentation owner split tu/CC (was D5) | ⏳ OPEN — decide by 14 mag | — |
+| D7 | PROMPT_6 Andon (post-demo customer feedback) | ⏳ OPEN — decide post-demo 22-23 mag | — |
+
+### D1 — Strategy ship date ✅ DECIDED 2026-05-04: B Realistic
 
 | Strategy | Tier 1 | Tier 2 | Tier 3 | Ship date |
 |---|---|---|---|---|
 | **A — Aggressive** | Auth solo demo mode (~2h) | skip | skip | 13-15 giu (target originale) |
-| **B — Realistic** ⭐ | Auth full + Deployment + E2E | skip | skip | 18-22 giu |
+| **B — Realistic** ⭐ ✅ | Deployment + E2E (Auth merged into Deployment) | skip | skip | **18-22 giu** (slipped +5-7 days vs target) |
 | **C — Conservative** | Tier 1 full | Tier 2 full | skip | 25-30 giu |
 | **D — Demo-driven** | TBD post-feedback | TBD | TBD | 25 giu - 5 lug |
 
-**Mia raccomandazione**: B (Realistic).
+**Outcome**: B Realistic adopted. Ship date 18-22 giu (slipped +5-7 days vs original target). AUTH_BASIC merged into PROMPT_DEPLOYMENT (D3).
 
-### D2 — Sound HMI inserimento (decide pre-demo ~12-13 mag)
+### D2 — Sound HMI ✅ DECIDED 2026-05-03: deferred to TODO-057
 
-Sound HMI feedback è quick win 30 min. Lo inseriamo in PROMPT_DESIGN_ALIGNMENT D3 batch 4.5 (con HMI Shell) oppure come patch a parte?
+D2 Batch 4.5 shipped `HMIShell` + `HMIBigBtn` primitives but did NOT include sound HMI feedback. Tracked as TODO-057 (Tier 3 polish, post-MVP). Demo path unaffected.
 
-**Mia raccomandazione**: inserire in HMI Shell batch 4.5 (no overhead extra).
+### D3 — AUTH_BASIC timing ✅ DECIDED 2026-05-04: DEFERRED post-demo, merged with PROMPT_DEPLOYMENT
 
-**STATUS post DESIGN_ALIGNMENT closure (2026-05-03)**: D2 Batch 4.5 shipped `HMIShell` + `HMIBigBtn` primitives but did NOT include sound HMI feedback. Decision still open — handle as standalone 30-min patch pre-demo.
+**Outcome**: AUTH_BASIC ($\approx$6-7h) merged into PROMPT_DEPLOYMENT (5-12 giu). HMI auth already exists (mock functional, 4 operators seeded with Argon2id PINs). Back-office demo manageable with brief disclaimer slide. Net effect: PROMPT_DEPLOYMENT effort 18-21h → 24-28h.
 
-### D3 — Auth basic timing (decide post Tier 1 commit)
+### D4 — PROMPT_PNE_5 ✅ DECIDED 2026-05-04: deferred post-demo
 
-PROMPT_AUTH_BASIC va prima o dopo PROMPT_9?
+Auto-trigger label + warning step + conditional Packaging — customer non lo richiede esplicitamente in demo brief. Defer to post-demo polish unless feedback positive.
 
-**Mia raccomandazione**: prima (9-11 mag), così demo customer vede sistema completo with auth.
+### D5 — ViewSwitcher Workflows pre-demo (NEW) ✅ DECIDED 2026-05-04: pre-demo, separate batch 5-6 mag
 
-### D4 — PROMPT_6 Andon (decide post-demo 22-23 mag)
+User request 2026-05-04 to add Tabella + Card view modes to Workflow editor. Schedule: separate batch AFTER PROMPT_9 closure, calendar 5-6 mag. Bonus: WorkflowHierarchyTable component reused in WO Detail Snapshot tab + Genealogy tab (closes 2 amber-notice placeholders). Tracked as TODO-065.
 
-Customer feedback determina priorità. Possibili outcomes:
-- "Customer ha apprezzato dashboard live" → build Andon (~2h)
-- "Customer non ha menzionato Andon" → defer post-MVP
-
-### D5 — Documentation owner (decide pre-ship)
+### D6 — Documentation owner split (was D5) ⏳ OPEN — decide by 14 mag
 
 Tu scrivi docs (10h) o assumiamo a Claude Code (1-2h con tuo review)?
 
 **Mia raccomandazione**: split. Tu scrivi user manual operatore (più contesto domain-specific), Claude Code prima draft di admin/troubleshooting/API docs.
+
+### D7 — PROMPT_6 Andon (was D4) ⏳ OPEN — decide post-demo 22-23 mag
+
+Customer feedback determina priorità. Possibili outcomes:
+- "Customer ha apprezzato dashboard live" → build Andon (~2h)
+- "Customer non ha menzionato Andon" → defer post-MVP
 
 ---
 
@@ -432,6 +446,7 @@ Tu scrivi docs (10h) o assumiamo a Claude Code (1-2h con tuo review)?
 |---|---|
 | 2026-05-03 | Initial document v1.0 — full inventory after PROMPT_7 D1 merged + DESIGN_ALIGNMENT D2 Batch 1+2 done |
 | 2026-05-03 | **PROMPT_DESIGN_ALIGNMENT closed** (D4 closure): § 1 status updated (item 1 ✅ done, item 2 ⏳ next), § 2 TODO list refreshed (TODO-039/046/055 ✅ done; TODO-049/050/052/053/054/056 NEW opened), § 9 D2 status note added. Smoke gate verified (`pnpm dev` 6/7 routes 200; `/work-orders` 404 expected). Total tests 770 → 898 (+128, zero regressions). |
+| 2026-05-04 | **PROMPT_9 reduced scope in flight + Dashboard nav fix + manual smoke findings.** § 1 Roadmap: PROMPT_7_RESUME + PROMPT_3c marked ✅ done; PROMPT_9 anticipated to 5-7 mag (was 11-13 mag) with reduced scope (no Recovery 4-stage; tool wear hook + MaintenanceOrder CRUD + Dashboard nav only); NEW PROMPT_VIEWSWITCHER_WORKFLOWS scheduled 5-6 mag. § 3.1 PROMPT_AUTH_BASIC marked DEFERRED post-demo (merged with PROMPT_DEPLOYMENT, total Tier 1 effort 18-21h → 24-28h). § 9 Decision queue overhauled: D1 (Strategy B Realistic, ship 18-22 giu), D2 (Sound HMI deferred TODO-057), D3 (AUTH_BASIC deferred post-demo), D4 (PROMPT_PNE_5 deferred), D5 (ViewSwitcher Workflows pre-demo) all DECIDED. D6 (docs owner) + D7 (Andon post-demo) OPEN. NEW TODOs in TODO.md: TODO-062 (PROMPT_9 deferred items + photo storage S3 migration note), TODO-063 (Tailwind palette tokens), TODO-064 (registry ViewSwitcher), TODO-065 (Workflow ViewSwitcher pre-demo). |
 
 ---
 
