@@ -135,7 +135,7 @@ export function RegistryListPage<T extends { id: string }>({
             newHref ? (
               <Link
                 href={newHref}
-                className="rounded-md bg-primary-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-primary-700"
+                className="inline-flex items-center justify-center gap-1.5 rounded-2 bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent-2"
               >
                 {newLabel}
               </Link>
@@ -297,7 +297,7 @@ function RegistryListPageOpTable<T extends { id: string }>({
           newHref ? (
             <Link
               href={newHref}
-              className="rounded-md bg-primary-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-primary-700"
+              className="inline-flex items-center justify-center gap-1.5 rounded-2 bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent-2"
             >
               {newLabel}
             </Link>

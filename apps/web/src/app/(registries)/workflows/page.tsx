@@ -11,16 +11,10 @@ import {
   StatusBadge,
   ConfirmModal,
 } from '@mes/ui'
-import type { Column, BulkAction } from '@mes/ui'
+import type { Column, BulkAction, StatusValue } from '@mes/ui'
 import { sdk } from '../../../lib/sdk'
 import type { WorkflowModel } from '@mes/sdk'
 import Link from 'next/link'
-
-const STATUS_TONE: Record<string, 'ok' | 'warn' | 'neutral' | 'bad'> = {
-  draft: 'neutral',
-  approved: 'ok',
-  deprecated: 'warn',
-}
 
 const COLUMNS: Column<WorkflowModel>[] = [
   { key: 'code', header: 'Codice', sortable: true, width: '140px' },
@@ -37,12 +31,8 @@ const COLUMNS: Column<WorkflowModel>[] = [
     width: '130px',
     render: (row) => {
       const status = row.currentVersion?.status
-      if (!status) return <span className="text-neutral-400">—</span>
-      return (
-        <StatusBadge tone={STATUS_TONE[status] ?? 'neutral'}>
-          {status}
-        </StatusBadge>
-      )
+      if (!status) return <span className="text-ink-3">—</span>
+      return <StatusBadge status={status as StatusValue} />
     },
   },
   {
@@ -126,13 +116,13 @@ export default function WorkflowsPage() {
           <div className="flex items-center gap-2">
             <Link
               href="/workflows/from-template"
-              className="rounded-md border border-primary-300 bg-white px-3.5 py-2 text-sm font-medium text-primary-700 hover:bg-primary-50"
+              className="inline-flex items-center justify-center gap-1.5 rounded-2 border border-line bg-paper px-3.5 py-2 text-sm font-medium text-ink hover:bg-paper-2"
             >
               Nuovo da template
             </Link>
             <Link
               href="/workflows/new"
-              className="rounded-md bg-primary-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-primary-700"
+              className="inline-flex items-center justify-center gap-1.5 rounded-2 bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent-2"
             >
               + Nuovo flusso
             </Link>
