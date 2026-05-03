@@ -27,6 +27,12 @@ export type { PriorityBadgeProps, Priority } from './components/priority-badge'
 export { ViewSwitcher } from './components/view-switcher'
 export type { ViewSwitcherProps, ViewMode } from './components/view-switcher'
 
+export { useRegistryView } from './components/use-registry-view'
+export type {
+  UseRegistryViewOptions,
+  UseRegistryViewResult,
+} from './components/use-registry-view'
+
 export { TreeNode } from './components/tree-node'
 export type {
   TreeNodeProps,

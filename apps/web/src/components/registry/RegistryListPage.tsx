@@ -10,6 +10,7 @@ import {
   TrashBannerBar,
   ConfirmModal,
   OperationalTable,
+  useRegistryView,
 } from '@mes/ui'
 import type {
   Column,
@@ -17,6 +18,7 @@ import type {
   OpTableColumn,
   SavedView,
   OpTableBulkAction,
+  ViewMode,
 } from '@mes/ui'
 import { Trash2 } from 'lucide-react'
 import Link from 'next/link'
@@ -48,6 +50,14 @@ export interface RegistryListPageProps<T extends { id: string }> {
   activeView?: string | undefined
   /** Called when the user picks a different saved view tab. */
   onViewChange?: ((id: string) => void) | undefined
+  /**
+   * Optional override for the per-registry view modes the user may pick
+   * (List / Card / Flow / etc.). Defaults to `['list']` — i.e. the
+   * ViewSwitcher renders nothing because there's only one view available.
+   * Bump to `['list', 'card']` (or more) once the corresponding renderers
+   * are built.
+   */
+  availableViews?: ViewMode[] | undefined
 }
 
 export function RegistryListPage<T extends { id: string }>({
@@ -63,6 +73,7 @@ export function RegistryListPage<T extends { id: string }>({
   views,
   activeView,
   onViewChange,
+  availableViews = ['list'],
 }: RegistryListPageProps<T>) {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
@@ -71,6 +82,13 @@ export function RegistryListPage<T extends { id: string }>({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selected, setSelected] = useState(new Set<string>())
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  // PROMPT_DESIGN_ALIGNMENT D3 batch 5 — per-registry view persistence wiring.
+  // For 1-view registries `switcher` is null (nothing rendered); the wiring
+  // is in place so future Card/Flow renderers only need to bump availableViews.
+  const { switcher: viewSwitcher } = useRegistryView({
+    registryId: moduleKey,
+    availableViews,
+  })
 
   const filters = { page, limit: 25, search, sortBy: sortBy || undefined, sortDir, ...extraFilters }
 
@@ -132,13 +150,18 @@ export function RegistryListPage<T extends { id: string }>({
           title={title}
           subtitle={subtitle}
           actions={
-            newHref ? (
-              <Link
-                href={newHref}
-                className="inline-flex items-center justify-center gap-1.5 rounded-2 bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent-2"
-              >
-                {newLabel}
-              </Link>
+            (viewSwitcher || newHref) ? (
+              <div className="flex items-center gap-2">
+                {viewSwitcher}
+                {newHref ? (
+                  <Link
+                    href={newHref}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-2 bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent-2"
+                  >
+                    {newLabel}
+                  </Link>
+                ) : null}
+              </div>
             ) : undefined
           }
         />
@@ -206,6 +229,7 @@ export function RegistryListPage<T extends { id: string }>({
       selection={selected}
       onSelectionChange={setSelected}
       bulkDeleteHandler={() => bulkDeleteMutation.mutate(Array.from(selected))}
+      viewSwitcher={viewSwitcher}
       {...(views ? { views } : {})}
       {...(activeView != null ? { activeView } : {})}
       {...(onViewChange ? { onViewChange } : {})}
@@ -236,6 +260,7 @@ interface OpTableShellProps<T extends { id: string }> {
   views?: SavedView[]
   activeView?: string
   onViewChange?: (id: string) => void
+  viewSwitcher?: React.ReactElement | null
 }
 
 function RegistryListPageOpTable<T extends { id: string }>({
@@ -261,6 +286,7 @@ function RegistryListPageOpTable<T extends { id: string }>({
   views,
   activeView,
   onViewChange,
+  viewSwitcher,
 }: OpTableShellProps<T>) {
   // Adapt legacy Column<T> shape to OpTableColumn<T> (additive properties only).
   const opColumns: OpTableColumn<T>[] = useMemo(
@@ -294,13 +320,18 @@ function RegistryListPageOpTable<T extends { id: string }>({
         title={title}
         subtitle={subtitle}
         actions={
-          newHref ? (
-            <Link
-              href={newHref}
-              className="inline-flex items-center justify-center gap-1.5 rounded-2 bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent-2"
-            >
-              {newLabel}
-            </Link>
+          (viewSwitcher || newHref) ? (
+            <div className="flex items-center gap-2">
+              {viewSwitcher}
+              {newHref ? (
+                <Link
+                  href={newHref}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-2 bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent-2"
+                >
+                  {newLabel}
+                </Link>
+              ) : null}
+            </div>
           ) : undefined
         }
       />

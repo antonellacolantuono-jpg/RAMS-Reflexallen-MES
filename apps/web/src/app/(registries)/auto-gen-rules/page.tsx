@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { PageHeader, Skeleton } from '@mes/ui'
+import { PageHeader, Skeleton, useRegistryView } from '@mes/ui'
 import { sdk } from '../../../lib/sdk'
 
 type RuleModel = { id: string; name: string; trigger: string; scope: string; description: string }
@@ -12,12 +12,17 @@ export default function AutoGenRulesPage() {
     queryKey: ['auto-gen-rules'],
     queryFn: () => sdk.autoGenRules.list(),
   })
+  const { switcher: viewSwitcher } = useRegistryView({
+    registryId: 'auto-gen-rules',
+    availableViews: ['list'],
+  })
 
   return (
     <div className="flex flex-col gap-6 p-6 h-full overflow-y-auto">
       <PageHeader
         title="Regole Auto-Generazione"
         subtitle="7 regole configurate dal sistema — sola lettura"
+        actions={viewSwitcher ?? undefined}
       />
 
       <div className="rounded-lg border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-800">

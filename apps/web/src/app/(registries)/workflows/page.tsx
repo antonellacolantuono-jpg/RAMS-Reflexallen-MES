@@ -10,6 +10,7 @@ import {
   TrashBannerBar,
   StatusBadge,
   ConfirmModal,
+  useRegistryView,
 } from '@mes/ui'
 import type { Column, BulkAction, StatusValue } from '@mes/ui'
 import { sdk } from '../../../lib/sdk'
@@ -51,6 +52,10 @@ export default function WorkflowsPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selected, setSelected] = useState(new Set<string>())
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const { switcher: viewSwitcher } = useRegistryView({
+    registryId: 'workflows',
+    availableViews: ['list'],
+  })
 
   const { data, isLoading } = useQuery({
     queryKey: ['workflows', page, search, sortBy, sortDir],
@@ -114,6 +119,7 @@ export default function WorkflowsPage() {
         subtitle="Progettazione e gestione dei workflow di produzione"
         actions={
           <div className="flex items-center gap-2">
+            {viewSwitcher}
             <Link
               href="/workflows/from-template"
               className="inline-flex items-center justify-center gap-1.5 rounded-2 border border-line bg-paper px-3.5 py-2 text-sm font-medium text-ink hover:bg-paper-2"

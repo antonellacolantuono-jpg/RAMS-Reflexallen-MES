@@ -8,6 +8,7 @@ import {
   StatusBadge,
   ConfirmModal,
   OperationalTable,
+  useRegistryView,
 } from '@mes/ui'
 import type {
   OpTableColumn,
@@ -68,6 +69,10 @@ export default function ItemsPage() {
   const [activeView, setActiveView] = useState('all')
   const [selected, setSelected] = useState(new Set<string>())
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const { switcher: viewSwitcher } = useRegistryView({
+    registryId: 'items',
+    availableViews: ['list'],
+  })
 
   const itemType = TYPE_VIEWS.find((v) => v.id === activeView)?.itemType ?? ''
 
@@ -148,12 +153,15 @@ export default function ItemsPage() {
         title="Articoli"
         subtitle="Anagrafica articoli (materie prime, componenti, prodotti finiti)"
         actions={
-          <Link
-            href="/items/new"
-            className="inline-flex items-center justify-center gap-1.5 rounded-2 bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent-2"
-          >
-            + Nuovo articolo
-          </Link>
+          <div className="flex items-center gap-2">
+            {viewSwitcher}
+            <Link
+              href="/items/new"
+              className="inline-flex items-center justify-center gap-1.5 rounded-2 bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent-2"
+            >
+              + Nuovo articolo
+            </Link>
+          </div>
         }
       />
 
