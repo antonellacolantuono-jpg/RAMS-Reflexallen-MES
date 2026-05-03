@@ -17,17 +17,18 @@ import {
   NotFoundException,
   Param,
   Post,
-  UseGuards,
 } from '@nestjs/common'
-import { JwtAuthGuard } from '../auth/jwt.guard'
 import { DemoControllerService } from './demo-controller.service'
 import { MockLeakTesterService } from './mock-leak-tester.service'
 import { MockCameraTesterService } from './mock-camera-tester.service'
 import { MockCrimpPressService } from './mock-crimp-press.service'
 import { ALL_OUTCOMES, type DeviceOutcome, type MockDevice } from './types'
 
+// PROMPT_PNE_3 D4 hotfix #2 — public (no @UseGuards): the back-office /demo
+// page must call these debug endpoints without a logged-in operator. DEMO_MODE
+// is the safety gate (production refuses to boot with DEMO_MODE unset; every
+// method below short-circuits to 404 when DEMO_MODE != 'true').
 @Controller('internal/mock-devices')
-@UseGuards(JwtAuthGuard)
 export class MockDevicesController {
   constructor(
     private readonly demo: DemoControllerService,

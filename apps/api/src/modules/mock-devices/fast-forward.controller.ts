@@ -25,10 +25,8 @@ import {
   Param,
   Post,
   Req,
-  UseGuards,
 } from '@nestjs/common'
 import type { Request } from 'express'
-import { JwtAuthGuard } from '../auth/jwt.guard'
 import type { JwtAuthenticatedUser } from '../auth/jwt.strategy'
 import { StepExecutionService } from '../work-orders/step-execution.service'
 
@@ -46,8 +44,12 @@ interface FastForwardBody {
   outcome: FastForwardOutcome
 }
 
+// PROMPT_PNE_3 D4 hotfix #2 — public (no @UseGuards): see MockDevicesController
+// for rationale. When the /demo page calls without a session, fall back to a
+// demo identity (DEMO_USER_ID + DEMO_PLANT_ID env vars). plantId must point at
+// a real seeded plant for the WO lookup to succeed; if unset, the request
+// surfaces a clean 404 from the WO/plant filter rather than a 500.
 @Controller('internal/fast-forward')
-@UseGuards(JwtAuthGuard)
 export class FastForwardController {
   constructor(private readonly stepExecution: StepExecutionService) {}
 
@@ -60,7 +62,11 @@ export class FastForwardController {
   ) {
     this.ensureDemoMode()
     const parsed = parseBody(body)
-    const user = req.user as JwtAuthenticatedUser
+    const user = (req.user as JwtAuthenticatedUser | undefined) ?? {
+      id: process.env['DEMO_USER_ID'] ?? 'demo-user',
+      badge: 'DEMO',
+      plantId: process.env['DEMO_PLANT_ID'] ?? '',
+    }
 
     const eventType = OUTCOME_TO_EVENT[parsed.outcome]
     const event =
