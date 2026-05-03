@@ -1,8 +1,12 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
   UnprocessableEntityException,
+  forwardRef,
 } from '@nestjs/common'
 import { createActor } from 'xstate'
 import {
@@ -22,6 +26,10 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditLogService } from '../audit-log/audit-log.service'
 import { WorkOrderEventsGateway } from '../events/work-order-events.gateway'
+import {
+  MockDeviceDispatcherService,
+  type DispatchOutcomeContext,
+} from '../mock-devices/mock-device-dispatcher.service'
 
 export interface TransitionRequest {
   stepExecutionId: string
@@ -88,11 +96,58 @@ export interface WorkOrderStepDto extends StepStateDto {
 
 @Injectable()
 export class StepExecutionService {
+  private readonly logger = new Logger(StepExecutionService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
     private readonly events: WorkOrderEventsGateway,
-  ) {}
+    /**
+     * PNE_4_FOCUSED D2 — optional MockDeviceDispatcher (closes TODO-043).
+     * `@Optional` so unit tests that don't register MockDevicesModule still
+     * work — when missing, dispatch is a silent no-op. `forwardRef` because
+     * MockDevicesModule and WorkOrdersModule each import the other.
+     */
+    @Optional()
+    @Inject(forwardRef(() => MockDeviceDispatcherService))
+    private readonly mockDeviceDispatcher: MockDeviceDispatcherService | null = null,
+  ) {
+    // Register the outcome listener once. The dispatcher fires this when a
+    // simulator finishes its cycle; we translate the outcome into the matching
+    // state-machine transition (COMPLETE_OK for PASS/MARGINAL,
+    // COMPLETE_NOK for FAIL).
+    this.mockDeviceDispatcher?.onOutcome((ctx) => this.handleDispatchOutcome(ctx))
+  }
+
+  private async handleDispatchOutcome(ctx: DispatchOutcomeContext): Promise<void> {
+    const eventType = ctx.outcome === 'FAIL' ? 'COMPLETE_NOK' : 'COMPLETE_OK'
+    const event =
+      eventType === 'COMPLETE_NOK'
+        ? {
+            type: eventType,
+            by: ctx.changedBy,
+            causeCode: 'auto_device_fail',
+          }
+        : { type: eventType, by: ctx.changedBy }
+    try {
+      await this.applyTransition({
+        stepExecutionId: ctx.stepExecutionId,
+        workOrderId: ctx.workOrderId,
+        event,
+        changedBy: ctx.changedBy,
+        plantId: ctx.plantId,
+      })
+    } catch (err) {
+      // Operator may have manually advanced the step before the simulator
+      // finished — applyTransition's state-machine guard rejects, surface as
+      // a warning so demo logs stay clean.
+      this.logger.warn(
+        `auto-dispatch ${eventType} failed for step ${ctx.stepExecutionId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      )
+    }
+  }
 
   async findStepsForWorkOrder(
     workOrderId: string,
@@ -276,6 +331,43 @@ export class StepExecutionService {
       workOrderId: row.workOrderId,
       changedAt,
     })
+
+    // PNE_4_FOCUSED D2 — closes TODO-043. After a START transition lands a
+    // step in `running` AND the step is a `device_run` action (with a known
+    // mock device serial under DEMO_MODE), kick off the matching simulator.
+    // The dispatcher will fire a follow-up COMPLETE_OK / COMPLETE_NOK via its
+    // outcome listener (registered in the constructor) when the simulator
+    // finishes its cycle. Real devices fall through to no-op (the dispatcher
+    // returns false from canDispatch).
+    if (
+      fromStatus === 'pending' &&
+      toStatus === 'running' &&
+      event.type === 'START' &&
+      row.step.actionType === 'device_run' &&
+      row.step.device?.serialNumber &&
+      this.mockDeviceDispatcher
+    ) {
+      this.mockDeviceDispatcher.dispatch({
+        stepExecutionId: row.id,
+        workOrderId: row.workOrderId,
+        deviceSerialNumber: row.step.device.serialNumber,
+        // Recipe parameters live on RecipeVersion (not Recipe directly) and
+        // would require an extra Prisma query to resolve. The 3 mock
+        // simulators have hardcoded defaults that match the PNE_2-seeded
+        // recipes (RCP-LEAK-PNE-12-001 v2 / RCP-CAMERA-PNE-001 v1 /
+        // RCP-CRIMP-12-001 v1), so passing an empty object is sufficient
+        // for the demo. Real-device dispatch in F2 will resolve via
+        // RecipeVersion lookup.
+        recipeParams: {},
+        // Identity fallback (Lesson 56): the simulator's onComplete fires
+        // asynchronously without a request context, so we capture changedBy /
+        // plantId from the current request and reuse them. If those happen to
+        // be empty (DEMO_MODE without auth), fall back to the env values
+        // that FastForwardController already uses.
+        changedBy: req.changedBy || process.env['DEMO_USER_ID'] || 'demo-user',
+        plantId: req.plantId || process.env['DEMO_PLANT_ID'] || '',
+      })
+    }
 
     // Auto-scrap rule (D5): when COMPLETE_NOK lands on `blocked` AND the step
     // has already exhausted MAX_RECOVERY_ATTEMPTS recovery cycles, chain a
@@ -535,7 +627,13 @@ export class StepExecutionService {
     const row = await this.prisma.stepExecution.findUnique({
       where: { id: stepExecutionId },
       include: {
-        step: { include: { group: true } },
+        // PNE_4_FOCUSED D2 — also load device so the dispatch trigger (after
+        // START on a device_main step) can read the device serial without an
+        // extra query. Recipe params resolution lives on RecipeVersion (not
+        // Recipe directly) and the 3 mock simulators have hardcoded defaults
+        // matching the PNE_2-seeded recipes — no recipe lookup needed for the
+        // demo. Real-device dispatch in F2 will resolve via RecipeVersion.
+        step: { include: { group: true, device: true } },
         workOrder: { select: { plantId: true, deletedAt: true } },
       },
     })
@@ -546,3 +644,4 @@ export class StepExecutionService {
     return row
   }
 }
+

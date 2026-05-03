@@ -16,6 +16,7 @@ import { WorkOrderEventsGateway } from '../events/work-order-events.gateway'
 import { DemoControllerService } from './demo-controller.service'
 import {
   PASS_FAIL_OUTCOMES,
+  type CycleCompletionListener,
   type DeviceOutcome,
   type MockDevice,
   type MockDeviceLifecycleState,
@@ -41,6 +42,7 @@ interface ActiveCrimpCycle {
   forceKn: number
   peakForceKn: number
   finalPeakForceKn: number
+  onComplete?: CycleCompletionListener | undefined
 }
 
 @Injectable()
@@ -62,7 +64,11 @@ export class MockCrimpPressService implements MockDevice, OnModuleDestroy {
     @Optional() private readonly random: () => number = Math.random,
   ) {}
 
-  start(stepExecutionId: string, recipeParams: Record<string, unknown> = {}): void {
+  start(
+    stepExecutionId: string,
+    recipeParams: Record<string, unknown> = {},
+    onComplete?: CycleCompletionListener,
+  ): void {
     if (this.state === 'running') {
       throw new ConflictException(`${this.deviceSerialNumber} cycle already running`)
     }
@@ -82,6 +88,7 @@ export class MockCrimpPressService implements MockDevice, OnModuleDestroy {
       forceKn: 0,
       peakForceKn: 0,
       finalPeakForceKn: finalPeak,
+      onComplete,
     }
 
     this.events.emitDeviceCycleStarted({
@@ -177,6 +184,9 @@ export class MockCrimpPressService implements MockDevice, OnModuleDestroy {
     this.lastOutcome = cycle.outcome
     this.currentCycle = null
     this.state = 'idle'
+
+    // PNE_4_FOCUSED D2 — fire dispatcher's completion callback after WS broadcast.
+    cycle.onComplete?.(cycle.outcome)
   }
 
   private clearTimers(): void {

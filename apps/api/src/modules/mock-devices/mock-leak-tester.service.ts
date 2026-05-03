@@ -18,7 +18,7 @@
 import { ConflictException, Injectable, Optional, OnModuleDestroy } from '@nestjs/common'
 import { WorkOrderEventsGateway } from '../events/work-order-events.gateway'
 import { DemoControllerService } from './demo-controller.service'
-import { ALL_OUTCOMES, type DeviceOutcome, type MockDevice, type MockDeviceLifecycleState, type MockDeviceStatus } from './types'
+import { ALL_OUTCOMES, type CycleCompletionListener, type DeviceOutcome, type MockDevice, type MockDeviceLifecycleState, type MockDeviceStatus } from './types'
 
 export const LEAK_DEVICE_SERIAL = 'DEV-LEAK-001'
 export const LEAK_DEFAULT_OUTCOME: DeviceOutcome = 'PASS'
@@ -38,6 +38,7 @@ interface ActiveLeakCycle {
   pressureBar: number
   leakRateMbarMin: number
   phase: LeakPhase
+  onComplete?: CycleCompletionListener | undefined
 }
 
 @Injectable()
@@ -59,7 +60,11 @@ export class MockLeakTesterService implements MockDevice, OnModuleDestroy {
     @Optional() private readonly random: () => number = Math.random,
   ) {}
 
-  start(stepExecutionId: string, recipeParams: Record<string, unknown> = {}): void {
+  start(
+    stepExecutionId: string,
+    recipeParams: Record<string, unknown> = {},
+    onComplete?: CycleCompletionListener,
+  ): void {
     if (this.state === 'running') {
       throw new ConflictException(`${this.deviceSerialNumber} cycle already running`)
     }
@@ -79,6 +84,7 @@ export class MockLeakTesterService implements MockDevice, OnModuleDestroy {
       pressureBar: 0,
       leakRateMbarMin: 0,
       phase: 'pressurize',
+      onComplete,
     }
 
     this.events.emitDeviceCycleStarted({
@@ -171,6 +177,11 @@ export class MockLeakTesterService implements MockDevice, OnModuleDestroy {
     this.lastOutcome = cycle.outcome
     this.currentCycle = null
     this.state = 'idle'
+
+    // PNE_4_FOCUSED D2 — fire the dispatcher's completion callback (if any)
+    // last, so the WS broadcast and internal state update are observable
+    // before any state-machine transition the callback may trigger.
+    cycle.onComplete?.(cycle.outcome)
   }
 
   private clearTimers(): void {

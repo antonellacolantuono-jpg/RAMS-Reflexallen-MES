@@ -14,6 +14,7 @@ import { WorkOrderEventsGateway } from '../events/work-order-events.gateway'
 import { DemoControllerService } from './demo-controller.service'
 import {
   PASS_FAIL_OUTCOMES,
+  type CycleCompletionListener,
   type DeviceOutcome,
   type MockDevice,
   type MockDeviceLifecycleState,
@@ -50,6 +51,7 @@ interface ActiveCameraCycle {
   elapsedMs: number
   phase: CameraPhase
   rois: RoiState[]
+  onComplete?: CycleCompletionListener | undefined
 }
 
 @Injectable()
@@ -71,7 +73,11 @@ export class MockCameraTesterService implements MockDevice, OnModuleDestroy {
     @Optional() private readonly random: () => number = Math.random,
   ) {}
 
-  start(stepExecutionId: string, recipeParams: Record<string, unknown> = {}): void {
+  start(
+    stepExecutionId: string,
+    recipeParams: Record<string, unknown> = {},
+    onComplete?: CycleCompletionListener,
+  ): void {
     if (this.state === 'running') {
       throw new ConflictException(`${this.deviceSerialNumber} cycle already running`)
     }
@@ -93,6 +99,7 @@ export class MockCameraTesterService implements MockDevice, OnModuleDestroy {
         similarityPct: 0,
         finalSimilarityPct: finals[i] ?? 0,
       })),
+      onComplete,
     }
 
     this.events.emitDeviceCycleStarted({
@@ -186,6 +193,9 @@ export class MockCameraTesterService implements MockDevice, OnModuleDestroy {
     this.lastOutcome = cycle.outcome
     this.currentCycle = null
     this.state = 'idle'
+
+    // PNE_4_FOCUSED D2 — fire dispatcher's completion callback after WS broadcast.
+    cycle.onComplete?.(cycle.outcome)
   }
 
   private clearTimers(): void {
