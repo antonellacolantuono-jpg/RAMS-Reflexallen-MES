@@ -36,6 +36,22 @@ export const defaultManual: ManualValues = {
 export const ON_NOK_VALUES = ['stop', 'recovery', 'block', 'continue'] as const
 export type OnNokValue = (typeof ON_NOK_VALUES)[number]
 
+// PNE_4_FOCUSED D4.1 — recovery configuration carried alongside Automatic.
+// Persisted on node.data.recoveryConfig (session-only until F2 schema
+// migration adds Step.recoveryConfig — TODO-040 extended).
+export const RecoveryConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  maxAttempts: z.coerce.number().int().min(0).max(5).default(2),
+  /** Step IDs (refs) executed before each retry — Option A from FOCUSED brief. */
+  preRetryStepIds: z.array(z.string()).default([]),
+})
+export type RecoveryConfigValues = z.infer<typeof RecoveryConfigSchema>
+export const defaultRecoveryConfig: RecoveryConfigValues = {
+  enabled: false,
+  maxAttempts: 2,
+  preRetryStepIds: [],
+}
+
 export const AutomaticSchema = z.object({
   cycleTimeSec: z
     .union([
@@ -56,6 +72,12 @@ export const AutomaticSchema = z.object({
   // for MVP and let the operator type the spec verbatim (e.g.
   // "leak_rate_max_mbar_min: 0.5"). Full structured rendering is F2 work.
   passThresholdNote: z.string().max(500).optional().default(''),
+  // PNE_4_FOCUSED D4.1 — recovery section (collapsed when enabled=false).
+  recoveryConfig: RecoveryConfigSchema.optional().default({
+    enabled: false,
+    maxAttempts: 2,
+    preRetryStepIds: [],
+  }),
 })
 export type AutomaticValues = z.infer<typeof AutomaticSchema>
 export const defaultAutomatic: AutomaticValues = {
@@ -65,6 +87,7 @@ export const defaultAutomatic: AutomaticValues = {
   onNok: 'stop',
   onNokWorkflowId: '',
   passThresholdNote: '',
+  recoveryConfig: defaultRecoveryConfig,
 }
 
 // ── Guided ───────────────────────────────────────────────────────────────────

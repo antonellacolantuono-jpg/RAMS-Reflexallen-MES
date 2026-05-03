@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { Field, Input, Select } from '@mes/ui'
 import { sdk } from '../../../../lib/sdk'
+import { useWorkflowStore } from '../../store'
 import {
   AutomaticSchema,
   defaultAutomatic,
@@ -61,6 +62,35 @@ export function AutomaticForm({
   const allowsParallel = watch('allowsParallel')
   const onNok = watch('onNok')
   const cycleTimeSec = watch('cycleTimeSec')
+  // PNE_4_FOCUSED D4.1 — recovery section
+  const recoveryEnabled = watch('recoveryConfig.enabled')
+  const preRetryStepIds = watch('recoveryConfig.preRetryStepIds')
+
+  // Pull current workflow's step nodes for the pre-retry multi-select.
+  // Select the raw `nodes` array (stable reference between renders) and
+  // derive the filtered candidates inside useMemo — selecting `.filter(...)`
+  // directly creates a new array each render and triggers Zustand's
+  // shallow-equal change detection, which would loop forever against
+  // react-hook-form's watch subscription.
+  const allNodes = useWorkflowStore((s) => s.nodes)
+  const preRetryCandidates = useMemo(
+    () =>
+      allNodes
+        .filter((n) => n.type === 'stepNode')
+        .map((n) => ({
+          id: n.id,
+          label: (n.data['label'] as string) ?? n.id,
+        })),
+    [allNodes],
+  )
+
+  const togglePreRetry = (id: string) => {
+    const current = (preRetryStepIds ?? []) as string[]
+    const next = current.includes(id)
+      ? current.filter((x) => x !== id)
+      : [...current, id]
+    setValue('recoveryConfig.preRetryStepIds', next)
+  }
 
   // Auto-fill cycle time from recipe.parameters when recipe loads + the field
   // is empty. Operator can override afterwards.
@@ -214,6 +244,81 @@ export function AutomaticForm({
           placeholder="—"
         />
       </Field>
+
+      <details
+        className="rounded-md border border-line bg-paper-2 px-3 py-2 text-sm"
+        data-automatic-recovery-section
+      >
+        <summary className="cursor-pointer font-semibold text-ink-2 text-xs uppercase tracking-wide">
+          Recovery (configurabile)
+        </summary>
+        <div className="mt-3 flex flex-col gap-3">
+          <label className="flex items-center gap-2 text-sm text-ink-2">
+            <input
+              type="checkbox"
+              {...register('recoveryConfig.enabled')}
+              className="h-4 w-4 rounded border-line text-accent focus:ring-accent"
+              data-testid="recovery-enabled"
+            />
+            Abilita recovery in caso di FAIL
+          </label>
+
+          {recoveryEnabled && (
+            <>
+              <Field
+                label="Numero massimo di tentativi (max retry)"
+                hint="Quante volte l'operatore può riprovare il ciclo prima dello scarto forzato"
+                error={errors.recoveryConfig?.maxAttempts?.message}
+              >
+                <Input
+                  type="number"
+                  min={0}
+                  max={5}
+                  {...register('recoveryConfig.maxAttempts')}
+                  placeholder="2"
+                  data-testid="recovery-max-attempts"
+                />
+              </Field>
+
+              <Field
+                label="Step pre-retry (opzionali)"
+                hint="Step da rieseguire prima di ogni retry (es. ricontrolla connessioni)"
+              >
+                <div
+                  className="flex flex-col gap-1 max-h-32 overflow-y-auto rounded border border-line bg-paper p-2"
+                  data-testid="recovery-pre-retry-list"
+                >
+                  {preRetryCandidates.length === 0 ? (
+                    <span className="text-[11px] italic text-ink-3">
+                      Nessuno step disponibile nel workflow corrente.
+                    </span>
+                  ) : (
+                    preRetryCandidates.map((c) => {
+                      const checked = ((preRetryStepIds ?? []) as string[]).includes(
+                        c.id,
+                      )
+                      return (
+                        <label
+                          key={c.id}
+                          className="flex items-center gap-2 text-xs text-ink-2"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => togglePreRetry(c.id)}
+                            className="h-3.5 w-3.5 rounded border-line text-accent focus:ring-accent"
+                          />
+                          <span className="truncate">{c.label}</span>
+                        </label>
+                      )
+                    })
+                  )}
+                </div>
+              </Field>
+            </>
+          )}
+        </div>
+      </details>
     </form>
   )
 }

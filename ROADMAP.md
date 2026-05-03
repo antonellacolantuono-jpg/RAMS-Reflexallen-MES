@@ -37,10 +37,10 @@ This pivot accepts **~3-4 week MVP slip** (mid-July → end of July / early Augu
 | F1.3 | PROMPT_PNE_1 (closed) | Step configurator with 6 tabs Materials/Tools/Devices/Skills/Recipes/Attention Points, multi-select + search, Recipe-Device coupling, 8 Action Config forms, Save flow wired | ~10h actual (closed 2026-05-02) | done |
 | F1.4 | PROMPT_PNE_2 (closed) | Prisma seed: 1 area / 4 WCs / 4 WSs / 3 devices + 5 items + 1 BoxType + 3 recipes + 4 skills + 2 operators + 6 cause codes + 10 fault codes (CauseCode workaround S1) + 3 APs + 2 workflows ("v1 Demo" pre-configured 4 phases/6 groups/**34 steps** incl. inline recovery groups B2+C2 + "v0 Empty" scaffold) + 1 WO released with WorkflowSnapshot. Closes TODO-031. Opens TODO-041, TODO-042. | ~6h actual (closed 2026-05-02) | done |
 | F1.5 | PROMPT_PNE_3 (closed) | DEV-LEAK-001 (45s/RCP-LEAK-PNE-12-001 v2/PASS+MARGINAL+FAIL bands) + DEV-CAMERA-001 (8s/4 ROIs/PASS+FAIL) + DEV-CRIMP-001 (8s/25kN±1/PASS+FAIL) simulators + DemoControllerService (next-outcome override) + `device:cycle:started/progress/complete` WS broadcasts on `WorkOrderEventsGateway` + `/api/internal/mock-devices/*` REST + `/api/internal/fast-forward/:woId/complete-step` debug endpoint + `/demo` Back-office Toggle Panel (server gate + client polling 2s + Toast IT) + DEMO_MODE boot guard. Step-execution dispatch deferred to PNE_4 D1 (TODO-043, Option 3b). Opens TODO-043, TODO-044. | ~6h actual (closed 2026-05-02) | done |
-| F1.6 | **PROMPT_PNE_4** HMI specialized + label/scrap fidelity | HMI Leak Test split layout (top device + bottom 3 parallel slots side-by-side), HMI Camera Test, recovery flow UI fidelity, scrap UI fidelity (cause code + photo mock + counters), label print mock (toast + SVG preview) | 12-16h | 14-17 May |
+| F1.6 | PROMPT_PNE_4_FOCUSED (closed) | Action Type selector + autofill + photo (D1) → HMI StepGeneric + DeviceCycleView + LeakTelemetry/CameraROIGrid/CrimpTelemetry + dispatcher closing TODO-043 (D2) → ParallelSlotsContainer split layout (D3) → D4.0 hotfix (page.tsx wires DeviceCycleWithParallels for active device_run group) + recovery config in AutomaticForm + HMIScrapForm with cause code + photo + F1 closure (D4) | ~14h actual (closed 2026-05-03) | done |
 | | **F1 totals** | | **48-70h** | **5-17 May** |
 
-**F1 demo target**: 18-20 May 2026 (Reflex Allen Pneumatic Air vertical demo, in code reality, mockup-faithful).
+**F1 demo target**: 18-20 May 2026 (Reflex Allen Pneumatic Air vertical demo, in code reality, mockup-faithful). **F1 100% complete as of 2026-05-03.**
 
 ### F2 — Horizontal MES shell (DEFERRED from original F1)
 
@@ -199,6 +199,7 @@ What to communicate to Reflex Allen before demo:
 | 2026-04-27 | ROADMAP v1.x initial (9 PROMPTs in 3 horizontal phases) | Claude Code + Antonella |
 | 2026-05-02 | ROADMAP v2 pivot to Pneumatic First (5 new F1 PROMPTs, F2/F3 reordered) | this document |
 | 2026-05-02 | F1.4 PROMPT_PNE_2 closed (4 D increments, +18 tests cumul 655, opens TODO-041/042 closes TODO-031) | this document |
+| 2026-05-03 | F1.6 PROMPT_PNE_4_FOCUSED closed (4 D increments, +42 tests cumul 734, closes TODO-043, demo-ready). **F1 100% complete.** | this document |
 
 ---
 

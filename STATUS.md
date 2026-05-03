@@ -1,8 +1,46 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 2, 2026 (PROMPT_PNE_3 D1-D4 closed — F1.5 100% complete)
+> **Last update**: May 3, 2026 (PROMPT_PNE_4_FOCUSED D1-D4 closed — **F1 100% complete, demo-ready**)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## 🎉 F1 (Pneumatic First) — 100% complete (May 3, 2026)
+
+Pneumatic Air vertical demo path is end-to-end functional: workflow editor with Action Type catalog + autofill + photo upload (D1) → HMI Step Generic with device cycle dispatch (TODO-043 closed in D2 at runtime) → parallel slots split layout during the leak cycle (D3) → page.tsx wiring + recovery configurable + scrap form with cause code & photo (D4).
+
+### F1 closure summary
+
+| PROMPT | Closed | Commits | Tests added | Cumul | Key deliverable |
+|---|---|---|---|---|---|
+| F1.1 DS_LIFT | 2026-05-02 | 14 patterns lifted to `@mes/ui` | — | — | foundation primitives |
+| F1.2 PROMPT_3d | 2026-05-02 | palette ungated, phase-columns canvas, 3-tab inspector | — | — | workflow editor mockup-faithful |
+| F1.3 PROMPT_PNE_1 | 2026-05-02 | step configurator with 6 resource tabs + 8 action forms | — | — | step builder UX |
+| F1.4 PROMPT_PNE_2 | 2026-05-02 | 4 D increments | +18 | 655 | Pneumatic seed (workflows v0/v1, 34 steps, 3 recipes) |
+| F1.5 PROMPT_PNE_3 | 2026-05-02 | 4 D increments + 2 hotfixes | +37 | 692 | mock simulators + DemoToggle + FastForward |
+| F1.6 PROMPT_PNE_4_FOCUSED | 2026-05-03 | 4 D increments | **+42** | **734** | Action Type + photo, HMI device cycle, parallel slots, recovery + scrap, F1 closure |
+| **Total residual F1 tests** | | | **+97** | **734** | |
+
+### Lessons accumulated through F1
+
+- **Lesson 54**: Vitest 2.1 + Windows multi-worker temp-dir race. Mitigated per-package via `--no-file-parallelism` (api / domain) or `fileParallelism: false` baked into `vitest.config.ts` (web / hmi added in PNE_4).
+- **Lesson 55**: TypeScript constructor params with function default values trigger Nest DI Function-resolution. Use `@Optional()` proactively (PNE_3 D4 hotfix #1).
+- **Lesson 56**: NestJS auth guards run before method handlers. Use `@Public` (or no guards) for debug-only `/api/internal/*` routes; rely on env-var fallback (`DEMO_USER_ID`, `DEMO_PLANT_ID`) when no JWT context. Always run `pnpm dev` post-Dn to catch DI/auth runtime issues — not just `pnpm test` (PNE_3 D4 hotfix #2 + PNE_4 D2 boot smoke confirmed dispatcher path live end-to-end).
+- **Lesson 57 (PNE_4 D4.0)**: shipping new HMI components doesn't make them visible — host pages must mount them. The PNE_4 D2 work shipped `StepGeneric` + `DeviceCycleView` but the existing `apps/hmi/src/app/wo/[id]/page.tsx` continued rendering `StepCard` for every step. Caught during user-side smoke after D2 commit; fixed in D4.0 by routing the active `device_run` device_main group to `<DeviceCycleWithParallels />` directly. Pinned by a regression test on the `isDeviceCycleStep` detection rule.
+
+### Demo-ready confirmation (May 3, 2026)
+
+- ✅ All 13 packages build clean (`pnpm build`)
+- ✅ `pnpm lint` clean (only pre-existing PNE_3 hmi `<img>` warnings, no errors)
+- ✅ All 734 tests pass: api 284 / domain 197 / ui 119 / web 38 / hmi 30 / schemas 29 / prisma 18 / cache 8 / storage 6 / queue 5
+- ✅ Lesson 56 boot smoke (PNE_4 D2): API + DI graph clean, dispatcher end-to-end runtime verified (Mario Rossi START on STEP-LEAK-003 → 45s simulator → step status `done` result `ok`)
+- ✅ Env templates committed: `apps/api/.env.example`, `apps/web/.env.local.example`, `apps/hmi/.env.local.example`
+- ✅ CLAUDE.md "Demo mode setup" section added
+
+### F2 (post-demo, 21 May+)
+
+F2 begins after the Reflex Allen demo. PROMPT_6 (Andon + Plant Overview) is first; refer to `ROADMAP.md` § 2 F2.
 
 ---
 

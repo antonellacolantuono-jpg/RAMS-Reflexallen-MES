@@ -29,6 +29,37 @@ This is an **INTERNAL MES** — built for Reflexallen's own use. The system must
 
 ---
 
+## 🚀 Demo mode setup (PROMPT_PNE_4_FOCUSED — F1 closure)
+
+For the Reflex Allen demo (18-22 May 2026) and any local end-to-end run-through of the Pneumatic Air vertical, three per-app env files are needed (Next.js doesn't read the root `.env`). Copy from the committed templates:
+
+```powershell
+Copy-Item apps/api/.env.example         apps/api/.env
+Copy-Item apps/web/.env.local.example   apps/web/.env.local
+Copy-Item apps/hmi/.env.local.example   apps/hmi/.env.local
+```
+
+Then edit `apps/api/.env` and fill `DEMO_USER_ID` + `DEMO_PLANT_ID` with real seeded IDs (Mario Rossi operator + plant). They power the dispatcher's identity fallback (Lesson 56) and FastForward debug endpoint when the request has no JWT context.
+
+Boot sequence:
+
+```powershell
+pnpm install
+pnpm --filter @mes/prisma generate
+pnpm --filter @mes/prisma db:push          # creates packages/prisma/dev.db
+pnpm --filter @mes/prisma db:seed          # baseline seed
+pnpm --filter @mes/prisma seed:pneumatic   # F1 vertical: WO-2026-PNE-0042 released
+pnpm dev                                    # all 3 apps (API 3000, web 3001, HMI 3002)
+```
+
+Demo journey:
+
+1. Back-office `http://localhost:3001/demo` — 3 device cards (DEV-LEAK-001 / DEV-CAMERA-001 / DEV-CRIMP-001) with Force PASS / FAIL / MARGINAL overrides.
+2. HMI `http://localhost:3002` — login Mario Rossi (badge `1234`, PIN `1234`) → WO-2026-PNE-0042 → step-by-step execution. STEP-LEAK-003 surfaces the immersive `<DeviceCycleWithParallels>` (timer + leak telemetry + 3 parallel slot cards). 
+3. Failure path: Force FAIL on DEV-LEAK-001 in `/demo`, run leak step → outcome FAIL → Recovery flow → Scrap form (cause code + photo + notes) → counters update.
+
+---
+
 ## ⚙️ Current operating mode — DEV MODE (read this carefully)
 
 **As of April 28-29, 2026, the project is in DEV MODE**: a fully local setup with **no Docker, no external services**. This is intentional — no production deployment yet, all infrastructure is in-process or local-filesystem.

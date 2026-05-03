@@ -17,20 +17,11 @@
 
 ## 🟠 High priority (should fix before MVP — May 8-9)
 
-### TODO-043 — PROMPT_PNE_3: wire SimulatorRegistry into step-execution dispatch (deferred)
+### TODO-043 — PROMPT_PNE_3: wire SimulatorRegistry into step-execution dispatch
 
-**Discovered**: 2026-05-02 (during PROMPT_PNE_3 pre-flight — § 8 surprise budget trigger)
-**Status**: 🟡 DEFERRED to PROMPT_PNE_4 by design (Option 3b chosen for PNE_3 scope).
-**File**: `apps/api/src/modules/work-orders/step-execution.service.ts` + new `device-step-executor.ts` (or equivalent dispatch helper to be created in PNE_4 D1)
-**Symptom**: PROMPT_PNE_3 § 3.4 assumed `apps/api/src/modules/work-orders/step-execution/device-step-executor.ts` already existed (presumed shipped by PROMPT_5_FULL D3). It does NOT. The actual `step-execution.service.ts` is purely XState-driven: operator events (`COMPLETE_OK` / `COMPLETE_NOK` / `RECOVER` / `MARK_SCRAPPED`) transition a state machine; the service never calls a "device client" or any device abstraction. So the real-device-execution branch the prompt expected to wrap with mocks does not exist anywhere in the codebase. Creating that branch from scratch is out of PROMPT_PNE_3's scope (8-12h budget; surprise budget § 8 explicitly calls this trigger).
-**Resolution chosen for PROMPT_PNE_3**: PROMPT_PNE_3 ships standalone simulator services + REST endpoints under `/api/internal/simulators/*` + DemoToggle UI in apps/web + WO debug FastForward endpoint that drives state machine transitions directly (no simulator dispatch). Simulators are reachable via REST + emit WS events but do NOT yet auto-fire when an operator advances a `device_run` step in the HMI.
-**Acceptance criterion (when revisited in PROMPT_PNE_4)**:
-- New helper `device-step-executor.ts` (or method on `StepExecutionService`) that, when an operator advances a `device_run` step, dispatches to: (a) the SimulatorRegistry from PROMPT_PNE_3 if `DEMO_MODE=true` AND device is one of the 3 mock devices, OR (b) a real-device client otherwise (to be designed in F2).
-- Adapter contract: simulator returns the same `StepExecutionResult` shape so the state machine cannot tell mock from real.
-- HMI Leak/Camera specialized screens (PNE_4 main scope) subscribe to the WS events the simulator already emits.
-- Existing `applyTransition` flow in `step-execution.service.ts` extended (or wrapped) without breaking the 24 api tests.
-**Estimated effort**: 4-6 hours (1-2h for the dispatch branch + 2-4h for HMI specialized integration which is PNE_4 main scope anyway)
-**Blocker for**: HMI Leak/Camera test specialized rendering with auto-cycle (PNE_4). Not blocking demo today since PNE_3 ships DemoToggle + FastForward as standalone debug surfaces.
+**Status**: ✅ **CLOSED by PROMPT_PNE_4_FOCUSED D2** (2026-05-03, commit `d61fc86`).
+**Resolution**: New `MockDeviceDispatcherService` (`apps/api/src/modules/mock-devices/mock-device-dispatcher.service.ts`) registered in `MockDevicesModule`, injected into `StepExecutionService` via `@Optional` + `forwardRef` (avoids circular dep — `FastForwardController` moved to `WorkOrdersModule` to clean up the prior MockDevicesModule → WorkOrdersModule import). The 3 simulator services (leak/camera/crimp) gained an optional `CycleCompletionListener` parameter on `start()` that fires when `complete()` runs. `StepExecutionService.applyTransition` triggers `dispatcher.dispatch(...)` after `START` lands a `device_run` device_main step on a known mock serial under `DEMO_MODE`; the registered outcome listener fires the matching `COMPLETE_OK` (PASS/MARGINAL) or `COMPLETE_NOK` (FAIL, causeCode=`auto_device_fail`) follow-up transition. Identity captured at dispatch time (req.changedBy / plantId) with `DEMO_USER_ID`/`DEMO_PLANT_ID` env fallback (Lesson 56). Real-device path is a silent no-op (canDispatch returns false for unknown serials).
+**Verification**: end-to-end runtime smoke confirmed — Mario Rossi login → POST transitions/START on STEP-LEAK-003 → simulator runs 45s → cycle PASS → step auto-transitioned to `status: "done"`, `result: "ok"` (commit `d61fc86` notes).
 
 ---
 
@@ -220,6 +211,13 @@
 ---
 
 ### TODO-040 — AddStepDialog multi-select arrays + per-form Action Config session-only / lossy on reload
+
+**Status update 2026-05-03 (PROMPT_PNE_4_FOCUSED D1 + D4)**: scope extended with three additional session-only fields, all stored on `node.data`:
+- `actionType` (DB-level Step.actionType — already round-trips via `buildSavePayload`'s default + dialog override; future schema migration would just persist the explicit override).
+- `description` (autofill mirror from D1 templates — used as a richer alternative to `instructions` on the HMI; lossy on reload).
+- `photoBase64` (mock attachment from PhotoUploadField, base64 in-memory; never reaches the server).
+- `recoveryConfig` (D4.1: `enabled` / `maxAttempts` / `preRetryStepIds[]` from AutomaticForm's recovery section; lossy on reload — runtime falls back to `MAX_RECOVERY_ATTEMPTS=2` constant from `@mes/domain`).
+Schema migration to land all session-only fields stays scoped to F2 / PROMPT_7. Demo path uses the seeded workflow (PNE_2) where all values are baked in by the seed script.
 
 **Discovered**: 2026-05-02 (during PROMPT_PNE_1 D1 surprise-budget resolution — § 7 trigger A & B)
 **File**: `packages/prisma/schema.prisma` (`Step` model) + `packages/schemas/src/registries/workflow.schema.ts` (`WorkflowStepInputSchema`) + new `apps/api/src/modules/workflow-steps/` lookup endpoints + `apps/web/src/components/workflow/AddStepDialog.tsx` (hydrate path) + `apps/web/src/components/workflow/WorkflowCanvas.tsx` (`buildSavePayload`)

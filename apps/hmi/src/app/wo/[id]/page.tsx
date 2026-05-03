@@ -20,6 +20,28 @@ import {
 import { StepCard } from '../../../components/StepCard'
 import { ParallelStepLane } from '../../../components/ParallelStepLane'
 import { RecoveryFlow } from '../../../components/RecoveryFlow'
+import {
+  HMIScrapForm,
+  derivePhaseFromStep,
+} from '../../../components/HMIScrapForm'
+import { DeviceCycleWithParallels } from './components/DeviceCycleWithParallels'
+
+// PNE_4_FOCUSED D4.0 hotfix — known mock device serials. When the active step
+// is a `device_run` step against one of these, the rendering switches from
+// the generic StepCard list to <DeviceCycleWithParallels /> so the operator
+// sees the timer + telemetry + parallel slots split layout.
+const DEVICE_CYCLE_SERIALS = new Set([
+  'DEV-LEAK-001',
+  'DEV-CAMERA-001',
+  'DEV-CRIMP-001',
+])
+
+function isDeviceCycleStep(step: WorkOrderStep | undefined): boolean {
+  if (!step) return false
+  if (step.actionType !== 'device_run') return false
+  if (step.deviceCategory !== 'device_main') return false
+  return !!step.deviceSerialNumber && DEVICE_CYCLE_SERIALS.has(step.deviceSerialNumber)
+}
 
 interface StepGroup {
   groupId: string
@@ -79,6 +101,9 @@ export default function WorkOrderExecutionPage() {
   const [nokOpen, setNokOpen] = React.useState(false)
   const [nokTargetId, setNokTargetId] = React.useState<string | null>(null)
   const [nokDraft, setNokDraft] = React.useState('')
+  // PNE_4_FOCUSED D4.2 — scrap modal state (cause code + photo + notes)
+  const [scrapOpen, setScrapOpen] = React.useState(false)
+  const [scrapTargetId, setScrapTargetId] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     setHydrated(true)
@@ -222,14 +247,44 @@ export default function WorkOrderExecutionPage() {
     [sendEvent, operator?.id],
   )
 
-  const handleScrap = React.useCallback(
-    (step: WorkOrderStep) =>
-      sendEvent(step.stepExecutionId, {
+  // PNE_4_FOCUSED D4.2 — Scarta now opens HMIScrapForm modal (cause code +
+  // photo + notes) instead of firing MARK_SCRAPPED directly. Confirmation
+  // happens via confirmScrap below.
+  const handleScrap = React.useCallback((step: WorkOrderStep) => {
+    setScrapTargetId(step.stepExecutionId)
+    setScrapOpen(true)
+  }, [])
+
+  const closeScrap = React.useCallback(() => {
+    setScrapOpen(false)
+    setScrapTargetId(null)
+  }, [])
+
+  const confirmScrap = React.useCallback(
+    (payload: {
+      causeCodeId: string
+      causeCode: string
+      photoBase64: string | null
+      notes: string | null
+    }) => {
+      if (!scrapTargetId) return
+      sendEvent(scrapTargetId, {
         type: 'MARK_SCRAPPED',
         by: operator?.id ?? 'anonymous',
-        reason: 'operator_scrap',
-      }),
-    [sendEvent, operator?.id],
+        // The state machine accepts a free-form `reason`; we pack the cause
+        // code there. Photo + notes ride in additional fields the audit log
+        // captures as `payload`. Schema migration in F2 will introduce
+        // first-class causeCodeId / photoUrl / notes columns.
+        reason: payload.causeCode,
+      })
+      closeScrap()
+    },
+    [scrapTargetId, sendEvent, operator?.id, closeScrap],
+  )
+
+  const scrapTargetStep = React.useMemo(
+    () => steps.find((s) => s.stepExecutionId === scrapTargetId) ?? null,
+    [steps, scrapTargetId],
   )
 
   const handleResumeAfterRecovery = React.useCallback(
@@ -246,6 +301,19 @@ export default function WorkOrderExecutionPage() {
       sendEvent(step.stepExecutionId, {
         type: 'COMPLETE_AFTER_RECOVERY',
         by: operator?.id ?? 'anonymous',
+      }),
+    [sendEvent, operator?.id],
+  )
+
+  // PNE_4_FOCUSED D4 — operator skips a parallel slot. Logged with
+  // causeCode='operator_choice' so the audit trail distinguishes it from a
+  // failure-driven NOK.
+  const handleSkipParallel = React.useCallback(
+    (step: WorkOrderStep) =>
+      sendEvent(step.stepExecutionId, {
+        type: 'COMPLETE_NOK',
+        by: operator?.id ?? 'anonymous',
+        causeCode: 'operator_choice',
       }),
     [sendEvent, operator?.id],
   )
@@ -375,6 +443,32 @@ export default function WorkOrderExecutionPage() {
 
       <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-4">
         {groupSteps(steps).map((group) => {
+          // PNE_4_FOCUSED D4.0 — when this group contains the active
+          // device_run device_main step against a known mock simulator,
+          // render the immersive DeviceCycleWithParallels view (timer +
+          // telemetry + parallel slots split layout). Falls back to the
+          // legacy ParallelStepLane/StepCard rendering for non-device groups
+          // and for non-active phases (pre/post operator work).
+          const activeDeviceStep = group.steps.find(
+            (s) =>
+              isDeviceCycleStep(s) &&
+              (s.status === 'running' || s.status === 'pending'),
+          )
+          if (activeDeviceStep) {
+            return (
+              <DeviceCycleWithParallels
+                key={group.groupId}
+                step={activeDeviceStep}
+                allSteps={steps}
+                onContinue={() => handleComplete(activeDeviceStep)}
+                onFail={() => openNok(activeDeviceStep.stepExecutionId)}
+                onStartSlot={(slot) => handleStart(slot)}
+                onCompleteSlot={(slot) => handleComplete(slot)}
+                onSkipSlot={(slot) => handleSkipParallel(slot)}
+                isPending={transition.isPending}
+              />
+            )
+          }
           if (group.groupSupportsParallel) {
             return (
               <ParallelStepLane
@@ -456,6 +550,15 @@ export default function WorkOrderExecutionPage() {
           className="w-full min-h-[140px] rounded-2 border border-line px-3 py-2 text-base text-ink focus:outline-none focus:ring-2 focus:ring-accent"
         />
       </Modal>
+
+      <HMIScrapForm
+        open={scrapOpen}
+        step={scrapTargetStep}
+        phase={derivePhaseFromStep(scrapTargetStep)}
+        onClose={closeScrap}
+        onConfirm={confirmScrap}
+        isPending={transition.isPending}
+      />
     </div>
   )
 }
