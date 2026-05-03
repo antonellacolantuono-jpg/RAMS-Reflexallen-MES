@@ -97,6 +97,53 @@ describe('PNE workflow v1 — recovery refs groups (post-cleanup)', () => {
     expect(camDecision?.instructions).not.toContain('inline recovery group C2')
   })
 
+  // TODO-061 closure (2026-05-06) — recoveryConfig populated on STEP-LEAK-003 +
+  // camera test cycle. preRetryStepCodes resolved to cuids by seedWorkflowV1's
+  // second pass; in-memory assertions verify the constant shape (the resolution
+  // step is exercised by the seed run itself).
+  it('STEP-LEAK-003 has recoveryConfig pointing to LEAK recovery refs', () => {
+    const phase2 = PNE_WORKFLOW_V1.phases[1]!
+    const groupB1 = phase2.groups[0]!
+    const leakStep = groupB1.steps.find((s) => s.name.includes('STEP-LEAK-003'))!
+    expect(leakStep.recoveryConfig).toBeDefined()
+    expect(leakStep.recoveryConfig!.enabled).toBe(true)
+    expect(leakStep.recoveryConfig!.maxAttempts).toBe(2)
+    expect(leakStep.recoveryConfig!.preRetryStepCodes).toEqual([
+      'STEP-LEAK-RECOVERY-CHECK',
+      'STEP-LEAK-RECOVERY-CLEAN',
+    ])
+
+    // Verify referenced ref steps actually exist in B2 (resolution sanity check)
+    const groupB2 = phase2.groups[1]!
+    const refCodes = groupB2.steps.map((s) => {
+      const m = s.name.match(/^\[([^\]]+)\]/)
+      return m ? m[1] : s.name
+    })
+    for (const code of leakStep.recoveryConfig!.preRetryStepCodes) {
+      expect(refCodes).toContain(code)
+    }
+  })
+
+  it('camera test cycle has recoveryConfig pointing to CAM recovery ref', () => {
+    const phase3 = PNE_WORKFLOW_V1.phases[2]!
+    const groupC1 = phase3.groups[0]!
+    const camStep = groupC1.steps.find((s) => s.name.includes('Camera test cycle'))!
+    expect(camStep.recoveryConfig).toBeDefined()
+    expect(camStep.recoveryConfig!.enabled).toBe(true)
+    expect(camStep.recoveryConfig!.maxAttempts).toBe(2)
+    expect(camStep.recoveryConfig!.preRetryStepCodes).toEqual(['STEP-CAM-RECOVERY-CLEAN'])
+
+    // Verify referenced ref step actually exists in C2
+    const groupC2 = phase3.groups[1]!
+    const refCodes = groupC2.steps.map((s) => {
+      const m = s.name.match(/^\[([^\]]+)\]/)
+      return m ? m[1] : s.name
+    })
+    for (const code of camStep.recoveryConfig!.preRetryStepCodes) {
+      expect(refCodes).toContain(code)
+    }
+  })
+
   it('C3 — Conformity Check group has STEP-CONFORMITY-001 as binary manual_choice', () => {
     const phase3 = PNE_WORKFLOW_V1.phases[2]!
     const groupC3 = phase3.groups[2]!

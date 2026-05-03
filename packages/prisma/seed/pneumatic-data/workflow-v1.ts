@@ -13,10 +13,11 @@
 //   the linear operator-facing flow; HMI page filters groups whose name
 //   matches /Recovery/i from rendering and from the allTerminal computation.
 // - The on-FAIL behaviour at runtime is owned by the RecoveryFlow inline
-//   panel (D5, MAX_RECOVERY_ATTEMPTS=2 hardcoded). recoveryConfig persistence
-//   on the Step row + DTO projection + HMI runtime read + pre-retry execution
-//   are deferred to PROMPT_7 (TODO-040 extended). Until then the seed simply
-//   exposes the refs to the editor; the modal does not consume them.
+//   panel (D5, MAX_RECOVERY_ATTEMPTS=2 hardcoded).
+// - PROMPT_7 D1-D4 shipped recoveryConfig persistence on Step.data + DTO
+//   projection + HMI runtime read of preRetryStepIds.
+// - TODO-061 (2026-05-06) populates Step.data.recoveryConfig at seed time for
+//   STEP-LEAK-003 + camera test cycle so the HMI pre-retry list is non-empty.
 //
 // New group C3 — Conformity Check holds STEP-CONFORMITY-001, a binary
 // manual_choice (Conforme PASS / Non conforme NOK) that gates Imballaggio.
@@ -34,6 +35,15 @@ import { SYSTEM, type PneumaticSeedContext, type Prisma } from '../helpers/upser
 export const PNE_WORKFLOW_V1_CODE = 'wf-pneumatic-air-680-v1'
 export const PNE_WORKFLOW_V1_NAME = 'Pneumatic Air M12 680mm v1 (Demo)'
 
+// TODO-061 closure (2026-05-06) — recoveryConfig persistence for STEP-LEAK-003 +
+// camera test step. preRetryStepCodes are bracket codes (e.g. 'STEP-LEAK-RECOVERY-CHECK')
+// resolved to cuids in seedWorkflowV1's second pass via stepIdByCode map.
+interface StepRecoveryConfigDef {
+  enabled?: boolean
+  maxAttempts?: number
+  preRetryStepCodes: string[]
+}
+
 interface StepDef {
   order: number
   name: string
@@ -47,6 +57,12 @@ interface StepDef {
   recipeCode?: string // resolves to ctx.recipes[code].id
   standardTimeSec?: number
   isRequired?: boolean
+  recoveryConfig?: StepRecoveryConfigDef
+}
+
+function extractStepCode(name: string): string {
+  const m = name.match(/^\[([^\]]+)\]/)
+  return m ? m[1]! : name
 }
 
 interface GroupDef {
@@ -114,7 +130,7 @@ const PHASE_2: PhaseDef = {
         { order: 1, name: '[STEP-LEAK-001] Position tube on fixture', category: 'setup', actionType: 'verify_workstation', deviceCategory: 'pre', skillCode: 'TEST', standardTimeSec: 8, instructions: '[AP-LEAK-PRESSURE] Disinnestare aria compressa prima di scollegare fixture.' },
         { order: 2, name: '[STEP-LEAK-002] Connect pneumatic hoses', category: 'setup', actionType: 'verify_tool', deviceCategory: 'pre', skillCode: 'TEST', standardTimeSec: 10 },
         // Device main
-        { order: 3, name: '[STEP-LEAK-003] Run leak test cycle', category: 'production', actionType: 'device_run', deviceCategory: 'device_main', deviceCode: 'DEV-LEAK-001', recipeCode: 'RCP-LEAK-PNE-12-001', skillCode: 'TEST', standardTimeSec: 45, instructions: 'Cycle 45s @ 6.0 bar. parallelStepsBufferSec: 5 (S3 workaround — schema field absent). PASS < 0.5 mbar/min, MARGINAL 0.5-1.0, FAIL > 1.0.' },
+        { order: 3, name: '[STEP-LEAK-003] Run leak test cycle', category: 'production', actionType: 'device_run', deviceCategory: 'device_main', deviceCode: 'DEV-LEAK-001', recipeCode: 'RCP-LEAK-PNE-12-001', skillCode: 'TEST', standardTimeSec: 45, instructions: 'Cycle 45s @ 6.0 bar. parallelStepsBufferSec: 5 (S3 workaround — schema field absent). PASS < 0.5 mbar/min, MARGINAL 0.5-1.0, FAIL > 1.0.', recoveryConfig: { enabled: true, maxAttempts: 2, preRetryStepCodes: ['STEP-LEAK-RECOVERY-CHECK', 'STEP-LEAK-RECOVERY-CLEAN'] } },
         // Parallel children (during 45s device cycle)
         { order: 4, name: '[STEP-LEAK-004] Apply label LBL-PNE-001 on previous tube', category: 'identification', actionType: 'apply_label', deviceCategory: 'parallel', partReference: 'previous', skillCode: 'IDENTIFICATION', standardTimeSec: 12 },
         { order: 5, name: '[STEP-LEAK-005] Apply identification tape TAPE-IDENT-001 on previous tube', category: 'identification', actionType: 'apply_label', deviceCategory: 'parallel', partReference: 'previous', skillCode: 'IDENTIFICATION', standardTimeSec: 10 },
@@ -155,7 +171,7 @@ const PHASE_3: PhaseDef = {
       supportsRecovery: true,
       steps: [
         { order: 1, name: '[3.1] Position tube in camera fixture', category: 'setup', actionType: 'verify_workstation', deviceCategory: 'pre', skillCode: 'TEST', standardTimeSec: 6 },
-        { order: 2, name: '[3.2] Camera test cycle', category: 'production', actionType: 'device_run', deviceCategory: 'device_main', deviceCode: 'DEV-CAMERA-001', recipeCode: 'RCP-CAMERA-PNE-001', skillCode: 'TEST', standardTimeSec: 8, instructions: '4 ROIs (raccordo A, raccordo B, label, tape) — similarity threshold ≥ 95% per ROI.' },
+        { order: 2, name: '[3.2] Camera test cycle', category: 'production', actionType: 'device_run', deviceCategory: 'device_main', deviceCode: 'DEV-CAMERA-001', recipeCode: 'RCP-CAMERA-PNE-001', skillCode: 'TEST', standardTimeSec: 8, instructions: '4 ROIs (raccordo A, raccordo B, label, tape) — similarity threshold ≥ 95% per ROI.', recoveryConfig: { enabled: true, maxAttempts: 2, preRetryStepCodes: ['STEP-CAM-RECOVERY-CLEAN'] } },
         { order: 3, name: '[3.3] Read camera result', category: 'decision', actionType: 'manual_choice', deviceCategory: 'post', skillCode: 'TEST', standardTimeSec: 3, instructions: 'PASS → next step. FAIL → blocks the step; HMI RecoveryFlow inline panel (D5) opens with "Riprova" / "Scarta" buttons. After max attempts, HMIScrapForm modal collects cause code + photo + notes.' },
         { order: 4, name: '[3.4] Remove tube', category: 'logistics', actionType: 'move', deviceCategory: 'post', skillCode: 'IDENTIFICATION', standardTimeSec: 3 },
       ],
@@ -282,6 +298,9 @@ export async function seedWorkflowV1(
   }
 
   // 3. Phases / Groups / Steps (idempotent by order within parent)
+  // TODO-061 — track step IDs by bracket code for recoveryConfig.preRetryStepIds
+  // resolution in the second pass below.
+  const stepIdByCode = new Map<string, string>()
   for (const phaseDef of PNE_WORKFLOW_V1.phases) {
     let phase = await prisma.phase.findFirst({
       where: { workflowVersionId: version.id, order: phaseDef.order },
@@ -362,16 +381,52 @@ export async function seedWorkflowV1(
         const existing = await prisma.step.findFirst({
           where: { groupId: group.id, order: stepDef.order },
         })
+        let stepRow: { id: string }
         if (!existing) {
-          await prisma.step.create({
+          stepRow = await prisma.step.create({
             data: { ...stepData, groupId: group.id, createdBy: SYSTEM, updatedBy: SYSTEM },
           })
         } else {
-          await prisma.step.update({
+          stepRow = await prisma.step.update({
             where: { id: existing.id },
             data: { ...stepData, updatedBy: SYSTEM },
           })
         }
+        stepIdByCode.set(extractStepCode(stepDef.name), stepRow.id)
+      }
+    }
+  }
+
+  // TODO-061 — second pass: resolve preRetryStepCodes → cuids, write Step.data.recoveryConfig.
+  // Steps reference recovery-ref steps that live in groups B2/C2 (seeded above), so the map
+  // is fully populated by the time we get here.
+  for (const phaseDef of PNE_WORKFLOW_V1.phases) {
+    for (const groupDef of phaseDef.groups) {
+      for (const stepDef of groupDef.steps) {
+        if (!stepDef.recoveryConfig) continue
+        const stepId = stepIdByCode.get(extractStepCode(stepDef.name))
+        if (!stepId) continue
+        const preRetryStepIds = stepDef.recoveryConfig.preRetryStepCodes
+          .map((code) => stepIdByCode.get(code))
+          .filter((id): id is string => Boolean(id))
+        if (preRetryStepIds.length !== stepDef.recoveryConfig.preRetryStepCodes.length) {
+          throw new Error(
+            `Workflow v1 recoveryConfig: unresolved preRetryStepCodes for step "${stepDef.name}" — ` +
+              `requested [${stepDef.recoveryConfig.preRetryStepCodes.join(', ')}], ` +
+              `resolved ${preRetryStepIds.length} of ${stepDef.recoveryConfig.preRetryStepCodes.length}.`,
+          )
+        }
+        const data = JSON.stringify({
+          recoveryConfig: {
+            enabled: stepDef.recoveryConfig.enabled ?? true,
+            maxAttempts: stepDef.recoveryConfig.maxAttempts ?? 2,
+            preRetryStepIds,
+          },
+        })
+        await prisma.step.update({
+          where: { id: stepId },
+          data: { data, updatedBy: SYSTEM },
+        })
       }
     }
   }

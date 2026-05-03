@@ -1,8 +1,109 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 5, 2026 (PROMPT_VIEWSWITCHER_WORKFLOWS — Workflow editor 3-mode toggle + Sidebar Lucide migration + WO Detail Snapshot tab refactor)
+> **Last update**: May 6, 2026 (GO BATCH B+C Phase 1 — TODO-061 closure: preRetryStepIds populated in pneumatic seed via two-pass resolution; PROMPT_PNE_5 deferred per S6+S8 recon surprises)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ GO BATCH B+C Phase 1 — TODO-061 preRetryStepIds seed (May 6, 2026)
+
+Closes the manual smoke gate skipped at PROMPT_7 D4 (commit `12e5f2a`). Backend wire-up of `Step.data.recoveryConfig.preRetryStepIds` shipped in D4; the seed never wrote the field, so the HMI recovery panel rendered an empty pre-retry list. This batch populates the seed.
+
+### Recon outcome — Phase 2 (PROMPT_PNE_5) deferred
+
+Recon discovered the existing auto-gen engine ([`apps/api/src/modules/auto-gen-engine/`](apps/api/src/modules/auto-gen-engine/)) is a **code/ID generator** (`(ruleId, ctx) → string`, 7 resolvers for lot codes / WO codes / sample IDs / etc.), **not a step-injection engine**. PROMPT_PNE_5's "auto-trigger label printing + packaging conditional at WO release" needs a fundamentally new pattern:
+- New module to evaluate rules and mutate cloned `WorkflowSnapshot.snapshotData` JSON.
+- `Item.requiresPackaging` schema migration (CLAUDE.md flags this as needing explicit approval — out of batch scope).
+- DEV-PRINT-001 + BOX-CARTON-EUROPALLET seed.
+- Integration in [`release.service.ts:205-241`](apps/api/src/modules/work-orders/release.service.ts) between snapshot clone and StepExecution creation.
+
+Realistic effort 4-6h, not the 2h budget. S6 (new rule type) + S8 (scope > 2h) per surprise budget. Demo path unaffected — label/packaging steps are not in the F1 demo journey. PROMPT_PNE_5 stays deferred per D4 decision (post-demo with PROMPT_DEPLOYMENT or line modules PROMPT_10/11/12/13).
+
+### Phase 1 — Scope delivered
+
+| Component | File | Notes |
+|---|---|---|
+| Two-pass seed pattern | [`packages/prisma/seed/pneumatic-data/workflow-v1.ts`](packages/prisma/seed/pneumatic-data/workflow-v1.ts) | New `StepRecoveryConfigDef` interface + `extractStepCode(name)` helper. `seedWorkflowV1()` extended: pass 1 builds `Map<bracketCode → cuid>` while upserting steps; pass 2 walks the same definition, resolves `preRetryStepCodes` → cuids via the map, writes `Step.data` as `JSON.stringify({ recoveryConfig: { enabled, maxAttempts, preRetryStepIds } })`. Throws if any code is unresolved (catches typos at seed time). Idempotent (same JSON each run). |
+| STEP-LEAK-003 recoveryConfig | same file (L117) | `recoveryConfig: { enabled: true, maxAttempts: 2, preRetryStepCodes: ['STEP-LEAK-RECOVERY-CHECK', 'STEP-LEAK-RECOVERY-CLEAN'] }` |
+| Camera test cycle recoveryConfig | same file (L158) | `recoveryConfig: { enabled: true, maxAttempts: 2, preRetryStepCodes: ['STEP-CAM-RECOVERY-CLEAN'] }`. Step keeps current name `[3.2] Camera test cycle` (no rename to STEP-CAM-002 — bracket-code resolution handles it). |
+| Seed assertions | [`packages/prisma/seed/pneumatic-data/__tests__/inline-recovery.test.ts`](packages/prisma/seed/pneumatic-data/__tests__/inline-recovery.test.ts) | +2 in-memory tests: STEP-LEAK-003 has `recoveryConfig` pointing to LEAK refs; camera step has `recoveryConfig` pointing to CAM ref. Both also verify the referenced bracket codes actually exist in the corresponding recovery-ref group (B2 / C2). |
+| TODO.md | [TODO.md](TODO.md) | TODO-061 → Resolved with full closure write-up. Tier 3 list updated to drop the entry. |
+| Header comment | workflow-v1.ts | Stale "recoveryConfig persistence deferred to PROMPT_7" comment refreshed to reference PROMPT_7 D1-D4 (shipped) + TODO-061 (this batch). |
+
+### Architectural decisions (recon-driven)
+
+- **R1 — Two-pass seed**: chosen over one-pass-with-deferred-updates because the seed already runs sequentially through phases and the Map<code, cuid> is small (30 entries). Throwing on unresolved codes catches typos early.
+- **R2 — Reuse existing recovery-ref steps**: STEP-LEAK-RECOVERY-CHECK / STEP-LEAK-RECOVERY-CLEAN / STEP-CAM-RECOVERY-CLEAN already seeded in groups B2 / C2 as `category: 'recovery'`. No new STEP-CALIBRATE-* steps invented.
+- **R3 — In-memory assertions**: existing test file pattern operates on the `PNE_WORKFLOW_V1` constant. New assertions follow the same shape. Runtime resolution is exercised by the seed run itself (no separate DB fixture needed).
+- **R4 — `[3.2]` keeps name**: the brief named the step "STEP-CAM-002" but the seed uses `[3.2] Camera test cycle`. Bracket-code resolution by regex handles either naming; renaming was unnecessary churn.
+
+### Test count
+
+- **Baseline (PROMPT_VIEWSWITCHER close)**: 980 tests
+- **This batch adds**: +2 in inline-recovery.test.ts
+- **New total**: **982 tests** (verified across 10 packages)
+
+| Package | Tests |
+|---|---|
+| @mes/api | 319 |
+| @mes/domain | 197 |
+| @mes/ui | 181 |
+| @mes/web | 145 |
+| @mes/hmi | 56 |
+| @mes/schemas | 39 |
+| @mes/prisma | 26 (was 24) |
+| @mes/cache | 8 |
+| @mes/storage | 6 |
+| @mes/queue | 5 |
+| **Total** | **982** |
+
+### Files changed
+
+```
+packages/prisma/seed/pneumatic-data/workflow-v1.ts                              (StepDef + 2 step entries + two-pass logic + comment refresh)
+packages/prisma/seed/pneumatic-data/__tests__/inline-recovery.test.ts          (+2 assertions)
+TODO.md                                                                         (TODO-061 → Resolved)
+STATUS.md                                                                       (this entry)
+```
+
+### Verification (DoD)
+
+```
+$ pnpm --filter @mes/prisma seed:pneumatic
+✓ Workflow v1: wf-pneumatic-air-680-v1 (4 phases / 7 groups / 30 steps; 2 recovery-refs groups, hidden from linear flow)
+✓ WO release: WO-2026-PNE-0042 → released, snapshot cmopq9ts…, 30 step executions (0 new)
+✅ Pneumatic Air seed (D4) complete.
+
+$ pnpm --filter @mes/prisma test
+Test Files  16 passed (16)
+     Tests  26 passed (26)
+
+$ # DB verification (direct Prisma query)
+[STEP-LEAK-003] Run leak test cycle
+  data: {"recoveryConfig":{"enabled":true,"maxAttempts":2,"preRetryStepIds":["cmopq9tm8004mecovpboq6r8b","cmopq9tmm004oecovhr0ub9dr"]}}
+[3.2] Camera test cycle
+  data: {"recoveryConfig":{"enabled":true,"maxAttempts":2,"preRetryStepIds":["cmopq9tp00054ecov7fi2svr9"]}}
+# IDs resolve to:
+cmopq9tm8004mecovpboq6r8b → [STEP-LEAK-RECOVERY-CHECK] Verifica integrità tubo e sede (recovery)
+cmopq9tmm004oecovhr0ub9dr → [STEP-LEAK-RECOVERY-CLEAN] Pulisci sede e riconnetti tubi (recovery)
+cmopq9tp00054ecov7fi2svr9 → [STEP-CAM-RECOVERY-CLEAN] Pulisci lente e riposiziona pezzo (recovery)
+
+$ # Per-package totals — see test count table above. Aggregated: 982 passing.
+```
+
+**Web build smoke**: not run — `apps/web/.next/trace` was locked by the live dev server on port 3001. Test suite passing across all 10 packages is the load-bearing verification.
+
+**Manual smoke gate** (closes the gate skipped at commit `12e5f2a`):
+- Boot dev (`pnpm dev`), open HMI, login Mario Rossi → WO-2026-PNE-0042 → STEP-LEAK-003.
+- `/demo`: Force FAIL on DEV-LEAK-001.
+- Run leak step → recovery panel now renders the 2 seeded pre-retry step names ("Verifica integrità tubo e sede" + "Pulisci sede e riconnetti tubi") instead of an empty list.
+
+### Conventional commit
+
+```
+feat(seed): populate preRetryStepIds for STEP-LEAK-003 + camera test (TODO-061 closure)
+```
 
 ---
 

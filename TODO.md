@@ -2,12 +2,12 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-05 (PROMPT_VIEWSWITCHER_WORKFLOWS closure — TODO-065 RESOLVED, sidebar Lucide migration shipped, WO Detail Snapshot tab now uses hierarchical table)
+> **Last updated**: 2026-05-06 (GO BATCH B+C Phase 1 closure — TODO-061 RESOLVED, seed populates preRetryStepIds for STEP-LEAK-003 + camera test via two-pass resolution; PROMPT_PNE_5 deferred per S6+S8 surprises in recon)
 >
 > **Tier guidance** (post DESIGN_ALIGNMENT closure, May 3 2026):
 > - **Tier 1 (critical pre-MVP)**: TODO-017 (Argon2id PIN auth + JWT cookies), TODO-021 (WO release flow), TODO-018 (full 11-state step machine), TODO-019 (parallel ops), TODO-020 (recovery 4-stage)
 > - **Tier 2 (important pre-MVP)**: TODO-008/010/011/012 (workflow editor polish), TODO-022 (real persistence), TODO-023 (Socket.IO real-time), TODO-049/050 (BoM/Recipe persistence gaps)
-> - **Tier 3 (post-MVP polish)**: TODO-001/002/003/004/005/006 (legacy registry/cosmetic), TODO-024/025/026/029/030 (HMI/canvas polish), TODO-052/053/054 (Equipment tree, Skills matrix, Operator-Skill editor — surfaced from D3 Batch 7.2), TODO-056 (multi-level timer aggregation), TODO-057 (HMI audio feedback), TODO-058 (recoveryMachine dynamic attempt_N), TODO-061 (preRetryStepIds seed gap for STEP-LEAK-003 / STEP-CAM-002), TODO-062 (PROMPT_9 deferred items: Equipment SM, MaintenanceLog, Calendar UI, Equipment OEE, Maintenance KPIs, MNT actions UI), TODO-063 (Tailwind palette tokens), TODO-064 (registry ViewSwitcher), TODO-065 (Workflow ViewSwitcher — Tier 1 PRE-DEMO, separate batch 5-6 mag)
+> - **Tier 3 (post-MVP polish)**: TODO-001/002/003/004/005/006 (legacy registry/cosmetic), TODO-024/025/026/029/030 (HMI/canvas polish), TODO-052/053/054 (Equipment tree, Skills matrix, Operator-Skill editor — surfaced from D3 Batch 7.2), TODO-056 (multi-level timer aggregation), TODO-057 (HMI audio feedback), TODO-058 (recoveryMachine dynamic attempt_N), TODO-062 (PROMPT_9 deferred items: Equipment SM, MaintenanceLog, Calendar UI, Equipment OEE, Maintenance KPIs, MNT actions UI), TODO-063 (Tailwind palette tokens), TODO-064 (registry ViewSwitcher)
 > - **Documentation hygiene only**: TODO-007/015/016/027/028/031/032/033/036/037/038/039/041/042/044/045
 
 ---
@@ -322,18 +322,13 @@
 
 ### TODO-061 — Seed Step.data.recoveryConfig.preRetryStepIds for STEP-LEAK-003 + STEP-CAM-002
 
-**Discovered**: 2026-05-03 (PROMPT_7 D4 closure manual smoke skipped due to seed gap; surfaced again at PROMPT_3c batch 1 close)
-**Status**: 🟢 PENDING — backend wire-up shipped in commit `12e5f2a`, but the seed never populates `preRetryStepIds`, so the HMI runtime renders an empty pre-retry list and the visual block stays hidden.
-**File**:
-- MOD `packages/prisma/seed/pneumatic-air.ts` (or whichever seed module owns STEP-LEAK-003 and STEP-CAM-002 — verify) — set `step.data.recoveryConfig.preRetryStepIds` to the workflow step IDs that operators must re-run before retrying the failing step (e.g. for STEP-LEAK-003 the pre-retry usually loops back to the leak-prep / fixture-clean steps; confirm with the process engineer).
-- VERIFY `apps/hmi/src/components/RecoveryFlow.tsx` reads `step.data.recoveryConfig.preRetryStepIds` at runtime (already verified — D4 closure).
-**Acceptance criterion**:
-- Seed `pnpm --filter @mes/prisma seed:pneumatic` populates non-empty `preRetryStepIds` on STEP-LEAK-003 and STEP-CAM-002.
-- HMI runtime test: trigger recovery on STEP-LEAK-003 → recovery panel renders the seeded pre-retry step list (not empty).
-- Add 1 vitest snapshot or assertion in `apps/hmi/src/components/RecoveryFlow.test.tsx` (or equivalent) that hits the seeded pre-retry path.
-**Estimated effort**: ~30 min (seed file edit + test).
-**Priority**: Tier 3 polish (post-MVP). Backend wire-up is verified by tests; this is purely demo-data fidelity. Not blocking the 18-22 May demo because the recovery flow itself works — the operator just doesn't see the pre-retry list until the seed is fixed.
-**Blocker for**: nothing in MVP. Demo path is unaffected unless we want to demo the pre-retry UX.
+**Status**: ✅ **CLOSED by GO BATCH B+C Phase 1** (2026-05-06, commit pending).
+**Resolution**: `seedWorkflowV1()` in [`packages/prisma/seed/pneumatic-data/workflow-v1.ts`](packages/prisma/seed/pneumatic-data/workflow-v1.ts) extended with a two-pass seed pattern. Pass 1 upserts every Phase/Group/Step and tracks `(bracketCode → cuid)` in a `Map<string, string>` keyed by the regex-extracted code prefix. Pass 2 walks the workflow definition again, finds steps carrying a `recoveryConfig: { preRetryStepCodes: string[] }` definition, resolves the codes to cuids via the map, and writes `Step.data` as `JSON.stringify({ recoveryConfig: { enabled, maxAttempts, preRetryStepIds } })`. The pass throws if any code is unresolved (catches ref typos at seed time). Two seed entries carry `recoveryConfig` today:
+- `[STEP-LEAK-003] Run leak test cycle` → `preRetryStepCodes: ['STEP-LEAK-RECOVERY-CHECK', 'STEP-LEAK-RECOVERY-CLEAN']`
+- `[3.2] Camera test cycle` → `preRetryStepCodes: ['STEP-CAM-RECOVERY-CLEAN']`
+
+`maxAttempts: 2` aligns with the HMI hardcoded `MAX_RECOVERY_ATTEMPTS=2` (D5). The `[3.2]` step keeps its current name (no rename to `STEP-CAM-002`); resolution is by bracket code, which is unique within the workflow. `+2` in-memory assertions added to [`packages/prisma/seed/pneumatic-data/__tests__/inline-recovery.test.ts`](packages/prisma/seed/pneumatic-data/__tests__/inline-recovery.test.ts) verify the seed-constant shape; runtime resolution is exercised by the seed run itself (`pnpm --filter @mes/prisma seed:pneumatic` finishes clean and populates `Step.data` with the resolved cuids — verified by direct DB query: STEP-LEAK-003 → 2 ids, camera step → 1 id, all pointing at category=`recovery` ref steps).
+**Verification (2026-05-06)**: Tests 980 → 982 (+2). Manual smoke gate previously skipped at commit `12e5f2a` is now executable: HMI Mario Rossi → STEP-LEAK-003 → Force FAIL on `/demo` → recovery panel renders the 2 seeded pre-retry step names ("Verifica integrità tubo e sede" + "Pulisci sede e riconnetti tubi").
 
 ---
 
