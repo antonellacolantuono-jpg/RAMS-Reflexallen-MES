@@ -2,7 +2,7 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-02 (PROMPT_PNE_3 D3 — opened TODO-044)
+> **Last updated**: 2026-05-03 (PROMPT_DESIGN_ALIGNMENT D3 batch 7.1 — opened TODO-049, TODO-050)
 
 ---
 
@@ -160,6 +160,41 @@
 ---
 
 ## 🟡 Medium priority (good to have)
+
+### TODO-049 — BoM lines not persisted on create/update
+
+**Discovered**: 2026-05-03 (during PROMPT_DESIGN_ALIGNMENT D3 batch 7.1 implementation)
+**Status**: 🟢 PENDING — frontend ships scalar-fidelity BoM detail/edit/new pages with read-only Lines tab (always empty until repo gap closed).
+**File**: `apps/api/src/modules/bom/bom.repository.ts` + `apps/api/src/modules/bom/bom.service.ts`
+**Symptom**: `CreateBomSchema` (in `packages/schemas/src/registries/bom.schema.ts`) requires `lines: array.min(1)`, but `BomRepository.create` only writes `{itemId, notes, status}` — the `lines` field from the DTO is silently discarded. `BomRepository.update` doesn't accept a `lines` field at all. Result: BOMLine rows are never created via the public API and the BoM detail page Lines tab (`GET /api/bom/:id/tree`) always returns `[]` for BoMs created through the UI. The Zod parse + service layer are wired correctly; only the repo persistence is the gap.
+**Acceptance criterion**:
+- `BomRepository.create` accepts `lines: CreateBomLineDto[]` and persists them via `prisma.$transaction([prisma.bOM.create(...), prisma.bOMLine.createMany(...)])`.
+- `BomRepository.update` accepts an optional `lines` field; on receipt, replaces existing BOMLine rows for the BoM atomically (delete + create or upsert with position).
+- New service method `BomService.createWithLines` / repo signatures cover both paths.
+- Frontend: replace the read-only Lines tab in `apps/web/src/app/(registries)/bom/[id]/page.tsx` with a repeating-row editor primitive (would land in `@mes/ui` as new `RepeatingRowEditor` or similar — separate scope from this TODO).
+- Tests: integration test that `POST /api/bom` with N lines returns `tree(id) === N` rows.
+**Estimated effort**: ~2h backend (repo + tests) + ~2h frontend (repeating-row primitive in `@mes/ui` + edit/new wiring).
+**Priority**: medium-low (post-demo). The Reflex Allen demo (May 18-22) does not require BoM editing through the UI — seed data covers demo BoMs.
+
+---
+
+### TODO-050 — Recipe parameters/versions not persisted
+
+**Discovered**: 2026-05-03 (during PROMPT_DESIGN_ALIGNMENT D3 batch 7.1 implementation)
+**Status**: 🟢 PENDING — frontend ships scalar-fidelity Recipe detail/edit/new pages with stub Versions tab.
+**File**: `apps/api/src/modules/recipes/recipes.repository.ts` + `apps/api/src/modules/recipes/recipes.controller.ts`
+**Symptom**: `CreateRecipeSchema` (in `packages/schemas/src/registries/recipe.schema.ts`) accepts `parameters: array(RecipeParameterSchema).default([])`, but `RecipesRepository.create` only writes the scalar Recipe row — no `RecipeVersion` is created and parameters are silently discarded. `RecipesRepository.update` doesn't accept `parameters`. The `GET /api/recipes/:id/versions` endpoint that the SDK type implies (`RecipeModel.versions?: RecipeVersionModel[]`) is not declared on the controller. Result: Recipe versioning is non-functional through the public API; Recipe detail page Versioni tab is a stub.
+**Acceptance criterion**:
+- `RecipesRepository.create` creates an initial `RecipeVersion` (version=1, status='draft', parameters=JSON-stringified) inside a transaction with the Recipe.
+- `RecipesRepository.update` accepts `parameters` and either updates the latest draft RecipeVersion or creates a new version (decision to be made — likely create-new-on-content-change for audit trail).
+- New `GET /api/recipes/:id/versions` endpoint on `RecipesController` returns `RecipeVersion[]` ordered by version desc.
+- New `POST /api/recipes/:id/versions/:vid/approve` endpoint flips `RecipeVersion.status='approved'` + sets `approvedBy` + `approvedAt`.
+- Frontend: replace the stub Versioni tab in `apps/web/src/app/(registries)/recipes/[id]/page.tsx` with a real version list (DataTable with version, status, approvedAt, parameter count) + parameter editor (would need new `@mes/ui` primitive — separate scope).
+- Tests: integration test that `POST /api/recipes` with 3 parameters → `versions(id)` returns 1 version with parameters, `update` with new parameter set → `versions(id)` returns 2 versions.
+**Estimated effort**: ~2h backend (repo refactor + endpoints + tests) + ~2h frontend (versions tab + parameter editor primitive).
+**Priority**: medium-low (post-demo). Demo recipes are seeded directly into `RecipeVersion` rows by `seed:pneumatic`, so the runtime path (HMI loading recipes onto devices) is unaffected.
+
+---
 
 ### TODO-044 — DemoToggle Panel: replace 2s polling with WebSocket subscription
 
