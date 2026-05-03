@@ -1,17 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import { PNE_WORKFLOW_V1, PNE_WORKFLOW_V1_COUNTS, PNE_WORKFLOW_V1_CODE } from '../workflow-v1'
 
-describe('PNE workflow v1 — structure', () => {
-  it('has 4 phases / 6 groups / 34 step rows with correct categories per PROMPT § 3.2', () => {
+describe('PNE workflow v1 — structure (post PROMPT_PNE_SEED_CLEANUP)', () => {
+  it('has 4 phases / 7 groups / 30 step rows with correct categories per PROMPT § 3.2', () => {
     expect(PNE_WORKFLOW_V1_CODE).toBe('wf-pneumatic-air-680-v1')
 
-    // Aggregate counts (PROMPT § 1 said "19 steps" — informal undercount;
-    // enumeration is 26 main-path + 8 inline recovery = 34 step rows.
-    // See TODO-042 doc-hygiene entry to be opened in D4.)
+    // Aggregate counts post-hotfix (PROMPT_PNE_SEED_CLEANUP):
+    // - 8 inline REC-* steps removed (4 in B2 + 4 in C2)
+    // - 3 hidden recovery-refs steps added (2 in B2 + 1 in C2)
+    // - 1 STEP-CONFORMITY-001 step added in new C3 group
+    // Net: 34 - 8 + 3 + 1 = 30 steps; groups: 6 - 0 + 1 = 7.
     expect(PNE_WORKFLOW_V1_COUNTS.phases).toBe(4)
-    expect(PNE_WORKFLOW_V1_COUNTS.groups).toBe(6)
-    expect(PNE_WORKFLOW_V1_COUNTS.steps).toBe(34)
-    expect(PNE_WORKFLOW_V1_COUNTS.recoveryGroups).toBe(2) // B2 + C2 inline
+    expect(PNE_WORKFLOW_V1_COUNTS.groups).toBe(7)
+    expect(PNE_WORKFLOW_V1_COUNTS.steps).toBe(30)
+    expect(PNE_WORKFLOW_V1_COUNTS.recoveryGroups).toBe(2) // B2 + C2 refs-only
 
     // Phase categories per PROMPT § 3.2
     const phaseCategories = PNE_WORKFLOW_V1.phases.map((p) => p.category)
@@ -21,17 +23,18 @@ describe('PNE workflow v1 — structure', () => {
     const cycleFlags = PNE_WORKFLOW_V1.phases.map((p) => p.isCycleBased)
     expect(cycleFlags).toEqual([true, true, true, false])
 
-    // Group counts per phase
+    // Group counts per phase: P1=1 (A1), P2=2 (B1+B2), P3=3 (C1+C2+C3), P4=1 (D1)
     const groupsPerPhase = PNE_WORKFLOW_V1.phases.map((p) => p.groups.length)
-    expect(groupsPerPhase).toEqual([1, 2, 2, 1])
+    expect(groupsPerPhase).toEqual([1, 2, 3, 1])
 
-    // Step counts per group (8 + 9 + 4 + 4 + 4 + 5)
+    // Step counts per group: A1=8, B1=9, B2=2 (refs), C1=4, C2=1 (refs), C3=1 (conformity), D1=5
     const stepCounts: number[] = []
     for (const p of PNE_WORKFLOW_V1.phases) for (const g of p.groups) stepCounts.push(g.steps.length)
-    expect(stepCounts).toEqual([8, 9, 4, 4, 4, 5])
+    expect(stepCounts).toEqual([8, 9, 2, 4, 1, 1, 5])
 
     // Step categories use only the StepCategory enum vocabulary
-    const validStepCategories = ['production', 'logistics', 'identification', 'quality_control', 'decision', 'information', 'setup', 'teardown']
+    // (added 'recovery' for the refs steps post-hotfix)
+    const validStepCategories = ['production', 'logistics', 'identification', 'quality_control', 'decision', 'information', 'setup', 'teardown', 'recovery']
     for (const p of PNE_WORKFLOW_V1.phases) {
       for (const g of p.groups) {
         for (const s of g.steps) {

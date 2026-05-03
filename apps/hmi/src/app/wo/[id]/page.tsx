@@ -36,6 +36,17 @@ const DEVICE_CYCLE_SERIALS = new Set([
   'DEV-CRIMP-001',
 ])
 
+// PROMPT_PNE_SEED_CLEANUP (post F1 hotfix) — recovery-refs groups (e.g.
+// "B2 — Leak Recovery (refs)") hold pre-retry step candidates exposed to the
+// workflow editor's recoveryConfig section. They are NOT part of the linear
+// operator flow: their step rows must not appear in the rendered list, must
+// not block the WO from completing, and must not be picked as the active step.
+const RECOVERY_GROUP_PATTERN = /Recovery/i
+
+function isRecoveryRefStep(step: WorkOrderStep): boolean {
+  return RECOVERY_GROUP_PATTERN.test(step.groupName)
+}
+
 function isDeviceCycleStep(step: WorkOrderStep | undefined): boolean {
   if (!step) return false
   if (step.actionType !== 'device_run') return false
@@ -134,18 +145,27 @@ export default function WorkOrderExecutionPage() {
     () => stepsQuery.data ?? [],
     [stepsQuery.data],
   )
-  const activeStep = pickActiveStep(steps)
+  // Operator-facing slice: hide recovery-refs steps so they don't appear in
+  // the linear flow, don't block WO completion, and don't get auto-picked as
+  // active. The full `steps` array is still used for ID-based lookups
+  // (scrapTargetStep, nokTargetId) since those reference stable execution IDs.
+  const visibleSteps = React.useMemo(
+    () => steps.filter((s) => !isRecoveryRefStep(s)),
+    [steps],
+  )
+  const activeStep = pickActiveStep(visibleSteps)
 
   const allTerminal = React.useMemo(
     () =>
-      steps.length > 0 && steps.every((s) => PAST_STATUSES.includes(s.status)),
-    [steps],
+      visibleSteps.length > 0 &&
+      visibleSteps.every((s) => PAST_STATUSES.includes(s.status)),
+    [visibleSteps],
   )
 
   React.useEffect(() => {
     if (allTerminal && hydrated) {
-      const okCount = steps.filter((s) => s.status === 'done').length
-      const nokCount = steps.filter(
+      const okCount = visibleSteps.filter((s) => s.status === 'done').length
+      const nokCount = visibleSteps.filter(
         (s) => s.status === 'blocked' || s.status === 'scrapped',
       ).length
       const elapsedSec = Math.max(
@@ -156,7 +176,7 @@ export default function WorkOrderExecutionPage() {
         `/wo/${woId}/done?ok=${okCount}&nok=${nokCount}&time=${elapsedSec}`,
       )
     }
-  }, [allTerminal, steps, router, woId, hydrated])
+  }, [allTerminal, visibleSteps, router, woId, hydrated])
 
   const machineInput = React.useMemo(
     () => ({
@@ -345,9 +365,9 @@ export default function WorkOrderExecutionPage() {
   const autoStartedRef = React.useRef<Set<string>>(new Set())
 
   React.useEffect(() => {
-    if (!steps.length) return
+    if (!visibleSteps.length) return
     if (transition.isPending) return
-    const groups = groupSteps(steps)
+    const groups = groupSteps(visibleSteps)
     for (const group of groups) {
       if (!group.groupSupportsParallel) continue
       const preDone = group.steps
@@ -370,7 +390,7 @@ export default function WorkOrderExecutionPage() {
         handleStart(s)
       }
     }
-  }, [steps, transition.isPending, handleStart])
+  }, [visibleSteps, transition.isPending, handleStart])
 
   if (!hydrated || !operator) {
     return (
@@ -399,9 +419,9 @@ export default function WorkOrderExecutionPage() {
     )
   }
 
-  const total = steps.length
-  const doneCount = steps.filter((s) => s.status === 'done').length
-  const blockedCount = steps.filter(
+  const total = visibleSteps.length
+  const doneCount = visibleSteps.filter((s) => s.status === 'done').length
+  const blockedCount = visibleSteps.filter(
     (s) => s.status === 'blocked' || s.status === 'scrapped',
   ).length
   const completedSteps = doneCount + blockedCount
@@ -442,7 +462,7 @@ export default function WorkOrderExecutionPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-4">
-        {groupSteps(steps).map((group) => {
+        {groupSteps(visibleSteps).map((group) => {
           // PNE_4_FOCUSED D4.0 — when this group contains the active
           // device_run device_main step against a known mock simulator,
           // render the immersive DeviceCycleWithParallels view (timer +
@@ -513,7 +533,7 @@ export default function WorkOrderExecutionPage() {
             </div>
           )
         })}
-        {steps.length === 0 && (
+        {visibleSteps.length === 0 && (
           <p className="text-ink-3 text-center py-8">
             Nessuno step disponibile per questo ordine.
           </p>

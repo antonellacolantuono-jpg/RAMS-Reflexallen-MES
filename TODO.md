@@ -212,12 +212,21 @@
 
 ### TODO-040 — AddStepDialog multi-select arrays + per-form Action Config session-only / lossy on reload
 
+**Status update 2026-05-03 (PROMPT_PNE_SEED_CLEANUP, post F1 hotfix)**: scope further extended to cover the **runtime read path** for `recoveryConfig`. Today the field is session-only on `node.data` AND the HMI runtime ignores it entirely — `RecoveryFlow` panel uses the hardcoded `MAX_RECOVERY_ATTEMPTS=2` constant from `@mes/domain` and **does not execute the configured pre-retry step refs** at "Riprova" click. The seed cleanup (workflow v1 redesign) added 3 hidden recovery-refs steps in dedicated B2/C2 groups so the workflow editor can reference them as `preRetryStepIds`, but they will not run until the persistence + projection + runtime read are wired. Demo path remains functional (operator clicks "Riprova" → step transitions back to running → device cycle re-launches; pre-retry step refs are visible only in the editor as documentation for the process engineer).
+
 **Status update 2026-05-03 (PROMPT_PNE_4_FOCUSED D1 + D4)**: scope extended with three additional session-only fields, all stored on `node.data`:
 - `actionType` (DB-level Step.actionType — already round-trips via `buildSavePayload`'s default + dialog override; future schema migration would just persist the explicit override).
 - `description` (autofill mirror from D1 templates — used as a richer alternative to `instructions` on the HMI; lossy on reload).
 - `photoBase64` (mock attachment from PhotoUploadField, base64 in-memory; never reaches the server).
 - `recoveryConfig` (D4.1: `enabled` / `maxAttempts` / `preRetryStepIds[]` from AutomaticForm's recovery section; lossy on reload — runtime falls back to `MAX_RECOVERY_ATTEMPTS=2` constant from `@mes/domain`).
 Schema migration to land all session-only fields stays scoped to F2 / PROMPT_7. Demo path uses the seeded workflow (PNE_2) where all values are baked in by the seed script.
+
+**Recovery-specific acceptance criterion (added by SEED_CLEANUP, scoped to PROMPT_7)**:
+- `Step.recoveryConfig Json?` column (or `Step.data Json?` superset including the four session-only fields above).
+- `WorkflowStepInputSchema` accepts `recoveryConfig: RecoveryConfigSchema.optional()`.
+- API `Step` projection (workflow detail + WorkOrderStep DTO consumed by HMI) carries `recoveryConfig` into the response.
+- HMI `RecoveryFlow` reads `step.recoveryConfig.maxAttempts` (falling back to `MAX_RECOVERY_ATTEMPTS=2`) and `step.recoveryConfig.preRetryStepIds`.
+- HMI runtime executes the pre-retry step refs at "Riprova" click before re-launching the device cycle: each ref step opens as a modal manual step (visual_check / process), operator confirms each, then the device cycle restarts. This is the gap the SEED_CLEANUP hotfix surfaced and explicitly deferred.
 
 **Discovered**: 2026-05-02 (during PROMPT_PNE_1 D1 surprise-budget resolution — § 7 trigger A & B)
 **File**: `packages/prisma/schema.prisma` (`Step` model) + `packages/schemas/src/registries/workflow.schema.ts` (`WorkflowStepInputSchema`) + new `apps/api/src/modules/workflow-steps/` lookup endpoints + `apps/web/src/components/workflow/AddStepDialog.tsx` (hydrate path) + `apps/web/src/components/workflow/WorkflowCanvas.tsx` (`buildSavePayload`)

@@ -1,8 +1,68 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 3, 2026 (PROMPT_PNE_4_FOCUSED D1-D4 closed — **F1 100% complete, demo-ready**)
+> **Last update**: May 3, 2026 (PROMPT_PNE_SEED_CLEANUP applied — post F1 hotfix, 744 tests)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## 🩹 Hotfix — PROMPT_PNE_SEED_CLEANUP (post F1 close, May 3, 2026)
+
+Re-designed `wf-pneumatic-air-680-v1` seed to align the operator-facing flow with the D5 RecoveryFlow / D4.2 HMIScrapForm runtime. The original PNE_2 seed modelled recovery as inline `[REC-LEAK-*]` / `[REC-CAM-*]` step rows in the linear workflow — once D4 shipped the inline recovery panel + scrap modal, the seeded steps started competing with the modal flow and confusing the operator (HMI showed `[STEP-LEAK-003]` blocked then auto-advanced to `[REC-LEAK-ATT-2]` instead of opening the recovery panel).
+
+### Scope (revised vs spec)
+
+The original spec aimed at a full Production phase restructure (Setup / Production / Outbound / Teardown auto-gen) with `recoveryConfig` persisted on the seed. Three pre-flight surprises forced a smaller, honest scope (decisions D-A through D-D documented mid-session):
+
+- **D-A** Drop `recoveryConfig` persistence from seed entirely. The `Step` schema has no JSON column, and the HMI runtime never reads `recoveryConfig` (it's a workflow-editor-only convention from D4.1). Persistence + DTO projection + runtime read + pre-retry execution all deferred to PROMPT_7 (TODO-040 extended below).
+- **D-B** Keep the existing 4-phase split (Final Assembly / Leak Test / Camera Test / Imballaggio). No restructure to Setup/Production/Outbound/Teardown — too risky for the demo.
+- **D-C** Accept that pre-retry step ref execution at "Riprova" click is NOT implemented. Refs appear in the workflow editor for the process engineer; runtime falls back to direct device cycle re-launch.
+- **D-D** Use `name.match(/Recovery/i)` as the HMI page filter signal — same convention `PNE_WORKFLOW_V1_COUNTS.recoveryGroups` already uses.
+
+### Changes
+
+- **Seed** `packages/prisma/seed/pneumatic-data/workflow-v1.ts`:
+  - Removed 8 inline recovery steps: REC-LEAK-DIAG, REC-LEAK-ATT-1, REC-LEAK-ATT-2, REC-LEAK-SCRAP, REC-CAM-DIAG, REC-CAM-ATT-1, REC-CAM-ATT-2, REC-CAM-SCRAP.
+  - Replaced with 2 dedicated "refs only" groups holding 3 hidden steps (category=`recovery`):
+    - B2 — Leak Recovery (refs): STEP-LEAK-RECOVERY-CHECK + STEP-LEAK-RECOVERY-CLEAN
+    - C2 — Camera Recovery (refs): STEP-CAM-RECOVERY-CLEAN
+  - Added new group C3 — Conformity Check with STEP-CONFORMITY-001 (binary manual_choice: Conforme / Non conforme).
+  - Updated STEP-LEAK-007 + [3.3] decision step instructions to reference the D5 RecoveryFlow inline panel + D4.2 HMIScrapForm modal (no longer reference inline B2/C2 sub-flow).
+  - Counts: 4 phases / **7 groups (was 6)** / **30 steps (was 34)** / 2 recovery-refs groups.
+- **HMI** `apps/hmi/src/app/wo/[id]/page.tsx`:
+  - Added `RECOVERY_GROUP_PATTERN = /Recovery/i` + `isRecoveryRefStep(step)` predicate.
+  - Derived `visibleSteps` memo filters out recovery-refs steps from: linear render, active step pick, allTerminal computation, auto-start parallel effect, progress bar counters.
+  - Hidden ref steps remain in the underlying `steps` array for ID-based lookups (NOK / scrap) but never reach the operator surface.
+- **Tests**:
+  - `__tests__/inline-recovery.test.ts` rewritten: asserts 0 inline REC-* names + 3 hidden recovery-refs in 2 dedicated groups + decision step instructions reference RecoveryFlow + C3 Conformity Check shape.
+  - `__tests__/workflow-v1.test.ts` counts rebaselined: groups 6→7, steps 34→30, groupsPerPhase [1,2,2,1]→[1,2,3,1], stepCounts [8,9,4,4,4,5]→[8,9,2,4,1,1,5]. Added `recovery` to validStepCategories.
+  - `__tests__/workflow-v0.test.ts` count assertion bumped 34→30.
+  - New `apps/hmi/src/app/wo/[id]/components/recovery-refs-filter.test.ts` (6 tests) pins the `isRecoveryRefStep` rule against future regression.
+
+### Verification (May 3, 2026)
+
+- ✅ Build 13/13 successful (`pnpm build`)
+- ✅ Lint clean (only pre-existing PNE_3 hmi `<img>` warnings, unchanged)
+- ✅ All **744 tests pass** (was 734, **+10 net**: prisma 18→22 from rewritten inline-recovery suite, hmi 30→36 from new filter test):
+  - api 284 / domain 197 / ui 119 / web 38 / hmi **36** / schemas 29 / prisma **22** / cache 8 / storage 6 / queue 5
+- ⏳ Manual `pnpm dev` smoke (recovery modal flow end-to-end after re-seed) — pending operator sign-off before commit per workflow rules.
+
+### Lessons learned (Lesson 58)
+
+- **Lesson 58 (SEED_CLEANUP pre-flight)**: shipping a full UI surface (D4.1 recoveryConfig section + D4.2 ScrapForm + D5 RecoveryFlow inline panel) does not by itself produce a working runtime feature. The recoveryConfig field flows through the editor but never reaches the runtime: no schema column, no DTO projection, no HMI read. Pre-flight on the SEED_CLEANUP hotfix surfaced the gap before touching code; without that step we'd have shipped a seed that documents pre-retry refs that the runtime can't execute. Practical guideline: when a hotfix promises behaviour that depends on cross-layer plumbing (editor → DB → DTO → HMI runtime), trace the read path explicitly during pre-flight, not just the write path.
+
+### Files changed
+
+```
+packages/prisma/seed/pneumatic-data/workflow-v1.ts
+packages/prisma/seed/pneumatic-data/__tests__/workflow-v1.test.ts
+packages/prisma/seed/pneumatic-data/__tests__/workflow-v0.test.ts
+packages/prisma/seed/pneumatic-data/__tests__/inline-recovery.test.ts          (rewritten)
+apps/hmi/src/app/wo/[id]/page.tsx
+apps/hmi/src/app/wo/[id]/components/recovery-refs-filter.test.ts                (new)
+TODO.md                                                                          (TODO-040 extended)
+STATUS.md                                                                        (this entry)
+```
 
 ---
 

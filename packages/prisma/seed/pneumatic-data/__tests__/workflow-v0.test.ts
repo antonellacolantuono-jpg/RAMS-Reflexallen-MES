@@ -19,6 +19,8 @@ describe('PNE workflow v0 (Empty) — scaffold for UX validation', () => {
 
     // v1 has body; v0 must NOT (verified at runtime by seed function via prisma.phase.count)
     expect(PNE_WORKFLOW_V1_COUNTS.phases).toBeGreaterThan(0)
-    expect(PNE_WORKFLOW_V1_COUNTS.steps).toBe(34)
+    // PROMPT_PNE_SEED_CLEANUP (post F1 hotfix): v1 trimmed from 34 → 30 steps
+    // (8 inline REC-* removed, 3 hidden recovery refs added, 1 STEP-CONFORMITY-001 added).
+    expect(PNE_WORKFLOW_V1_COUNTS.steps).toBe(30)
   })
 })

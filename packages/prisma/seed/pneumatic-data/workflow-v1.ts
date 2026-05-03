@@ -1,23 +1,33 @@
 // PROMPT_PNE_2 D3 — Workflow v1 (Demo) for Pneumatic Air M12 680mm.
+// PROMPT_PNE_SEED_CLEANUP (post F1 hotfix, 2026-05-03) — recovery redesign.
 //
 // Code:    wf-pneumatic-air-680-v1
 // Status:  approved (PROMPT "Active" → schema enum 'approved')
 // Item:    PNE-TUBE-12-680
-// Tree:    4 phases / 6 groups (4 main + 2 inline recovery) / 34 step rows
+// Tree:    4 phases / 7 groups (4 main + 2 recovery-refs + 1 conformity) / 30 step rows
 //
-// Recovery groups B2 + C2 are INLINE per S2 workaround (TODO-036): the schema
-// does not have Step.onNokTargetWorkflowId, so separate recovery sub-flow
-// workflows can't link back from decision steps. Instead, recovery flows live
-// as Groups within their parent phase, with supportsRecovery=true. Decision
-// steps reference them via instructions text (loose-coupling).
+// Post-cleanup recovery model (replaces inline REC-* sub-flow approach):
+// - Recovery groups B2 (Leak) + C2 (Camera) now contain ONLY hidden ref steps
+//   used as preRetryStepIds candidates from the workflow editor's
+//   recoveryConfig section (D4.1 Automatic action form). They are NOT part of
+//   the linear operator-facing flow; HMI page filters groups whose name
+//   matches /Recovery/i from rendering and from the allTerminal computation.
+// - The on-FAIL behaviour at runtime is owned by the RecoveryFlow inline
+//   panel (D5, MAX_RECOVERY_ATTEMPTS=2 hardcoded). recoveryConfig persistence
+//   on the Step row + DTO projection + HMI runtime read + pre-retry execution
+//   are deferred to PROMPT_7 (TODO-040 extended). Until then the seed simply
+//   exposes the refs to the editor; the modal does not consume them.
+//
+// New group C3 — Conformity Check holds STEP-CONFORMITY-001, a binary
+// manual_choice (Conforme PASS / Non conforme NOK) that gates Imballaggio.
 //
 // Per S3 workaround: STEP-LEAK-003 (device main) encodes the 5-second parallel
 // buffer in instructions text since the Group/Step schema lacks
 // parallelStepsBufferSec column.
 //
-// Per S1 workaround: REC-*-DIAG steps reference fault codes by code-string in
-// instructions (no Step.recoveryFaultCodes[] FK exists). The 10 fault codes
-// are seeded as CauseCode rows with category='recovery_fault' (D2).
+// The 10 fault codes (LK-* + CM-*) seeded by fault-codes.ts as CauseCode rows
+// with category='recovery_fault' (D2) remain available for the HMIScrapForm
+// dropdown in the recovery → scrap path.
 
 import { SYSTEM, type PneumaticSeedContext, type Prisma } from '../helpers/upsert'
 
@@ -110,23 +120,21 @@ const PHASE_2: PhaseDef = {
         { order: 5, name: '[STEP-LEAK-005] Apply identification tape TAPE-IDENT-001 on previous tube', category: 'identification', actionType: 'apply_label', deviceCategory: 'parallel', partReference: 'previous', skillCode: 'IDENTIFICATION', standardTimeSec: 10 },
         { order: 6, name: '[STEP-LEAK-006] Prepare next tube on staging', category: 'production', actionType: 'assembly', deviceCategory: 'parallel', partReference: 'next', skillCode: 'ASSY', standardTimeSec: 20 },
         // Post
-        { order: 7, name: '[STEP-LEAK-007] Read leak result', category: 'decision', actionType: 'manual_choice', deviceCategory: 'post', skillCode: 'TEST', standardTimeSec: 3, instructions: 'PASS → next step. MARGINAL → operator decision (re-test or escalate). FAIL → trigger inline recovery group B2 (S2 workaround — schema lacks onNokTargetWorkflowId).' },
+        { order: 7, name: '[STEP-LEAK-007] Read leak result', category: 'decision', actionType: 'manual_choice', deviceCategory: 'post', skillCode: 'TEST', standardTimeSec: 3, instructions: 'PASS → next step. MARGINAL → operator decision (re-test or escalate). FAIL → blocks the step; HMI RecoveryFlow inline panel (D5) opens with "Riprova" / "Scarta" buttons. After max attempts, HMIScrapForm modal collects cause code + photo + notes.' },
         { order: 8, name: '[STEP-LEAK-008] Disconnect hoses', category: 'teardown', actionType: 'verify_tool', deviceCategory: 'post', skillCode: 'TEST', standardTimeSec: 5 },
         { order: 9, name: '[STEP-LEAK-009] Remove tube to passed tray', category: 'logistics', actionType: 'move', deviceCategory: 'post', skillCode: 'IDENTIFICATION', standardTimeSec: 3 },
       ],
     },
     {
       order: 2,
-      category: 'device_execution',
-      name: 'B2 — Leak Recovery (inline, S2 workaround)',
+      category: 'qc',
+      name: 'B2 — Leak Recovery (refs)',
       supportsParallel: false,
       supportsRecovery: true,
-      description: 'Recovery flow inline (max 3 attempts). Triggered manually when STEP-LEAK-007 → FAIL.',
+      description: 'Hidden recovery refs only. Steps are exposed to the workflow editor as preRetryStepIds candidates for STEP-LEAK-003.recoveryConfig (D4.1 Automatic action form). HMI page.tsx filters this group from the linear operator flow via /Recovery/i name match. Pre-retry execution at runtime is deferred to PROMPT_7 (TODO-040).',
       steps: [
-        { order: 1, name: '[REC-LEAK-DIAG] Diagnosis — select leak fault code', category: 'decision', actionType: 'manual_choice', skillCode: 'QC', standardTimeSec: 30, instructions: 'Select fault code from: LK-HOSE-LOOSE, LK-SEAL-CONTAM, LK-REAL-DEFECT, LK-CRIMP-LEAK, LK-OTHER (CauseCode rows with category=recovery_fault, S1 workaround).' },
-        { order: 2, name: '[REC-LEAK-ATT-1] First retry — apply correction per fault', category: 'quality_control', actionType: 'rework', skillCode: 'QC', standardTimeSec: 60 },
-        { order: 3, name: '[REC-LEAK-ATT-2] Second retry — alternative correction', category: 'quality_control', actionType: 'rework', skillCode: 'QC', standardTimeSec: 60 },
-        { order: 4, name: '[REC-LEAK-SCRAP] Forced scrap — cause code mandatory', category: 'quality_control', actionType: 'document_defect', skillCode: 'QC', standardTimeSec: 45, instructions: 'After 3 failed attempts: select scrap cause code (material_defect, crimp_leak, etc.), upload photo (mock), notify QC supervisor.' },
+        { order: 1, name: '[STEP-LEAK-RECOVERY-CHECK] Verifica integrità tubo e sede', category: 'recovery', actionType: 'visual_check', skillCode: 'QC', standardTimeSec: 25, instructions: 'Ref step (recoveryConfig.preRetryStepIds candidate). Verifica visiva di integrità tubo, sede di tenuta, raccordi crimpati. Esposto al workflow editor; non eseguito nel flow lineare.' },
+        { order: 2, name: '[STEP-LEAK-RECOVERY-CLEAN] Pulisci sede e riconnetti tubi', category: 'recovery', actionType: 'process', skillCode: 'QC', standardTimeSec: 40, instructions: 'Ref step (recoveryConfig.preRetryStepIds candidate). Pulizia sede di tenuta con isopropanolo, riconnessione tubi pneumatici, verifica serraggio.' },
       ],
     },
   ],
@@ -148,22 +156,30 @@ const PHASE_3: PhaseDef = {
       steps: [
         { order: 1, name: '[3.1] Position tube in camera fixture', category: 'setup', actionType: 'verify_workstation', deviceCategory: 'pre', skillCode: 'TEST', standardTimeSec: 6 },
         { order: 2, name: '[3.2] Camera test cycle', category: 'production', actionType: 'device_run', deviceCategory: 'device_main', deviceCode: 'DEV-CAMERA-001', recipeCode: 'RCP-CAMERA-PNE-001', skillCode: 'TEST', standardTimeSec: 8, instructions: '4 ROIs (raccordo A, raccordo B, label, tape) — similarity threshold ≥ 95% per ROI.' },
-        { order: 3, name: '[3.3] Read camera result', category: 'decision', actionType: 'manual_choice', deviceCategory: 'post', skillCode: 'TEST', standardTimeSec: 3, instructions: 'PASS → next step. FAIL → trigger inline recovery group C2 (S2 workaround).' },
+        { order: 3, name: '[3.3] Read camera result', category: 'decision', actionType: 'manual_choice', deviceCategory: 'post', skillCode: 'TEST', standardTimeSec: 3, instructions: 'PASS → next step. FAIL → blocks the step; HMI RecoveryFlow inline panel (D5) opens with "Riprova" / "Scarta" buttons. After max attempts, HMIScrapForm modal collects cause code + photo + notes.' },
         { order: 4, name: '[3.4] Remove tube', category: 'logistics', actionType: 'move', deviceCategory: 'post', skillCode: 'IDENTIFICATION', standardTimeSec: 3 },
       ],
     },
     {
       order: 2,
-      category: 'device_execution',
-      name: 'C2 — Camera Recovery (inline, S2 workaround)',
+      category: 'qc',
+      name: 'C2 — Camera Recovery (refs)',
       supportsParallel: false,
       supportsRecovery: true,
-      description: 'Recovery flow inline (max 2 attempts). Triggered manually when [3.3] → FAIL.',
+      description: 'Hidden recovery refs only. Steps are exposed to the workflow editor as preRetryStepIds candidates for [3.2].recoveryConfig (D4.1 Automatic action form). HMI page.tsx filters this group from the linear operator flow via /Recovery/i name match. Pre-retry execution at runtime is deferred to PROMPT_7 (TODO-040).',
       steps: [
-        { order: 1, name: '[REC-CAM-DIAG] Diagnosis — select camera fault code', category: 'decision', actionType: 'manual_choice', skillCode: 'QC', standardTimeSec: 25, instructions: 'Select fault code from: CM-MISALIGN, CM-LIGHTING, CM-POSITIONING, CM-REAL-DEFECT, CM-CALIBRATION (CauseCode rows with category=recovery_fault, S1 workaround).' },
-        { order: 2, name: '[REC-CAM-ATT-1] First retry — apply correction per fault', category: 'quality_control', actionType: 'rework', skillCode: 'QC', standardTimeSec: 45 },
-        { order: 3, name: '[REC-CAM-ATT-2] Second retry — alternative correction', category: 'quality_control', actionType: 'rework', skillCode: 'QC', standardTimeSec: 45 },
-        { order: 4, name: '[REC-CAM-SCRAP] Forced scrap — cause code mandatory', category: 'quality_control', actionType: 'document_defect', skillCode: 'QC', standardTimeSec: 40, instructions: 'After 2 failed attempts: select scrap cause code (material_defect, camera_calibration, etc.), upload photo (mock), notify QC supervisor.' },
+        { order: 1, name: '[STEP-CAM-RECOVERY-CLEAN] Pulisci lente e riposiziona pezzo', category: 'recovery', actionType: 'process', skillCode: 'QC', standardTimeSec: 30, instructions: 'Ref step (recoveryConfig.preRetryStepIds candidate). Pulizia lente camera con panno antistatico, ricontrollo illuminazione ring-light, riposizionamento tubo su fixture per SOP.' },
+      ],
+    },
+    {
+      order: 3,
+      category: 'qc',
+      name: 'C3 — Conformity Check',
+      supportsParallel: false,
+      supportsRecovery: false,
+      description: 'Final QC gate before Imballaggio. Binary decision: Conforme (PASS, advance) / Non conforme (NOK, trigger HMIScrapForm with default cause "Non conformity at conformity check").',
+      steps: [
+        { order: 1, name: '[STEP-CONFORMITY-001] Conformity check', category: 'decision', actionType: 'manual_choice', skillCode: 'QC', standardTimeSec: 8, instructions: 'Operator binary choice: Conforme (PASS → next step Imballaggio) | Non conforme (NOK → opens HMIScrapForm modal pre-filled with cause "Non conformity at conformity check"). Rich variant taxonomy (estetico/funzionale/critico) deferred to post-demo.' },
       ],
     },
   ],
@@ -363,7 +379,7 @@ export async function seedWorkflowV1(
   console.log(
     `✓ Workflow v1: ${PNE_WORKFLOW_V1_CODE} (${PNE_WORKFLOW_V1_COUNTS.phases} phases / ` +
       `${PNE_WORKFLOW_V1_COUNTS.groups} groups / ${PNE_WORKFLOW_V1_COUNTS.steps} steps; ` +
-      `${PNE_WORKFLOW_V1_COUNTS.recoveryGroups} inline recovery groups)`,
+      `${PNE_WORKFLOW_V1_COUNTS.recoveryGroups} recovery-refs groups, hidden from linear flow)`,
   )
   return { workflowId: workflow.id, workflowVersionId: version.id }
 }
