@@ -238,9 +238,37 @@ export function StepCard({
               <dt className="text-ink-3 uppercase text-xs tracking-wide">
                 Azione
               </dt>
-              <dd className="text-ink font-medium">{step.actionType}</dd>
+              {/* PROMPT_7 D4 — display-only override: prefer the workflow
+                  editor's step.data.actionType when set, fall back to the
+                  top-level Step.actionType column. Branching logic in
+                  page.tsx (isDeviceCycleStep, parallel detection) keeps
+                  using the top-level field. */}
+              <dd className="text-ink font-medium">
+                {step.data?.actionType ?? step.actionType}
+              </dd>
             </div>
           </dl>
+
+          {/* PROMPT_7 D4 — reference photo attached in the workflow editor
+              (step.data.photoUrl). Display-only; capture happens in
+              apps/web's PhotoUploadField. */}
+          {step.data?.photoUrl && (
+            <figure
+              className="flex flex-col gap-1"
+              data-testid="step-card-photo"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={step.data.photoUrl}
+                alt="Foto di riferimento"
+                className="rounded-2 border border-line max-w-xs object-cover"
+                style={{ maxHeight: 200 }}
+              />
+              <figcaption className="text-[10px] text-ink-3">
+                Foto di riferimento
+              </figcaption>
+            </figure>
+          )}
 
           {isActive && (
             <div className="grid grid-cols-3 gap-3 mt-2">

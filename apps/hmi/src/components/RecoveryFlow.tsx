@@ -8,12 +8,19 @@ import {
 } from '@mes/domain'
 import type { WorkOrderStep } from '../lib/queries'
 
-const STAGE_LABEL: Record<RecoveryStage, string> = {
-  diagnosis: 'Diagnosi iniziale',
-  attempt_1: 'Tentativo 1 di 2',
-  attempt_2: 'Tentativo 2 di 2',
-  scrap: 'Scartato',
-  recovered: 'Recuperato',
+function buildStageLabel(stage: RecoveryStage, max: number): string {
+  switch (stage) {
+    case 'diagnosis':
+      return 'Diagnosi iniziale'
+    case 'attempt_1':
+      return `Tentativo 1 di ${max}`
+    case 'attempt_2':
+      return `Tentativo 2 di ${max}`
+    case 'scrap':
+      return 'Scartato'
+    case 'recovered':
+      return 'Recuperato'
+  }
 }
 
 const STAGE_INSTRUCTIONS: Record<RecoveryStage, string> = {
@@ -27,6 +34,11 @@ const STAGE_INSTRUCTIONS: Record<RecoveryStage, string> = {
   recovered: 'Lo step è stato recuperato. Riprendi il pezzo o conferma la chiusura.',
 }
 
+export interface PreRetryStepRef {
+  id: string
+  name: string
+}
+
 export interface RecoveryFlowProps {
   step: WorkOrderStep
   isPending?: boolean
@@ -34,6 +46,14 @@ export interface RecoveryFlowProps {
   onScrap: () => void
   onResumeAfterRecovery?: () => void
   onCompleteAfterRecovery?: () => void
+  /**
+   * PROMPT_7 D4 — preparation steps configured via
+   * `step.data.recoveryConfig.preRetryStepIds`, resolved by the parent page
+   * to display names. Display-only: rendered as an ordered list above the
+   * recover button so the operator knows what to do BEFORE clicking retry.
+   * Sequential execution is deferred (TODO-040 follow-up).
+   */
+  preRetryNames?: ReadonlyArray<PreRetryStepRef>
 }
 
 export function RecoveryFlow({
@@ -43,7 +63,27 @@ export function RecoveryFlow({
   onScrap,
   onResumeAfterRecovery,
   onCompleteAfterRecovery,
+  preRetryNames,
 }: RecoveryFlowProps) {
+  // PROMPT_7 D4 — read maxAttempts from step.data.recoveryConfig with the
+  // structural cap of MAX_RECOVERY_ATTEMPTS (recoveryMachine in @mes/domain
+  // only models attempt_1/attempt_2; see TODO-058 for dynamic-N refactor).
+  const configuredMax = step.data?.recoveryConfig?.maxAttempts
+  if (
+    typeof configuredMax === 'number' &&
+    configuredMax > MAX_RECOVERY_ATTEMPTS
+  ) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[RecoveryFlow] step.data.recoveryConfig.maxAttempts=${configuredMax} ` +
+        `exceeds machine cap ${MAX_RECOVERY_ATTEMPTS}; clamping (TODO-058).`,
+    )
+  }
+  const effectiveMax =
+    typeof configuredMax === 'number'
+      ? Math.min(Math.max(1, configuredMax), MAX_RECOVERY_ATTEMPTS)
+      : MAX_RECOVERY_ATTEMPTS
+
   const stage: RecoveryStage =
     step.recoveryStage ??
     (step.status === 'recovered' ? 'recovered' : 'diagnosis')
@@ -54,7 +94,7 @@ export function RecoveryFlow({
   const recoverLabel =
     stage === 'diagnosis'
       ? 'Avvia tentativo di recupero'
-      : `Tentativo ${step.attemptCount + 1} di ${MAX_RECOVERY_ATTEMPTS}`
+      : `Tentativo ${step.attemptCount + 1} di ${effectiveMax}`
 
   return (
     <section
@@ -65,10 +105,10 @@ export function RecoveryFlow({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge tone={isRecovered ? 'ok' : 'bad'}>
-            Recupero · {STAGE_LABEL[stage]}
+            Recupero · {buildStageLabel(stage, effectiveMax)}
           </Badge>
           <span className="text-xs text-ink-3 tabular-nums">
-            Tentativi: {step.attemptCount} / {MAX_RECOVERY_ATTEMPTS}
+            Tentativi: {step.attemptCount} / {effectiveMax}
           </span>
         </div>
       </div>
@@ -79,7 +119,25 @@ export function RecoveryFlow({
       <RecoveryStepper currentStage={stage} attemptCount={step.attemptCount} />
 
       {step.status === 'blocked' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="flex flex-col gap-3">
+          {showRecoverButton && preRetryNames && preRetryNames.length > 0 && (
+            <div
+              className="rounded-2 border border-warn/30 bg-warn-soft/40 p-3 flex flex-col gap-2"
+              data-testid="pre-retry-list"
+            >
+              <p className="text-xs font-semibold text-ink uppercase tracking-wide">
+                Prima del prossimo tentativo, esegui questi controlli:
+              </p>
+              <ol className="list-decimal pl-5 text-sm text-ink-2 flex flex-col gap-1">
+                {preRetryNames.map((ref) => (
+                  <li key={ref.id} data-pre-retry-step-id={ref.id}>
+                    {ref.name}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {showRecoverButton ? (
             <Button
               size="hmi"
@@ -104,6 +162,7 @@ export function RecoveryFlow({
           >
             Scarta pezzo
           </Button>
+          </div>
         </div>
       )}
 

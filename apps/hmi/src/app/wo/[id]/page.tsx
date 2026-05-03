@@ -47,6 +47,24 @@ function isRecoveryRefStep(step: WorkOrderStep): boolean {
   return RECOVERY_GROUP_PATTERN.test(step.groupName)
 }
 
+// PROMPT_7 D4 — resolve preRetryStepIds (Step.id refs from the workflow
+// editor's recoveryConfig) to display names for RecoveryFlow's display-only
+// pre-retry list. Lookup uses the FULL steps array, not visibleSteps, because
+// preRetry refs live in recovery-refs groups that are filtered out of the
+// operator flow. Unresolved IDs (deleted steps) are silently dropped.
+function resolvePreRetryNames(
+  step: WorkOrderStep,
+  allSteps: WorkOrderStep[],
+): { id: string; name: string }[] {
+  const ids = step.data?.recoveryConfig?.preRetryStepIds ?? []
+  return ids
+    .map((id) => {
+      const ref = allSteps.find((s) => s.stepId === id)
+      return ref ? { id, name: ref.stepName } : null
+    })
+    .filter((x): x is { id: string; name: string } => x !== null)
+}
+
 function isDeviceCycleStep(step: WorkOrderStep | undefined): boolean {
   if (!step) return false
   if (step.actionType !== 'device_run') return false
@@ -517,6 +535,7 @@ export default function WorkOrderExecutionPage() {
                       onScrap={() => handleScrap(step)}
                       onResumeAfterRecovery={() => handleResumeAfterRecovery(step)}
                       onCompleteAfterRecovery={() => handleCompleteAfterRecovery(step)}
+                      preRetryNames={resolvePreRetryNames(step, steps)}
                     />
                   )}
                 </div>
