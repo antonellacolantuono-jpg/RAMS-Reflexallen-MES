@@ -1,7 +1,7 @@
 'use client'
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@mes/ui'
+import { HMIBigBtn, HMIShell } from '@mes/ui'
 import {
   useLogout,
   useMe,
@@ -39,8 +39,10 @@ export default function DashboardPage() {
 
   if (me.isLoading || !me.data) {
     return (
-      <div className="min-h-screen bg-paper flex items-center justify-center">
-        <p className="text-ink-3">Caricamento…</p>
+      <div className="min-h-screen flex flex-col">
+        <HMIShell title="Caricamento…">
+          <p className="text-ink-3 text-center mt-12">Caricamento…</p>
+        </HMIShell>
       </div>
     )
   }
@@ -48,6 +50,7 @@ export default function DashboardPage() {
   const operator = me.data
   const woList = workOrders.data ?? []
   const shiftCode = woList[0]?.shiftCode ?? null
+  const hasQc = (operator.skillCodes ?? []).includes('QC')
 
   async function handleLogout() {
     try {
@@ -64,112 +67,87 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-paper">
-      <header className="sticky top-0 z-10 bg-paper/95 backdrop-blur border-b border-line">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <img
-              src="/brand/logo-light.svg"
-              alt="Reflexallen"
-              className="h-7"
-            />
-            <div className="flex flex-col">
-              <span className="text-xs text-ink-3 uppercase tracking-wide">
-                Bentornato
-              </span>
-              <span className="text-base font-semibold text-ink">
-                {operator.firstName} {operator.lastName}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col text-right">
-              <span className="text-xs text-ink-3 uppercase tracking-wide">
-                Turno
-              </span>
-              <span className="text-sm font-medium text-ink">
-                {shiftCode ? `${shiftCode} · ` : ''}Badge {operator.badge}
-              </span>
-            </div>
-            {(operator.skillCodes ?? []).includes('QC') && (
-              <Button
-                size="hmi"
-                variant="primary"
-                onClick={() => router.push('/qc-review')}
-              >
-                Revisione QC
-              </Button>
-            )}
-            <Button
-              size="hmi"
-              variant="default"
-              onClick={handleLogout}
-              disabled={logout.isPending}
+    <div className="min-h-screen flex flex-col">
+      <HMIShell
+        title="Ordini di lavoro"
+        sub={`${operator.firstName} ${operator.lastName}${shiftCode ? ` · Turno ${shiftCode}` : ''} · Badge ${operator.badge}`}
+        headerRight={
+          hasQc ? (
+            <HMIBigBtn
+              variant="primary"
+              onClick={() => router.push('/qc-review')}
             >
-              Esci
-            </Button>
+              Revisione QC
+            </HMIBigBtn>
+          ) : undefined
+        }
+        footer={
+          <HMIBigBtn
+            variant="default"
+            onClick={handleLogout}
+            disabled={logout.isPending}
+          >
+            Esci
+          </HMIBigBtn>
+        }
+      >
+        <div className="max-w-6xl mx-auto flex flex-col gap-6">
+          <div className="flex items-baseline justify-between">
+            <span className="uppercase-label">Assegnati al tuo badge</span>
+            <span className="text-sm text-ink-3 tabular-nums">
+              {woList.length} {woList.length === 1 ? 'ordine' : 'ordini'}
+            </span>
           </div>
-        </div>
-      </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8 flex flex-col gap-6">
-        <div className="flex items-baseline justify-between">
-          <h1 className="text-2xl font-semibold text-ink">
-            Ordini di lavoro assegnati
-          </h1>
-          <span className="text-sm text-ink-3 tabular-nums">
-            {woList.length} {woList.length === 1 ? 'ordine' : 'ordini'}
-          </span>
+          {workOrders.isLoading ? (
+            <div className="glass rounded-3 p-12 flex flex-col items-center gap-3 text-center">
+              <p className="text-sm text-ink-3">Caricamento ordini…</p>
+            </div>
+          ) : workOrders.isError ? (
+            <div className="glass rounded-3 p-12 flex flex-col items-center gap-3 text-center">
+              <span className="text-4xl">⚠️</span>
+              <h2 className="text-lg font-semibold text-ink">
+                Impossibile caricare gli ordini
+              </h2>
+              <p className="text-sm text-ink-3 max-w-sm">
+                Verificare la connessione di rete e riprovare.
+              </p>
+            </div>
+          ) : woList.length === 0 ? (
+            <div className="glass rounded-3 p-12 flex flex-col items-center gap-3 text-center">
+              <span className="text-4xl">📋</span>
+              <h2 className="text-lg font-semibold text-ink">
+                Nessun ordine assegnato
+              </h2>
+              <p className="text-sm text-ink-3 max-w-sm">
+                Al momento non risultano ordini di lavoro assegnati al tuo
+                badge. Rivolgiti al responsabile di linea.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {woList.map((wo) => (
+                <WorkOrderCard
+                  key={wo.id}
+                  workOrder={{
+                    id: wo.id,
+                    code: wo.code,
+                    itemCode: wo.itemCode,
+                    itemName: wo.itemName,
+                    quantity: wo.quantity,
+                    completed: wo.completed,
+                    assignedTo: operator.badge,
+                    priority: wo.priority,
+                    status: wo.status,
+                    startedAt: wo.startedAt,
+                  }}
+                  onOpen={handleOpen}
+                />
+              ))}
+            </div>
+          )}
         </div>
-
-        {workOrders.isLoading ? (
-          <div className="glass rounded-3 p-12 flex flex-col items-center gap-3 text-center">
-            <p className="text-sm text-ink-3">Caricamento ordini…</p>
-          </div>
-        ) : workOrders.isError ? (
-          <div className="glass rounded-3 p-12 flex flex-col items-center gap-3 text-center">
-            <span className="text-4xl">⚠️</span>
-            <h2 className="text-lg font-semibold text-ink">
-              Impossibile caricare gli ordini
-            </h2>
-            <p className="text-sm text-ink-3 max-w-sm">
-              Verificare la connessione di rete e riprovare.
-            </p>
-          </div>
-        ) : woList.length === 0 ? (
-          <div className="glass rounded-3 p-12 flex flex-col items-center gap-3 text-center">
-            <span className="text-4xl">📋</span>
-            <h2 className="text-lg font-semibold text-ink">
-              Nessun ordine assegnato
-            </h2>
-            <p className="text-sm text-ink-3 max-w-sm">
-              Al momento non risultano ordini di lavoro assegnati al tuo
-              badge. Rivolgiti al responsabile di linea.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {woList.map((wo) => (
-              <WorkOrderCard
-                key={wo.id}
-                workOrder={{
-                  id: wo.id,
-                  code: wo.code,
-                  itemCode: wo.itemCode,
-                  itemName: wo.itemName,
-                  quantity: wo.quantity,
-                  completed: wo.completed,
-                  assignedTo: operator.badge,
-                  priority: wo.priority,
-                  status: wo.status,
-                  startedAt: wo.startedAt,
-                }}
-                onOpen={handleOpen}
-              />
-            ))}
-          </div>
-        )}
-      </main>
+      </HMIShell>
     </div>
   )
 }

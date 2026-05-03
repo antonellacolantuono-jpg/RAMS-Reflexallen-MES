@@ -1,6 +1,12 @@
 export { Button } from './components/Button'
 export type { ButtonProps } from './components/Button'
 
+export { HMIShell } from './components/HMIShell'
+export type { HMIShellProps } from './components/HMIShell'
+
+export { HMIBigBtn } from './components/HMIBigBtn'
+export type { HMIBigBtnProps } from './components/HMIBigBtn'
+
 export { Input } from './components/Input'
 export type { InputProps } from './components/Input'
 

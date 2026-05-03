@@ -7,7 +7,7 @@ import {
   stepExecutionMachine,
   type StepExecutionEvent,
 } from '@mes/domain'
-import { Button, Modal, Progress } from '@mes/ui'
+import { Button, HMIBigBtn, HMIShell, Modal, Progress } from '@mes/ui'
 import { useOperatorStore } from '../../../lib/operator-store'
 import {
   useMyWorkOrders,
@@ -427,41 +427,32 @@ export default function WorkOrderExecutionPage() {
   const completedSteps = doneCount + blockedCount
 
   return (
-    <div className="min-h-screen bg-paper">
-      <header className="sticky top-0 z-10 bg-paper/95 backdrop-blur border-b border-line">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs uppercase tracking-wide text-ink-3">
-                {wo.code}
-              </span>
-              <h1 className="text-lg font-semibold text-ink truncate">
-                {wo.itemName}
-              </h1>
-            </div>
-            <Button
-              size="hmi"
-              variant="default"
-              onClick={() => router.replace('/dashboard')}
-            >
-              Esci
-            </Button>
-          </div>
-          <div className="flex items-center gap-3">
-            <Progress
-              value={completedSteps}
-              max={Math.max(1, total)}
-              tone="accent"
-              className="flex-1"
-            />
-            <span className="text-sm tabular-nums text-ink font-medium shrink-0">
-              {completedSteps} / {total} step
-            </span>
-          </div>
+    <div className="min-h-screen flex flex-col">
+      <HMIShell
+        title={wo.itemName}
+        sub={`${wo.code} · ${completedSteps} / ${total} step`}
+        footer={
+          <HMIBigBtn
+            variant="default"
+            onClick={() => router.replace('/dashboard')}
+          >
+            Esci
+          </HMIBigBtn>
+        }
+      >
+        <div className="max-w-5xl mx-auto flex items-center gap-3 mb-6">
+          <Progress
+            value={completedSteps}
+            max={Math.max(1, total)}
+            tone="accent"
+            className="flex-1"
+          />
+          <span className="text-sm tabular-nums text-ink font-medium shrink-0">
+            {completedSteps} / {total} step
+          </span>
         </div>
-      </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-4">
+        <main className="max-w-5xl mx-auto flex flex-col gap-4">
         {groupSteps(visibleSteps).map((group) => {
           // PNE_4_FOCUSED D4.0 — when this group contains the active
           // device_run device_main step against a known mock simulator,
@@ -538,7 +529,8 @@ export default function WorkOrderExecutionPage() {
             Nessuno step disponibile per questo ordine.
           </p>
         )}
-      </main>
+        </main>
+      </HMIShell>
 
       <Modal
         open={nokOpen}

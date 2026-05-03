@@ -1,7 +1,7 @@
 'use client'
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Input, Field } from '@mes/ui'
+import { Button, Input, Field, HMIBigBtn, HMIShell } from '@mes/ui'
 import { PinKeypad } from '../components/PinKeypad'
 import { useLogin, useMe } from '../lib/queries'
 import { ApiError } from '../lib/api-client'
@@ -58,15 +58,16 @@ export default function HMILoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-paper flex flex-col items-center justify-center p-6">
-      <div className="mb-8">
-        <img src="/brand/logo-light.svg" alt="Reflexallen" className="h-10" />
-      </div>
-
-      <div className="w-full max-w-xs glass rounded-3 p-6 flex flex-col gap-5">
-        <h1 className="text-xl font-semibold text-center text-ink">Accesso Operatore</h1>
-
-        {step === 'badge' && (
+    <div className="min-h-screen flex flex-col">
+      <HMIShell
+        title="Accesso Operatore"
+        sub="Reflexallen MES · Sign-in"
+        headerRight={
+          <img src="/brand/logo-light.svg" alt="Reflexallen" className="h-7" />
+        }
+      >
+        <div className="w-full max-w-xs mx-auto glass rounded-3 p-6 flex flex-col gap-5 mt-12">
+          {step === 'badge' && (
           <>
             <Field label="Numero Badge" required>
               <Input
@@ -83,9 +84,14 @@ export default function HMILoginPage() {
                 }}
               />
             </Field>
-            <Button size="hmi" className="w-full" onClick={handleBadgeContinue}>
+            <HMIBigBtn
+              variant="primary"
+              size="big"
+              className="w-full"
+              onClick={handleBadgeContinue}
+            >
               Continua
-            </Button>
+            </HMIBigBtn>
             {SHOW_DEMO_HINT && (
               <p className="text-xs text-ink-3 text-center">
                 Demo: OP-001..OP-004 · PIN 1234 / 2222 / 3333 / 4444
@@ -125,7 +131,8 @@ export default function HMILoginPage() {
             </Button>
           </>
         )}
-      </div>
+        </div>
+      </HMIShell>
     </div>
   )
 }
