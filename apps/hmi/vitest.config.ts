@@ -7,11 +7,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
     globals: true,
-    // PNE_4_FOCUSED D1 — web test count crossed the threshold where Vitest
-    // 2.1 multi-worker hits a Windows temp-dir race (Lesson #54 from STATUS;
-    // already mitigated in @mes/api, @mes/domain via --no-file-parallelism).
-    // Bake the flag into the config so `pnpm test` matches the validated
-    // per-package serial mode without extra CLI args.
+    // Vitest 2.1 + Windows multi-worker hits a temp-dir race on this repo
+    // (Lesson #54 from STATUS history; same flake affects @mes/api,
+    // @mes/domain, @mes/web). Disabling file parallelism resolves it without
+    // breaking jsdom DOM cleanup the way singleFork would.
     fileParallelism: false,
   },
   resolve: {

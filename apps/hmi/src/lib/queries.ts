@@ -39,6 +39,13 @@ export type WorkOrderStep = {
   actionType: string
   instructions: string | null
   deviceCategory: string | null
+  /**
+   * PNE_4_FOCUSED D1 — projected from `Step.device.serialNumber` so the HMI
+   * generic step view can pick the matching device-cycle telemetry subview
+   * (leak / camera / crimp). Pre-PNE_4 servers omit this field; client treats
+   * `undefined` as `null`.
+   */
+  deviceSerialNumber?: string | null
   groupId: string
   groupName: string
   groupCategory: string

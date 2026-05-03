@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Modal,
   Field,
@@ -40,6 +40,12 @@ import {
   SetupTeardownSchema,
   type FormKey,
 } from '../../lib/step-validation-schemas'
+import {
+  buildAutofilledTitle,
+  buildAutofilledDescription,
+} from '../../lib/step-title-templates'
+import { useFirstSelectedResourceCode } from '../../lib/use-resource-code'
+import { PhotoUploadField } from './configurator/PhotoUploadField'
 import type { ZodTypeAny } from 'zod'
 
 function toggleId(prev: string[], id: string): string[] {
@@ -78,7 +84,21 @@ export function AddStepDialog() {
   const toast = useToast()
 
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [kindId, setKindId] = useState<StepKindId>('manual')
+
+  // PNE_4_FOCUSED D1 — explicit Action Type selector + autofill + photo upload.
+  // `actionType` is the DB-level Step.actionType string (one of the catalog ids
+  // in `step-action-types.ts`). Autofill targets `name` (title) and
+  // `description` from the templates in `step-title-templates.ts`. We track the
+  // last-applied autofill snapshot to detect manual edits — once the operator
+  // diverges from the suggestion, autofill stops touching that field.
+  const [actionType, setActionType] = useState<string>('')
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null)
+  const lastAutofillRef = useRef<{ title: string; description: string }>({
+    title: '',
+    description: '',
+  })
 
   // Resource selections (lifted into the dialog so ResourceTabs can read+write
   // and so the Save handler can persist them — single-FK fields end up in
@@ -102,6 +122,10 @@ export function AddStepDialog() {
   useEffect(() => {
     if (dialog.open) {
       setName('')
+      setDescription('')
+      setActionType('')
+      setPhotoBase64(null)
+      lastAutofillRef.current = { title: '', description: '' }
       setKindId(dialog.preselectedKind ?? 'manual')
       setSelectedMaterialIds([])
       setSelectedToolIds([])
@@ -112,6 +136,37 @@ export function AddStepDialog() {
       setActionConfig(defaultActionConfig)
     }
   }, [dialog.open, dialog.preselectedKind])
+
+  const firstResourceCode = useFirstSelectedResourceCode({
+    deviceIds: selectedDeviceIds,
+    recipeId: selectedRecipeId,
+    toolIds: selectedToolIds,
+    materialIds: selectedMaterialIds,
+  })
+
+  // Autofill effect: when actionType OR firstResourceCode changes, refresh the
+  // title/description suggestion. Only overwrites the user's value when the
+  // current value still matches the previously-applied autofill (or is empty).
+  useEffect(() => {
+    if (!actionType) return
+    const suggestedTitle = buildAutofilledTitle(actionType, firstResourceCode)
+    const suggestedDesc = buildAutofilledDescription(actionType)
+
+    setName((prev) => {
+      const untouched = prev === '' || prev === lastAutofillRef.current.title
+      return untouched ? suggestedTitle : prev
+    })
+    setDescription((prev) => {
+      const untouched =
+        prev === '' || prev === lastAutofillRef.current.description
+      return untouched ? suggestedDesc : prev
+    })
+
+    lastAutofillRef.current = {
+      title: suggestedTitle,
+      description: suggestedDesc,
+    }
+  }, [actionType, firstResourceCode])
 
   const targetGroup = useMemo(
     () => nodes.find((n) => n.id === dialog.groupId && n.type === 'groupNode'),
@@ -210,6 +265,12 @@ export function AddStepDialog() {
       // Session-only multi-select arrays.
       materialIds: selectedMaterialIds,
       attentionPointIds: selectedAttentionPointIds,
+      // PNE_4_FOCUSED D1 — actionType (DB-level Step.actionType), description
+      // template, and photoBase64 mock are session-only on node.data until F2
+      // schema migration (TODO-040 extended).
+      actionType: actionType || null,
+      description: description.trim() || null,
+      photoBase64: photoBase64 ?? null,
       // Session-only kind/category-specific config.
       actionConfig: actionConfig as unknown as Record<string, unknown>,
     })
@@ -347,6 +408,17 @@ export function AddStepDialog() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="es. Verifica torque iniziale"
+              data-testid="step-name-input"
+            />
+          </Field>
+          <Field label="Descrizione (mock autofill)">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Descrizione breve. Compilata automaticamente da Action Type."
+              className="w-full rounded-2 border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-4 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              data-testid="step-description-input"
             />
           </Field>
           <ActionConfig
@@ -356,6 +428,8 @@ export function AddStepDialog() {
             selectedToolIds={selectedToolIds}
             selectedRecipeId={selectedRecipeId}
             state={actionConfig}
+            actionType={actionType}
+            onChangeActionType={setActionType}
             onChangeManual={(v) =>
               setActionConfig((s) => ({ ...s, manual: v }))
             }
@@ -381,6 +455,7 @@ export function AddStepDialog() {
               setActionConfig((s) => ({ ...s, setupTeardown: v }))
             }
           />
+          <PhotoUploadField value={photoBase64} onChange={setPhotoBase64} />
           {kindDescriptor && (
             <p className="mt-1 text-[10px] text-neutral-500">
               Tipo selezionato:{' '}

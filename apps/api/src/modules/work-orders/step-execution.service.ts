@@ -70,6 +70,14 @@ export interface WorkOrderStepDto extends StepStateDto {
   actionType: string
   instructions: string | null
   deviceCategory: string | null
+  /**
+   * PNE_4_FOCUSED D1 — projected from `Step.device.serialNumber` so the HMI
+   * generic step view can pick the right device-cycle telemetry subview (leak
+   * pressure, camera ROI grid, crimp force) and so step-execution dispatch
+   * (D2, closes TODO-043) can route to the matching mock simulator. `null`
+   * when the step has no device link or the device has no serial number.
+   */
+  deviceSerialNumber: string | null
   groupId: string
   groupName: string
   groupCategory: string
@@ -99,7 +107,7 @@ export class StepExecutionService {
     }
     const rows = await this.prisma.stepExecution.findMany({
       where: { workOrderId },
-      include: { step: { include: { group: true } } },
+      include: { step: { include: { group: true, device: true } } },
       orderBy: { step: { order: 'asc' } },
     })
     return rows.map((r) => {
@@ -119,6 +127,7 @@ export class StepExecutionService {
         actionType: r.step.actionType,
         instructions: r.step.instructions ?? null,
         deviceCategory: r.step.deviceCategory ?? null,
+        deviceSerialNumber: r.step.device?.serialNumber ?? null,
         groupId: r.step.groupId,
         groupName: r.step.group.name,
         groupCategory: r.step.group.category,

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import type { Node } from '@xyflow/react'
+import { Field } from '@mes/ui'
 import { useWorkflowStore } from '../store'
 import {
   deriveFormKey,
@@ -15,6 +16,7 @@ import {
   type InformationValues,
   type SetupTeardownValues,
 } from '../../../lib/step-validation-schemas'
+import { getActionTypesForCategory } from '../../../lib/step-action-types'
 import { ManualForm } from './action-forms/ManualForm'
 import { AutomaticForm } from './action-forms/AutomaticForm'
 import { GuidedForm } from './action-forms/GuidedForm'
@@ -48,6 +50,9 @@ export interface ActionConfigProps {
   selectedToolIds: string[]
   selectedRecipeId: string | null
   state: ActionConfigState
+  /** PNE_4_FOCUSED D1 — selected action type (e.g. 'apply_label'). Empty = none. */
+  actionType: string
+  onChangeActionType: (next: string) => void
   onChangeManual: (v: ManualValues) => void
   onChangeAutomatic: (v: AutomaticValues) => void
   onChangeGuided: (v: GuidedValues) => void
@@ -108,6 +113,11 @@ export function ActionConfig(props: ActionConfigProps) {
     [stepNodes],
   )
 
+  const actionTypeOptions = useMemo(
+    () => getActionTypesForCategory(props.category),
+    [props.category],
+  )
+
   return (
     <div
       className="flex flex-col gap-3"
@@ -121,6 +131,24 @@ export function ActionConfig(props: ActionConfigProps) {
           Le selezioni multiple e i parametri avanzati saranno persistiti in F2
           (PROMPT_7). Per il demo, configurali per sessione.
         </div>
+      )}
+
+      {actionTypeOptions.length > 0 && (
+        <Field label="Action Type">
+          <select
+            value={props.actionType}
+            onChange={(e) => props.onChangeActionType(e.target.value)}
+            className="w-full rounded-2 border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            data-testid="action-type-select"
+          >
+            <option value="">— Seleziona —</option>
+            {actionTypeOptions.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.labelIt}
+              </option>
+            ))}
+          </select>
+        </Field>
       )}
 
       {formKey === 'manual' && (

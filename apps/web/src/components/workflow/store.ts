@@ -127,6 +127,12 @@ interface WorkflowCanvasStore {
       materialIds?: string[]
       attentionPointIds?: string[]
       actionConfig?: Record<string, unknown>
+      // PNE_4_FOCUSED D1 — explicit DB-level Step.actionType + autofilled
+      // description + photoBase64 mock. All session-only on node.data until
+      // F2 schema migration (TODO-040 extended).
+      actionType?: string | null
+      description?: string | null
+      photoBase64?: string | null
     },
   ) => string
   // Append a new phase node (column) at the end + chain edge from previous.
@@ -373,6 +379,12 @@ export const useWorkflowStore = create<WorkflowCanvasStore>((set, get) => ({
         ...(payload.actionConfig
           ? { actionConfig: payload.actionConfig }
           : {}),
+        // PNE_4_FOCUSED D1 — actionType (DB-level Step.actionType — picked up
+        // by buildSavePayload below if present), description (autofill mirror),
+        // photoBase64 (mock attachment, session-only).
+        ...(payload.actionType ? { actionType: payload.actionType } : {}),
+        ...(payload.description ? { description: payload.description } : {}),
+        ...(payload.photoBase64 ? { photoBase64: payload.photoBase64 } : {}),
       },
     }
     const updater = (ns: Node[]) => [...ns, newNode]
