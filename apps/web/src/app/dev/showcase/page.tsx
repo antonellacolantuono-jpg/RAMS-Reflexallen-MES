@@ -47,7 +47,8 @@ import {
   ArrowDefs,
 } from '@mes/ui'
 import { Eye, Factory, Package, Pencil, Plus, Trash2 } from 'lucide-react'
-import { ThemeToggle } from '../components/ThemeToggle'
+import { notFound } from 'next/navigation'
+import { ThemeToggle } from '../../../components/ThemeToggle'
 
 const TABS = ['Components', 'Patterns', 'Detail', 'Dashboard', 'Colors', 'Typography'] as const
 type Tab = (typeof TABS)[number]
@@ -170,6 +171,9 @@ function ShowcaseInner() {
 }
 
 export default function ShowcasePage() {
+  if (process.env.NODE_ENV === 'production') {
+    notFound()
+  }
   return (
     <ToastProvider>
       <ShowcaseInner />
