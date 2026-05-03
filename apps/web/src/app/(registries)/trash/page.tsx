@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { PageHeader, DataTable } from '@mes/ui'
+import { Button, PageHeader, DataTable } from '@mes/ui'
 import type { Column } from '@mes/ui'
 import { sdk } from '../../../lib/sdk'
 
@@ -73,19 +73,19 @@ export default function TrashPage() {
         subtitle={`${rows.length} elementi eliminati in tutti i moduli`}
         actions={
           selected.size > 0 ? (
-            <button
+            <Button
+              variant="primary"
               onClick={() => restoreMutation.mutate([...selected])}
-              className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
             >
               Ripristina selezionati ({selected.size})
-            </button>
+            </Button>
           ) : rows.length > 0 ? (
-            <button
+            <Button
+              variant="default"
               onClick={() => restoreMutation.mutate(rows.map((r) => r.id))}
-              className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
             >
               Ripristina tutti
-            </button>
+            </Button>
           ) : undefined
         }
       />
