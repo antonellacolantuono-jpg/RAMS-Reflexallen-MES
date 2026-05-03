@@ -15,7 +15,7 @@
 //
 // Default outcome: PASS (override via DemoController consumes the next cycle).
 
-import { ConflictException, Injectable, OnModuleDestroy } from '@nestjs/common'
+import { ConflictException, Injectable, Optional, OnModuleDestroy } from '@nestjs/common'
 import { WorkOrderEventsGateway } from '../events/work-order-events.gateway'
 import { DemoControllerService } from './demo-controller.service'
 import { ALL_OUTCOMES, type DeviceOutcome, type MockDevice, type MockDeviceLifecycleState, type MockDeviceStatus } from './types'
@@ -56,7 +56,7 @@ export class MockLeakTesterService implements MockDevice, OnModuleDestroy {
   constructor(
     private readonly demo: DemoControllerService,
     private readonly events: WorkOrderEventsGateway,
-    private readonly random: () => number = Math.random,
+    @Optional() private readonly random: () => number = Math.random,
   ) {}
 
   start(stepExecutionId: string, recipeParams: Record<string, unknown> = {}): void {

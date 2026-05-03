@@ -595,6 +595,8 @@ infrastructure in repo). Suggested checks:
 
 54. **Vitest 2.1.x parallel runner Windows flake**: `pnpm test` sometimes hits temp-file races (UNKNOWN error opening AppData\Local\Temp\…). Workaround: run with `--concurrency=1` or per-package serial. Test results are correct in both modes — only the parallel runner has the race. Worth noting for CI considerations.
 
+55. **TypeScript constructor params with function default values trigger Nest DI Function-resolution attempts**: Symptom: `Nest can't resolve dependencies of X (..., ?)` at boot, despite test-green via direct instantiation. Cause: TS emits `Function` parameter metadata for `random: () => number = Math.random`; Nest tries to resolve a `Function` provider for that index and fails. Fix: `@Optional()` decorator on the parameter so Nest skips DI and uses the default value. Detection gap: unit tests using `new ServiceX(...)` bypass the DI container entirely; only runtime smoke (`pnpm dev`) catches it. Going forward: when introducing services with function-typed default-value constructor args, either (a) add `@Optional()` proactively, or (b) add a minimal NestJS-bootstrap integration test that wires through the DI container, not just direct instantiation. (Encountered: PROMPT_PNE_3 D4 hotfix, May 3, 2026 — affected MockLeakTester / MockCameraTester / MockCrimpPress.)
+
 ---
 
 ## 🗂️ Repo structure (post Session A)

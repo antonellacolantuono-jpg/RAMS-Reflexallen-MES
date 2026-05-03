@@ -9,7 +9,7 @@
 //   FAIL: one randomly-chosen ROI in 70..90, others in 95..99
 //   No MARGINAL — camera is binary.
 
-import { ConflictException, Injectable, OnModuleDestroy } from '@nestjs/common'
+import { ConflictException, Injectable, Optional, OnModuleDestroy } from '@nestjs/common'
 import { WorkOrderEventsGateway } from '../events/work-order-events.gateway'
 import { DemoControllerService } from './demo-controller.service'
 import {
@@ -68,7 +68,7 @@ export class MockCameraTesterService implements MockDevice, OnModuleDestroy {
   constructor(
     private readonly demo: DemoControllerService,
     private readonly events: WorkOrderEventsGateway,
-    private readonly random: () => number = Math.random,
+    @Optional() private readonly random: () => number = Math.random,
   ) {}
 
   start(stepExecutionId: string, recipeParams: Record<string, unknown> = {}): void {

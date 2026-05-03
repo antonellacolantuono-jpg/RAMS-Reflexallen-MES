@@ -11,7 +11,7 @@
 //   FAIL: peak force out of tolerance (e.g. 22..23.5 or 26.5..28)
 //   No MARGINAL — crimp is binary tolerance check.
 
-import { ConflictException, Injectable, OnModuleDestroy } from '@nestjs/common'
+import { ConflictException, Injectable, Optional, OnModuleDestroy } from '@nestjs/common'
 import { WorkOrderEventsGateway } from '../events/work-order-events.gateway'
 import { DemoControllerService } from './demo-controller.service'
 import {
@@ -59,7 +59,7 @@ export class MockCrimpPressService implements MockDevice, OnModuleDestroy {
   constructor(
     private readonly demo: DemoControllerService,
     private readonly events: WorkOrderEventsGateway,
-    private readonly random: () => number = Math.random,
+    @Optional() private readonly random: () => number = Math.random,
   ) {}
 
   start(stepExecutionId: string, recipeParams: Record<string, unknown> = {}): void {
