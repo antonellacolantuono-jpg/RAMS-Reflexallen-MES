@@ -2,12 +2,12 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-03 (PROMPT_DESIGN_ALIGNMENT D4 closure — closed TODO-055; opened TODO-056)
+> **Last updated**: 2026-05-03 (Sound HMI Quick Win deferred at kickoff — opened TODO-057; PROMPT_7 D4 recon — opened TODO-058)
 >
 > **Tier guidance** (post DESIGN_ALIGNMENT closure, May 3 2026):
 > - **Tier 1 (critical pre-MVP)**: TODO-017 (Argon2id PIN auth + JWT cookies), TODO-021 (WO release flow), TODO-018 (full 11-state step machine), TODO-019 (parallel ops), TODO-020 (recovery 4-stage)
 > - **Tier 2 (important pre-MVP)**: TODO-008/010/011/012 (workflow editor polish), TODO-022 (real persistence), TODO-023 (Socket.IO real-time), TODO-049/050 (BoM/Recipe persistence gaps)
-> - **Tier 3 (post-MVP polish)**: TODO-001/002/003/004/005/006 (legacy registry/cosmetic), TODO-024/025/026/029/030 (HMI/canvas polish), TODO-052/053/054 (Equipment tree, Skills matrix, Operator-Skill editor — surfaced from D3 Batch 7.2), TODO-056 (multi-level timer aggregation)
+> - **Tier 3 (post-MVP polish)**: TODO-001/002/003/004/005/006 (legacy registry/cosmetic), TODO-024/025/026/029/030 (HMI/canvas polish), TODO-052/053/054 (Equipment tree, Skills matrix, Operator-Skill editor — surfaced from D3 Batch 7.2), TODO-056 (multi-level timer aggregation), TODO-057 (HMI audio feedback), TODO-058 (recoveryMachine dynamic attempt_N)
 > - **Documentation hygiene only**: TODO-007/015/016/027/028/031/032/033/036/037/038/039/041/042/044/045
 
 ---
@@ -265,6 +265,58 @@
 - Tests: unit test for `aggregateStepTimers` covering (a) all-completed flow, (b) mixed in-progress + completed, (c) deeply nested groups.
 **Estimated effort**: ~2h (helper + tests + Steps tab integration).
 **Priority**: medium-low (post-demo). Per-step timers cover the demo critical path; multi-level aggregation is enterprise polish for the planner's WO supervision view. Owner: F3.2 PROMPT_9.
+
+---
+
+### TODO-057 — HMI audio feedback (success / error / cycle-complete)
+
+**Discovered**: 2026-05-03 (Sound HMI Quick Win scoped at Step A kickoff then deferred per MASTER_BACKLOG Tier 3 polish call)
+**Status**: 🟢 PENDING — exploration done, plan written, implementation deferred to post-demo polish slot.
+**File**:
+- NEW `apps/hmi/src/lib/sound.ts` — `playSound(name)` helper, Web Audio API synthesized tones, localStorage opt-out (`hmi:audio-enabled`, default ON).
+- NEW `apps/hmi/src/lib/sound.test.ts` — 2-3 smoke tests (mocked AudioContext).
+- NEW `packages/ui/src/components/AudioToggle.tsx` — small icon button (lucide `Volume2` / `VolumeX`) for the HMIShell `headerRight` slot.
+- MOD `packages/ui/src/index.ts` — export `AudioToggle`.
+- MOD `apps/hmi/src/lib/queries.ts` — extend `useStepTransitionSubscription` handler at line ~350: `toStatus==='done'` → `playSound('success')`; `toStatus==='blocked'|'scrapped'` → `playSound('error')`. Single source for both local-mutation and remote-fired transitions (avoids double-play).
+- MOD `apps/hmi/src/app/wo/[id]/page.tsx` — `playSound('cycle-complete')` inside the `allTerminal` `useEffect` (line ~175) before `router.replace`; mount `<AudioToggle />` in `headerRight` (line ~431).
+**Symptom**: Operators get only visual feedback (badge color flip + status text) when steps transition. On a busy shop floor with ambient noise, that's easily missed; audible feedback on success / error / cycle-complete is standard MES UX and a tangible demo polish.
+**Acceptance criterion**:
+- 3 distinct synthesized tones via Web Audio API: success (ascending C5→E5 two-tone, sine, ~120ms each), error (descending A3→G3, square, ~280ms), cycle-complete (C5→E5→G5 arpeggio, sine, ~140ms each).
+- Master gain default 0.6; concurrent plays layer naturally (each call schedules its own oscillator+gain chain on a shared AudioContext singleton).
+- Lazy AudioContext init (autoplay-policy safe — created on first user gesture, which is always upstream of step transitions).
+- localStorage `hmi:audio-enabled` opt-out persisted; `AudioToggle` button in HMIShell header reads/writes; SSR-safe hydration.
+- Italian aria-labels: "Audio attivo" / "Audio disattivato".
+- 2-3 unit tests covering: (a) opt-out no-ops, (b) success fires `createOscillator` + `createGain` on mocked AudioContext, (c) `setAudioEnabled(false)` writes localStorage. HMI count target: 45 → 47-48.
+- Manual smoke: HMI login → start step → COMPLETE_OK → success tone; recovery/scrap → error tone; WO complete → cycle-complete arpeggio; toggle mute → silence persists across reload.
+**Estimated effort**: 30 min (already scoped — Phase 1 exploration + Phase 4 plan complete).
+**Reference**: scoped plan at `~/.claude/plans/iterative-baking-clarke.md` — Hybrid approach (synthesized tones now, MP3 swap later) chosen.
+**Priority**: Tier 3 polish (post-MVP). Demo-grade polish, non-blocking for the 18-22 May demo critical path.
+**Follow-up TODO** (after TODO-057 lands): swap synthesized tones for curated short MP3 samples from a royalty-free source — richer fidelity, identical API surface from `playSound()`. Same Tier 3 polish bucket.
+
+---
+
+### TODO-058 — recoveryMachine dynamic attempt_N support (currently capped at 2)
+
+**Discovered**: 2026-05-03 (PROMPT_7 D4 closure recon — surfaced as the structural blocker to honoring `step.data.recoveryConfig.maxAttempts > 2`)
+**Status**: 🟢 PENDING — UI clamps to 2 with `console.warn`, real fix deferred.
+**File**:
+- MOD `packages/domain/src/machines/recovery.machine.ts` — refactor from explicit `attempt_1` / `attempt_2` states to a single `attempting` state with a counter in context + guard (`attemptCount < maxAttempts`) controlling the next-attempt vs auto-scrap branch on `ATTEMPT_NOK`.
+- MOD `packages/domain/src/machines/recovery.machine.test.ts` — add cases for max=1 (single attempt → scrap), max=3, max=5 (verify the guard fires correctly at each boundary).
+- MOD `apps/hmi/src/components/RecoveryFlow.tsx` — drop the `Math.min(configured, MAX_RECOVERY_ATTEMPTS)` clamp + the `console.warn`; let `effectiveMax` flow through verbatim.
+- MOD `apps/hmi/src/components/RecoveryFlow.test.tsx` — drop the "clamps to 2 + warn" case, add cases for max=3, max=5 rendering the correct counter.
+- VERIFY `apps/api/src/modules/work-orders/step-execution.service.ts` — confirm `applyTransition` doesn't have its own hardcoded 2-attempt assumption; thread `maxAttempts` from `step.data.recoveryConfig` into the machine input if needed.
+**Symptom**: `recoveryMachine` structurally encodes only `attempt_1` and `attempt_2` as XState states (lines 33-34, 122, 163). Auto-scrap on `attempt_2 + ATTEMPT_NOK` is hardcoded into the `attempt_2` state's transition. So even when the workflow editor sets `recoveryConfig.maxAttempts: 5`, the machine still scraps after the 2nd attempt — UI lies if it shows "Tentativo 1 di 5". PROMPT_7 D4 closes the lie by clamping the displayed counter at `min(config.maxAttempts, MAX_RECOVERY_ATTEMPTS)` and logging a warning when the configured value exceeds the cap. Honest UI, no machine refactor.
+**Acceptance criterion**:
+- `recoveryMachine` accepts `maxAttempts` in context (default 2 for backward compat).
+- States collapse to `diagnosis` → `attempting` → (`recovered` | `scrap`) with `attemptCount` driving the loop.
+- `nextRecoveryStage` helper updated to operate on `(currentStage, outcome, maxAttempts)`.
+- `isMaxAttemptsReached(attemptCount, maxAttempts)` signature extended; existing callers pass the new arg.
+- API `step-execution.service.ts` projects `recoveryConfig.maxAttempts` from `step.data` into the recovery machine input.
+- HMI `RecoveryFlow` clamp + console.warn removed; counter shows arbitrary N verbatim.
+- Tests: machine + helper + RecoveryFlow integration cover N ∈ {1, 2, 3, 5}.
+**Estimated effort**: 2-4h (machine refactor + tests + frontend integration verify + audit any callers of `MAX_RECOVERY_ATTEMPTS` constant across the repo).
+**Priority**: Tier 3 polish (post-MVP). Non-blocking for the 18-22 May demo — the seeded workflow uses `maxAttempts: 2` which the current machine handles natively. Pull earlier only if a process engineer needs >2 attempts for a real production workflow.
+**Blocker for**: nothing in MVP. Demo path is unaffected.
 
 ---
 
