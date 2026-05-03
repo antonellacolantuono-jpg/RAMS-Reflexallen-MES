@@ -3,6 +3,7 @@ import * as React from 'react'
 import { Badge, Button } from '@mes/ui'
 import type { WorkOrderStep } from '../../../lib/queries'
 import { DeviceCycleView } from './components/DeviceCycleView'
+import { DeviceCycleWithParallels } from './components/DeviceCycleWithParallels'
 
 const CATEGORY_LABEL_IT: Record<string, string> = {
   production: 'Produzione',
@@ -34,6 +35,12 @@ const CATEGORY_TONE: Record<
 export interface StepGenericProps {
   step: WorkOrderStep
   /**
+   * Full WO step list — used by DeviceCycleWithParallels to resolve the
+   * `parallel` siblings of a `device_main` step. When omitted, parallel
+   * detection is skipped and the device cycle renders alone.
+   */
+  allSteps?: WorkOrderStep[]
+  /**
    * Photo (base64 data URL) attached to the step config from D1's
    * PhotoUploadField. Read-only display in the HMI. Resolved by the parent
    * page from the workflow snapshot's node.data.photoBase64.
@@ -49,6 +56,10 @@ export interface StepGenericProps {
   onComplete?: () => void
   /** Action: mark NOK / open recovery. */
   onFail?: () => void
+  /** PNE_4_FOCUSED D3 — parallel slot handlers (forwarded to ParallelSlotsContainer). */
+  onStartParallelSlot?: (slot: WorkOrderStep) => void
+  onCompleteParallelSlot?: (slot: WorkOrderStep) => void
+  onSkipParallelSlot?: (slot: WorkOrderStep) => void
   isPending?: boolean
 }
 
@@ -62,12 +73,16 @@ export interface StepGenericProps {
  */
 export function StepGeneric({
   step,
+  allSteps,
   photoBase64,
   description,
   resources,
   onStart,
   onComplete,
   onFail,
+  onStartParallelSlot,
+  onCompleteParallelSlot,
+  onSkipParallelSlot,
   isPending,
 }: StepGenericProps) {
   const isDeviceMain =
@@ -143,14 +158,26 @@ export function StepGeneric({
         </figure>
       )}
 
-      {showCycle && (
-        <DeviceCycleView
-          step={step}
-          onContinue={onComplete}
-          onFail={onFail}
-          isPending={isPending}
-        />
-      )}
+      {showCycle &&
+        (allSteps && allSteps.length > 0 ? (
+          <DeviceCycleWithParallels
+            step={step}
+            allSteps={allSteps}
+            onContinue={onComplete}
+            onFail={onFail}
+            onStartSlot={onStartParallelSlot}
+            onCompleteSlot={onCompleteParallelSlot}
+            onSkipSlot={onSkipParallelSlot}
+            isPending={isPending}
+          />
+        ) : (
+          <DeviceCycleView
+            step={step}
+            onContinue={onComplete}
+            onFail={onFail}
+            isPending={isPending}
+          />
+        ))}
 
       {!isDeviceMain && step.status === 'pending' && onStart && (
         <Button
