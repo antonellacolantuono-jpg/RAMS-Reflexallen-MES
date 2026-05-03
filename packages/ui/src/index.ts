@@ -10,7 +10,7 @@ export { Badge } from './components/Badge'
 export type { BadgeProps } from './components/Badge'
 
 export { StatusBadge } from './components/StatusBadge'
-export type { StatusBadgeProps, StatusTone } from './components/StatusBadge'
+export type { StatusBadgeProps, StatusTone, StatusValue } from './components/StatusBadge'
 
 export { PhaseBadge } from './components/PhaseBadge'
 export type { PhaseBadgeProps, PhaseCategory } from './components/PhaseBadge'

@@ -2,20 +2,26 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../utils/cn'
 
+const DEFAULT_VARIANT_CLASSES =
+  'bg-paper hover:bg-paper-2 border border-line text-ink'
+
 const buttonVariants = cva(
   'inline-flex items-center justify-center gap-1.5 font-medium rounded-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
+        default: DEFAULT_VARIANT_CLASSES,
         primary: 'bg-accent text-white hover:bg-accent/90',
-        secondary: 'bg-paper-3 text-ink hover:bg-line',
+        /** @deprecated Use `default` instead. Visually aliased to `default` for backward compatibility. */
+        secondary: DEFAULT_VARIANT_CLASSES,
+        soft: 'bg-paper-2 hover:bg-paper-3 border border-line text-ink',
         ghost: 'bg-transparent text-ink hover:bg-paper-2',
         danger: 'bg-bad text-white hover:bg-bad/90',
       },
       size: {
-        sm: 'h-7 px-2.5 text-sm',
-        md: 'h-9 px-3.5 text-base',
-        lg: 'h-11 px-5 text-lg',
+        sm: 'h-7 px-2 text-sm',
+        md: 'h-8 px-3 text-base',
+        lg: 'h-10 px-4 text-lg',
         hmi: 'h-14 px-6 text-xl min-w-[56px]',
       },
     },
