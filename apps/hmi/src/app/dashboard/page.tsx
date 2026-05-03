@@ -102,7 +102,7 @@ export default function DashboardPage() {
             )}
             <Button
               size="hmi"
-              variant="secondary"
+              variant="default"
               onClick={handleLogout}
               disabled={logout.isPending}
             >

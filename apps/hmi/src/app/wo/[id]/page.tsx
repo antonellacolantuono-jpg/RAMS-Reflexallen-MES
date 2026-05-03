@@ -441,7 +441,7 @@ export default function WorkOrderExecutionPage() {
             </div>
             <Button
               size="hmi"
-              variant="secondary"
+              variant="default"
               onClick={() => router.replace('/dashboard')}
             >
               Esci

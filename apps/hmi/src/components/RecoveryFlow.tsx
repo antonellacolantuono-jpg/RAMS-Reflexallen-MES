@@ -122,7 +122,7 @@ export function RecoveryFlow({
           {onCompleteAfterRecovery && (
             <Button
               size="hmi"
-              variant="secondary"
+              variant="default"
               onClick={onCompleteAfterRecovery}
               disabled={isPending}
             >
