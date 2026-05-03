@@ -763,6 +763,7 @@ model Step {
   partReference   String? @map("part_reference") // PartReference enum value
   noTargetPolicy  String? @map("no_target_policy") // NoTargetPolicy enum value
   deviceCategory  String? @map("device_category") // StepDeviceCategory: pre | device_main | parallel | post
+  data            String? // JSON serialized polymorphic step data: { recoveryConfig?, photoUrl?, actionType? }. PROMPT_7 D1 — matches StepExecution.data pattern (SQLite has no native Json — see DEV_MODE)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

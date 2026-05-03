@@ -17,6 +17,29 @@ export const UpdateWorkflowSchema = z
 
 // ── Step input (leaf of the tree) ────────────────────────────────────────────
 
+// PROMPT_7 D1 — recoveryConfig persistence on Step.data JSON.
+// Mirrors apps/web/src/lib/step-validation-schemas.ts RecoveryConfigSchema —
+// kept in sync by hand (the web copy is the authoring form, this is the
+// transport contract sent on save). Step IDs may not be cuid() yet on first
+// save (see WorkflowCanvas drop handler — uses `new-${Date.now()}` placeholders
+// until the server reissues IDs), so preRetryStepIds is loose-typed.
+export const StepRecoveryConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  maxAttempts: z.number().int().min(0).max(5).default(2),
+  preRetryStepIds: z.array(z.string()).default([]),
+})
+
+// Polymorphic Step.data carrier. session-only fields exposed by the
+// configurator (recoveryConfig + photoUrl + actionType) are persisted under
+// this object so the workflow editor save/load roundtrip survives.
+export const StepDataSchema = z
+  .object({
+    recoveryConfig: StepRecoveryConfigSchema.optional(),
+    photoUrl: z.string().max(2000).optional(),
+    actionType: z.string().max(100).optional(),
+  })
+  .passthrough()
+
 export const WorkflowStepInputSchema = z.object({
   order: z.number().int().min(1),
   category: z.string().min(1),
@@ -33,6 +56,8 @@ export const WorkflowStepInputSchema = z.object({
   isRequired: z.boolean().default(true),
   partReference: z.string().optional(),
   noTargetPolicy: z.string().optional(),
+  /** PROMPT_7 D1 — polymorphic JSON; nullable on save (omits → no-op). */
+  data: StepDataSchema.nullable().optional(),
 })
 
 export const WorkflowGroupInputSchema = z.object({
@@ -91,3 +116,5 @@ export type CloneWorkflowDto = z.infer<typeof CloneWorkflowSchema>
 export type WorkflowPhaseInput = z.infer<typeof WorkflowPhaseInputSchema>
 export type WorkflowGroupInput = z.infer<typeof WorkflowGroupInputSchema>
 export type WorkflowStepInput = z.infer<typeof WorkflowStepInputSchema>
+export type StepData = z.infer<typeof StepDataSchema>
+export type StepRecoveryConfig = z.infer<typeof StepRecoveryConfigSchema>

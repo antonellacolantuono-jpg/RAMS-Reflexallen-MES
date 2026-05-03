@@ -390,6 +390,7 @@ describe('WorkflowsService', () => {
               isRequired: true,
               partReference: null,
               noTargetPolicy: null,
+              data: null,
               createdAt: new Date('2026-04-01'),
               updatedAt: new Date('2026-04-01'),
               createdBy: 'system',

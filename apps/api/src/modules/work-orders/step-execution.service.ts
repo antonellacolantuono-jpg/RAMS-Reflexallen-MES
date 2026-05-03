@@ -92,6 +92,32 @@ export interface WorkOrderStepDto extends StepStateDto {
   groupSupportsParallel: boolean
   recoveryStage: RecoveryStage | null
   attemptCount: number
+  /**
+   * PROMPT_7 D1 — polymorphic step data projection from `Step.data` JSON
+   * column. Parsed server-side so HMI can read `step.data.recoveryConfig` /
+   * `step.data.photoUrl` directly without re-parsing. Returns `null` when
+   * the column is null OR when the JSON failed to parse (defensive).
+   */
+  data: Record<string, unknown> | null
+}
+
+/**
+ * PROMPT_7 D1 — defensive JSON parse for Step.data column.
+ * Returns the parsed object on success, `null` on missing/malformed input.
+ * Mirrors the parseStepData helper on the web side (WorkflowCanvas) so
+ * the contract is identical at both ends of the pipe.
+ */
+function parseStepDataJson(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 @Injectable()
@@ -189,6 +215,9 @@ export class StepExecutionService {
         groupSupportsParallel: r.step.group.supportsParallel,
         recoveryStage: recovery.recoveryStage,
         attemptCount: recovery.attemptCount,
+        // PROMPT_7 D1 — parse Step.data JSON server-side; null on missing or
+        // malformed payload (never throws — see parseStepDataJson helper).
+        data: parseStepDataJson(r.step.data ?? null),
       }
     })
   }

@@ -14,6 +14,8 @@ type FakeStep = {
   actionType: string
   instructions: string | null
   deviceCategory: string | null
+  /** PROMPT_7 D1 — Step.data JSON column projection. */
+  data: string | null
   group: {
     id: string
     name: string
@@ -46,6 +48,7 @@ const makeStep = (over: Partial<FakeStep> = {}): FakeStep => ({
   actionType: 'process',
   instructions: 'Crimp connector to spec',
   deviceCategory: null,
+  data: null,
   group: {
     id: 'g-1',
     name: 'Crimping group',
@@ -782,5 +785,56 @@ describe('StepExecutionService.findStepsForWorkOrder — recovery payload (D5)',
       recoveryStage: 'attempt_2',
       attemptCount: 2,
     })
+  })
+})
+
+describe('StepExecutionService.findStepsForWorkOrder — Step.data projection (PROMPT_7 D1)', () => {
+  it('projects parsed Step.data JSON onto the DTO', async () => {
+    const stepDataJson = JSON.stringify({
+      recoveryConfig: {
+        enabled: true,
+        maxAttempts: 2,
+        preRetryStepIds: ['step-recovery-check', 'step-recovery-clean'],
+      },
+      photoUrl: '/uploads/leak.png',
+      actionType: 'device_run',
+    })
+    const { service } = makeService(
+      baseRow({
+        step: makeStep({ data: stepDataJson }),
+      }),
+    )
+    const result = await service.findStepsForWorkOrder('wo-1', 'plant-1')
+    expect(result[0]?.data).toEqual({
+      recoveryConfig: {
+        enabled: true,
+        maxAttempts: 2,
+        preRetryStepIds: ['step-recovery-check', 'step-recovery-clean'],
+      },
+      photoUrl: '/uploads/leak.png',
+      actionType: 'device_run',
+    })
+  })
+
+  it('returns data: null when Step.data is null (backward-compat)', async () => {
+    const { service } = makeService(baseRow({ step: makeStep({ data: null }) }))
+    const result = await service.findStepsForWorkOrder('wo-1', 'plant-1')
+    expect(result[0]?.data).toBeNull()
+  })
+
+  it('returns data: null when Step.data is malformed JSON (defensive)', async () => {
+    const { service } = makeService(
+      baseRow({ step: makeStep({ data: '{not even close' }) }),
+    )
+    const result = await service.findStepsForWorkOrder('wo-1', 'plant-1')
+    expect(result[0]?.data).toBeNull()
+  })
+
+  it('returns data: null when Step.data is a JSON array (object expected)', async () => {
+    const { service } = makeService(
+      baseRow({ step: makeStep({ data: JSON.stringify([1, 2, 3]) }) }),
+    )
+    const result = await service.findStepsForWorkOrder('wo-1', 'plant-1')
+    expect(result[0]?.data).toBeNull()
   })
 })

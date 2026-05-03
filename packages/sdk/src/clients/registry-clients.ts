@@ -181,6 +181,8 @@ export interface WorkflowStepModel {
   instructions?: string | null; skillId?: string | null; deviceId?: string | null
   recipeId?: string | null; toolId?: string | null; standardTimeSec?: number | null
   isRequired: boolean; partReference?: string | null; noTargetPolicy?: string | null
+  /** PROMPT_7 D1 — JSON-serialized polymorphic step data ({ recoveryConfig?, photoUrl?, actionType? }). Parse on demand. */
+  data?: string | null
   createdAt: string; updatedAt: string; createdBy: string; updatedBy: string
 }
 export interface WorkflowGroupModel {

@@ -52,6 +52,31 @@ export type WorkOrderStep = {
   groupSupportsParallel: boolean
   recoveryStage: RecoveryStage | null
   attemptCount: number
+  /**
+   * PROMPT_7 D1 — polymorphic step.data projection from the API DTO.
+   * Carries `recoveryConfig` (D4 pre-retry config), `photoUrl`, and
+   * `actionType` overrides set in the workflow editor. Pre-D1 servers omit
+   * this field; client treats `undefined` as `null`.
+   */
+  data?: StepData | null
+}
+
+/**
+ * PROMPT_7 D1 — Step.data polymorphic shape, parsed server-side.
+ * Mirrors `StepDataSchema` in `@mes/schemas`. Loose typing because the
+ * blob is forward-compatible (passthrough on the schema side).
+ */
+export type StepRecoveryConfig = {
+  enabled: boolean
+  maxAttempts: number
+  preRetryStepIds: string[]
+}
+
+export type StepData = {
+  recoveryConfig?: StepRecoveryConfig
+  photoUrl?: string
+  actionType?: string
+  [k: string]: unknown
 }
 
 export type StepTransitionResult = {

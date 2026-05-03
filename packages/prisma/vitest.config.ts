@@ -9,7 +9,7 @@ import { defineConfig } from 'vitest/config'
 // Workaround: pool=forks + singleFork serializes test files within one process.
 export default defineConfig({
   test: {
-    include: ['seed/**/*.test.ts', 'src/**/*.test.ts'],
+    include: ['seed/**/*.test.ts', 'src/**/*.test.ts', '__tests__/**/*.test.ts'],
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } },
   },

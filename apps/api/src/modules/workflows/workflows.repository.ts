@@ -55,6 +55,12 @@ export type StepModel = {
   isRequired: boolean
   partReference: string | null
   noTargetPolicy: string | null
+  /**
+   * PROMPT_7 D1 — JSON-serialized polymorphic step data
+   * (recoveryConfig + photoUrl + actionType). Consumers parse on demand —
+   * mirrors StepExecution.data convention.
+   */
+  data: string | null
   createdAt: Date
   updatedAt: Date
   createdBy: string
@@ -384,6 +390,10 @@ export class WorkflowsRepository {
                 isRequired: step.isRequired,
                 partReference: step.partReference,
                 noTargetPolicy: step.noTargetPolicy,
+                // PROMPT_7 D1 — propagate the polymorphic Step.data JSON
+                // through clone so recoveryConfig + photoUrl + actionType
+                // overrides survive workflow duplication.
+                data: step.data,
                 createdBy: actorId,
                 updatedBy: actorId,
               },
@@ -452,6 +462,10 @@ export class WorkflowsRepository {
 
           const createdSteps: StepModel[] = []
           for (const step of group.steps) {
+            // PROMPT_7 D1 — serialize polymorphic step.data to JSON string.
+            // null means no extra payload; undefined collapses to null too.
+            const serialisedData =
+              step.data == null ? null : JSON.stringify(step.data)
             const newStep = await tx.step.create({
               data: {
                 groupId: newGroup.id,
@@ -470,6 +484,7 @@ export class WorkflowsRepository {
                 isRequired: step.isRequired ?? true,
                 partReference: step.partReference ?? null,
                 noTargetPolicy: step.noTargetPolicy ?? null,
+                data: serialisedData,
                 createdBy: actorId,
                 updatedBy: actorId,
               },
@@ -647,6 +662,10 @@ export class WorkflowsRepository {
                 isRequired: step.isRequired,
                 partReference: step.partReference,
                 noTargetPolicy: step.noTargetPolicy,
+                // PROMPT_7 D1 — propagate the polymorphic Step.data JSON
+                // through clone so recoveryConfig + photoUrl + actionType
+                // overrides survive workflow duplication.
+                data: step.data,
                 createdBy: actorId,
                 updatedBy: actorId,
               },
