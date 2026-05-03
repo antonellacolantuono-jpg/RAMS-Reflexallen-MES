@@ -2,7 +2,7 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-03 (PROMPT_DESIGN_ALIGNMENT D3 batch 7.1 — opened TODO-049, TODO-050)
+> **Last updated**: 2026-05-03 (PROMPT_DESIGN_ALIGNMENT D3 batch 7.2 — opened TODO-052, TODO-053, TODO-054, TODO-055)
 
 ---
 
@@ -193,6 +193,72 @@
 - Tests: integration test that `POST /api/recipes` with 3 parameters → `versions(id)` returns 1 version with parameters, `update` with new parameter set → `versions(id)` returns 2 versions.
 **Estimated effort**: ~2h backend (repo refactor + endpoints + tests) + ~2h frontend (versions tab + parameter editor primitive).
 **Priority**: medium-low (post-demo). Demo recipes are seeded directly into `RecipeVersion` rows by `seed:pneumatic`, so the runtime path (HMI loading recipes onto devices) is unaffected.
+
+---
+
+### TODO-052 — Equipment ISA-95 tree visualization
+
+**Discovered**: 2026-05-03 (during PROMPT_DESIGN_ALIGNMENT D3 batch 7.2 implementation)
+**Status**: 🟢 PENDING — frontend ships scalar-fidelity Equipment detail/edit/new pages with `parentId` shown as plain text. Hierarchy walking and tree sidebar deferred.
+**File**: `packages/ui/src/` (new `Tree`/`TreeNode` primitive) + `apps/web/src/app/(registries)/equipment/[id]/page.tsx`
+**Symptom**: The mockup `design-system/source/project/screens-4-registries.jsx` `EqDetail` component (lines 240-368) shows a 300px sidebar with the full 5-level ISA-95 tree (enterprise → site → area → work_center → work_unit → equipment_module) and a status dot per node. `@mes/ui` does not export a `Tree` primitive. `EquipmentNode.parentId` IS persisted by the repository (verified) and the SDK exposes `equipment.tree()` returning a flat list — only the recursive UI is missing. The current detail page renders `parentId` as a scalar string with no parent name, no children, no hierarchy context.
+**Acceptance criterion**:
+- New `Tree<T>` / `TreeNode<T>` primitive in `@mes/ui` with collapsible nodes, level-based indentation, status dot slot, icon slot, and selected-state styling (matches mockup `EqTreeNode` design tokens).
+- `apps/web/src/app/(registries)/equipment/page.tsx` switches from flat DataTable to 300px tree sidebar + detail pane (mockup parity).
+- `apps/web/src/app/(registries)/equipment/[id]/page.tsx` adds a "Gerarchia" tab with parent chain (breadcrumb-style) and direct children list.
+- `parentId` on edit form becomes a tree-aware Select / autocomplete instead of a raw cuid input.
+- Tests: render-and-expand smoke for `Tree` primitive in `@mes/ui`.
+**Estimated effort**: ~3h DS work (Tree primitive + tests in `@mes/ui`) + ~2h frontend integration (sidebar layout + hierarchy tab + parentId picker).
+**Priority**: medium (post-demo polish). The Reflex Allen demo (May 18-22) does not require equipment editing through the UI; demo plant + work_center seed rows are sufficient.
+
+---
+
+### TODO-053 — Skills × Operators matrix view
+
+**Discovered**: 2026-05-03 (during PROMPT_DESIGN_ALIGNMENT D3 batch 7.2 implementation)
+**Status**: 🟢 PENDING — frontend ships scalar-fidelity Skill detail/edit/new pages with no link to a matrix view.
+**File**: `apps/api/src/modules/skills/skills.controller.ts` (new `@Get('matrix')` route) + new `apps/web/src/app/(registries)/skills/matrix/page.tsx` (or matrix tab on list page)
+**Symptom**: The mockup `design-system/source/project/screens-4-registries.jsx` `ScreenSkills` (lines 370-433) shows an operator × skill matrix with cell badges (`cert` / `training` / `expired` / `none`). `SkillsClient.matrix()` is declared in the SDK (`packages/sdk/src/clients/registry-clients.ts:74`) and points at `GET /api/skills/matrix`, but the API controller does not expose this route — calling it returns 404. The matrix data must be assembled from `Operator[]` × `Skill[]` joined via `OperatorSkill[]`.
+**Acceptance criterion**:
+- `SkillsController.matrix()` returns `{ skills: SkillMatrixHeader[], operators: SkillMatrixRow[] }` where each row is `{ operatorId, badge, fullName, cells: { skillId: 'cert' | 'training' | 'expired' | 'none' } }`. Status derived from `OperatorSkill.expiresAt` (expired if past) and `OperatorSkill.level` (training if level missing or below baseline).
+- Frontend matrix page renders a sticky-header / sticky-first-column table with badge cells per the mockup, plus a legend strip.
+- Filters: by skill category, by operator status, optional "expired only" toggle.
+- Tests: controller integration test + matrix page render test.
+**Estimated effort**: ~2h backend (controller + tests) + ~3h frontend (matrix page + filter strip + cell badges).
+**Priority**: medium-low (post-demo). Skills certification tracking is not on the demo critical path.
+
+---
+
+### TODO-054 — Operator-Skill assignment editor
+
+**Discovered**: 2026-05-03 (during PROMPT_DESIGN_ALIGNMENT D3 batch 7.2 implementation)
+**Status**: 🟢 PENDING — frontend ships scalar-fidelity Operator detail/edit/new pages with no skill assignment editor; the operator detail shows a static "skills assignment in arrivo post-demo" notice.
+**File**: `apps/api/src/modules/operators/operators.controller.ts` (new `@Post(':id/skills')` + `@Delete(':id/skills/:skillId')` routes) + repository extensions + `apps/web/src/app/(registries)/operators/[id]/page.tsx` (skills tab)
+**Symptom**: `OperatorsClient.assignSkill(id, data)` and `OperatorsClient.removeSkill(id, skillId)` are declared in the SDK (`packages/sdk/src/clients/registry-clients.ts:91-92`), and `AssignSkillSchema` is exported from `@mes/schemas/registries/operator.schema.ts`, but neither route is wired on `OperatorsController` — calling them returns 404. The `OperatorSkill` junction table (with `level` + `certifiedAt` + `expiresAt`) is unreachable through the public API.
+**Acceptance criterion**:
+- New `OperatorsController.assignSkill(@Param('id') id, @Body() body)` route validates with `AssignSkillSchema`, upserts an `OperatorSkill` row (composite unique on `[operatorId, skillId]` already enforced by Prisma).
+- New `OperatorsController.removeSkill(@Param('id') id, @Param('skillId') skillId)` deletes the matching `OperatorSkill` row.
+- Repository methods `assignSkill` / `removeSkill` (use raw `prisma.operatorSkill` calls).
+- Operator detail page adds a "Skill" tab listing assigned skills with level + certifiedAt + expiresAt + delete button + "Assegna skill" button opening a modal that submits the assign form.
+- Tests: controller integration test + form submit test.
+**Estimated effort**: ~3h backend (controller + repo + tests) + ~3h frontend (skills tab + assign modal + delete confirmation).
+**Priority**: medium-low (post-demo). Operator login + identity flow does not depend on skill assignments — the demo seed `seed:pneumatic` directly inserts the few `OperatorSkill` rows Mario Rossi needs.
+
+---
+
+### TODO-055 — Move `deriveEquipmentCounts` helper out of Next.js page file
+
+**Discovered**: 2026-05-03 (during PROMPT_DESIGN_ALIGNMENT D3 batch 7.2 verification — surfaced when `.next/types` was regenerated by a build attempt)
+**Status**: 🟢 PENDING — latent issue from D3 batch 6 (commit `3588a2e`), NOT introduced by batch 7.2.
+**File**: `apps/web/src/app/(registries)/page.tsx`
+**Symptom**: `(registries)/page.tsx` exports a named symbol `deriveEquipmentCounts` alongside its default page component. Next.js 14 App Router only allows specific named exports from page files (`metadata`, `generateMetadata`, `generateStaticParams`, `revalidate`, `dynamic`, `dynamicParams`, `fetchCache`, `runtime`, `preferredRegion`, `maxDuration`, `generateViewport`). The auto-generated `.next/types/app/(registries)/page.ts` enforces this constraint via an `OmitWithTag` index-signature check, which fails with `Type '...deriveEquipmentCounts...' is not assignable to type 'never'`. The error only surfaces after `.next/types/` has been regenerated by a build (or `next dev` startup), so a fresh `tsc --noEmit` against an empty `.next/` passes — masking the latent issue. The Reflex Allen demo path (`pnpm dev` → already running) does not regenerate the offending types file, so runtime is unaffected.
+**Acceptance criterion**:
+- Move `deriveEquipmentCounts` (and its return-type implications) to a new helper file, e.g. `apps/web/src/lib/dashboard-helpers.ts`.
+- Import the helper into `(registries)/page.tsx` at the call site (currently line 145).
+- Co-locate the existing test (if any) with the helper.
+- Re-run `pnpm --filter @mes/web build` to confirm `.next/types/app/(registries)/page.ts` no longer flags an extra export.
+**Estimated effort**: ~15 minutes (mechanical refactor).
+**Priority**: low (cleanup, not user-facing, doesn't affect DEV MODE or tests). Should be cleaned up before any production build pipeline runs CI typechecks against a fresh `.next/`.
 
 ---
 
