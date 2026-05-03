@@ -13,10 +13,8 @@ vi.mock('../../lib/sdk', () => ({
   },
 }))
 
-import PlantOverviewDashboard, {
-  deriveEquipmentCounts,
-  deriveBoxCounts,
-} from './page'
+import PlantOverviewDashboard from './page'
+import { deriveEquipmentCounts, deriveBoxCounts } from '../../lib/dashboard-helpers'
 
 function renderWithQuery(ui: React.ReactElement) {
   const client = new QueryClient({

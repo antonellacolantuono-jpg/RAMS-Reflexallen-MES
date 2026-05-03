@@ -38,9 +38,10 @@ This pivot accepts **~3-4 week MVP slip** (mid-July → end of July / early Augu
 | F1.4 | PROMPT_PNE_2 (closed) | Prisma seed: 1 area / 4 WCs / 4 WSs / 3 devices + 5 items + 1 BoxType + 3 recipes + 4 skills + 2 operators + 6 cause codes + 10 fault codes (CauseCode workaround S1) + 3 APs + 2 workflows ("v1 Demo" pre-configured 4 phases/6 groups/**34 steps** incl. inline recovery groups B2+C2 + "v0 Empty" scaffold) + 1 WO released with WorkflowSnapshot. Closes TODO-031. Opens TODO-041, TODO-042. | ~6h actual (closed 2026-05-02) | done |
 | F1.5 | PROMPT_PNE_3 (closed) | DEV-LEAK-001 (45s/RCP-LEAK-PNE-12-001 v2/PASS+MARGINAL+FAIL bands) + DEV-CAMERA-001 (8s/4 ROIs/PASS+FAIL) + DEV-CRIMP-001 (8s/25kN±1/PASS+FAIL) simulators + DemoControllerService (next-outcome override) + `device:cycle:started/progress/complete` WS broadcasts on `WorkOrderEventsGateway` + `/api/internal/mock-devices/*` REST + `/api/internal/fast-forward/:woId/complete-step` debug endpoint + `/demo` Back-office Toggle Panel (server gate + client polling 2s + Toast IT) + DEMO_MODE boot guard. Step-execution dispatch deferred to PNE_4 D1 (TODO-043, Option 3b). Opens TODO-043, TODO-044. | ~6h actual (closed 2026-05-02) | done |
 | F1.6 | PROMPT_PNE_4_FOCUSED (closed) | Action Type selector + autofill + photo (D1) → HMI StepGeneric + DeviceCycleView + LeakTelemetry/CameraROIGrid/CrimpTelemetry + dispatcher closing TODO-043 (D2) → ParallelSlotsContainer split layout (D3) → D4.0 hotfix (page.tsx wires DeviceCycleWithParallels for active device_run group) + recovery config in AutomaticForm + HMIScrapForm with cause code + photo + F1 closure (D4) | ~14h actual (closed 2026-05-03) | done |
-| | **F1 totals** | | **48-70h** | **5-17 May** |
+| F1.7 | PROMPT_DESIGN_ALIGNMENT (closed) | Full app aligned to Claude Design mockups: D1 prep (Button+StatusBadge tokens) + D2 batches 1-4.5 (HMI Decision A migration, registry list alignment, trash page, HMIShell+HMIBigBtn) + D3 batches 5-9 (useRegistryView hook, Plant Overview Dashboard rebuild, 30 registry CRUD pages across 11 registries, Equipment Risorse tab, WO BO 7-tab) + D4 closure (TODO-055 fix, doc updates). **+128 tests** (770 → 898). Absorbs ex-PROMPT_7 D2/D3 scope. Closes TODO-039, TODO-055; opens TODO-049/050/052/053/054/056. | ~22h actual (closed 2026-05-03) | done |
+| | **F1 totals** | | **70-92h** | **5-17 May** |
 
-**F1 demo target**: 18-20 May 2026 (Reflex Allen Pneumatic Air vertical demo, in code reality, mockup-faithful). **F1 100% complete as of 2026-05-03.**
+**F1 demo target**: 18-20 May 2026 (Reflex Allen Pneumatic Air vertical demo, in code reality, mockup-faithful). **F1 100% complete as of 2026-05-03 — extended through DESIGN_ALIGNMENT closure.**
 
 ### F2 — Horizontal MES shell (DEFERRED from original F1)
 
@@ -48,8 +49,8 @@ Resume horizontal build after Pneumatic Air demo.
 
 | # | PROMPT | Scope summary | Effort | Calendar (post-demo) |
 |---|---|---|---|---|
-| F2.1 | PROMPT_6 | Andon dashboard (KpiHero giants + WCCard grid + LiveAlert feed) + Plant Overview (PlantMap with workstations + zones + click-through to Andon) | 12-16h | 21-26 May |
-| F2.2 | PROMPT_7 | 11 registry detail/edit/new pages (operators, equipment, tools, recipes, skills, cause-codes, attention-points, BOM, box-types, boxes, devices) + WO List back-office + WO Detail back-office (DetailHeader + 7-tab body) | 14-20h | 27 May - 3 June |
+| F2.1 | PROMPT_6 | Andon dashboard (KpiHero giants + WCCard grid + LiveAlert feed). Plant Overview already shipped in F1.7 D3 Batch 6. | 6-10h (reduced — Plant Overview done) | 21-26 May |
+| F2.2 | PROMPT_7_RESUME | HMI runtime `recoveryConfig` read + pre-retry execution. Most of original PROMPT_7 D2/D3 scope (registry detail/edit/new + WO BO 7-tab) absorbed into F1.7 PROMPT_DESIGN_ALIGNMENT. | 1-2h | 27 May |
 | F2.3 | PROMPT_3c | Workflow editor Live Preview State-Driven (11 states interactive on selected step) | 6-10h | 4-5 June |
 | F2.4 | i18n setup | next-intl routing IT/EN, locale switcher, all hardcoded strings extracted (estimate covers F1 surface + new F2 pages; F3 covered by per-PROMPT extraction) | 8-12h optional | 6-8 June (skippable) |
 | | **F2 totals** | | **40-58h** | **21 May - 8 June** |
@@ -165,6 +166,18 @@ Opened during PROMPT_PNE_2 (F1.4):
 - **TODO-041** — Split FaultCode from CauseCode (currently colocated under category='recovery_fault'). Schema migration required. Owner: F2 / PROMPT_7 default; pull earlier if PROMPT_PNE_4 HMI Recovery dropdown design needs first-class FaultCode entity.
 - **TODO-042** — PROMPT_PNE_2 § 1 summary said "19 steps" but enumeration totals 34 step rows. Documentation hygiene only — no code action.
 
+Opened during PROMPT_DESIGN_ALIGNMENT (F1.7):
+- **TODO-049** — BoM lines not persisted on create/update (`BomRepository.create` discards `lines` field; frontend ships scalar-fidelity with read-only Lines tab). Owner: F2.
+- **TODO-050** — Recipe parameters/versions not persisted (`RecipesRepository.create` discards `parameters`; SDK's `recipes/:id/versions` route missing on controller). Owner: F2.
+- **TODO-052** — Equipment ISA-95 tree visualization (`Tree` primitive missing in `@mes/ui`; current detail renders `parentId` as scalar string). Owner: F3.2 PROMPT_9.
+- **TODO-053** — Skills × Operators matrix view (`SkillsClient.matrix()` SDK declared but `/api/skills/matrix` controller route missing). Owner: F3.6 PROMPT_13.
+- **TODO-054** — Operator-Skill assignment editor (`OperatorsController.assignSkill` / `removeSkill` routes missing). Owner: F3.6 PROMPT_13.
+- **TODO-056** — Multi-level timer aggregation on WO BO Steps tab (per-step elapsed timers shipped; group/phase/WO roll-up deferred). Owner: F3.2 PROMPT_9.
+
+Closed during PROMPT_DESIGN_ALIGNMENT (F1.7):
+- ~~**TODO-039**~~ — ✅ closed by D2 Batch 2 (token alignment in `apps/web` tailwind config).
+- ~~**TODO-055**~~ — ✅ closed by D4 closure (helpers moved to `apps/web/src/lib/dashboard-helpers.ts`; `pnpm --filter @mes/web build` now passes).
+
 ---
 
 ## 6. Demo guidance
@@ -200,6 +213,7 @@ What to communicate to Reflex Allen before demo:
 | 2026-05-02 | ROADMAP v2 pivot to Pneumatic First (5 new F1 PROMPTs, F2/F3 reordered) | this document |
 | 2026-05-02 | F1.4 PROMPT_PNE_2 closed (4 D increments, +18 tests cumul 655, opens TODO-041/042 closes TODO-031) | this document |
 | 2026-05-03 | F1.6 PROMPT_PNE_4_FOCUSED closed (4 D increments, +42 tests cumul 734, closes TODO-043, demo-ready). **F1 100% complete.** | this document |
+| 2026-05-03 | F1.7 PROMPT_DESIGN_ALIGNMENT closed (D1 prep + 5 D2 batches + 5 D3 batches + D4 closure, +128 tests cumul 898, 30 registry CRUD pages + Plant Overview + WC Risorse + WO BO 7-tab + useRegistryView hook, closes TODO-039 / TODO-055, opens TODO-049/050/052/053/054/056). F2 scope reduced (PROMPT_6 narrowed to Andon only; PROMPT_7 narrowed to recovery runtime resume). | this document |
 
 ---
 

@@ -1,8 +1,95 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 3, 2026 (PROMPT_PNE_SEED_CLEANUP applied — post F1 hotfix, 744 tests)
+> **Last update**: May 3, 2026 (PROMPT_DESIGN_ALIGNMENT closed — full app aligned to Claude Design mockups, 898 tests)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ PROMPT_DESIGN_ALIGNMENT — full-app mockup alignment — 100% complete (May 3, 2026)
+
+Bridges the gap between F1 (Pneumatic vertical demo path) and F2 (Andon + back-office registry detail). Lifts every back-office surface, the HMI shell, and the home dashboard from "spec-correct" to "mockup-faithful" against `design-system/source/project/screens-*.jsx`. Absorbs the original PROMPT_7 D2 (registry detail/edit/new pages) and D3 (WO BO 7-tab) scope.
+
+### Scope delivered
+
+| Phase | Batch | Scope | Commit |
+|---|---|---|---|
+| D1 prep | — | `Button` + `StatusBadge` aligned to mockup tokens (size/variant matrix) | `e9550ed` |
+| D2 | 1 | HMI Decision A (variant migration: explicit `variant=`/`size=` props on every `<Button>`) | `69a7a32` |
+| D2 | 2 | Registry list pages aligned to mockup tokens (DataTable, Filter strip, Bulk-actions bar) | `4fa80e2` |
+| D2 | 3 | Trash page action buttons | `a799e3c` |
+| D2 | 4.5 | `HMIShell` + `HMIBigBtn` primitives in `@mes/ui`; HMI screens wrapped | `4e3d89d` |
+| D3 | 5 | `useRegistryView` hook + wired across 13 registries (filter / sort / multi-select / pagination unified) | `ba176c5` |
+| D3 | 6 | `/` rebuilt as Plant Overview Dashboard (KPI strip + Active WOs + Live Activity + Equipment Status + 6 Big Losses + Box Inventory) from mockup `ScreenDashboard` | `3588a2e` |
+| D3 | 7.1 | BoM + Recipe scalar-fidelity detail/edit/new (6 pages) | `8dcae9e` |
+| D3 | 7.2 | Equipment + Skills + Operators detail/edit/new (9 pages) | `56f1cba` |
+| D3 | 7.3 | Cause-codes + Attention-points + Tools detail/edit/new (9 pages) | `d210530` |
+| D3 | 7.4 | Box-types + Boxes detail/edit/new (6 pages) | `3c2c270` |
+| D3 | 8 | Risorse tab on Equipment detail for `work_unit` / `work_center` levels (cross-tree) | `316a1cd` |
+| D3 | 9 | Back-office WO detail page with 7-tab layout (Overview / Steps / Resources / Quality / Audit / Genealogy / Comments) | `98d55bd` |
+| D4 | closure | TODO-055 fix (move `deriveEquipmentCounts` + `deriveBoxCounts` out of `(registries)/page.tsx` to `lib/dashboard-helpers.ts` — unblocks `pnpm --filter @mes/web build`) + this STATUS / ROADMAP / TODO / MASTER_BACKLOG closure | _this commit_ |
+
+**Totals**: 30 registry CRUD pages across 11 registries (BoM, Recipe, Equipment, Skill, Operator, Cause-code, Attention-point, Tool, Box-type, Box) + 1 Plant Overview Dashboard + 1 WC Risorse tab + 1 WO BO 7-tab + 5 D2 batches (Button/StatusBadge tokens, HMI Decision A migration, registry-list alignment, trash page, HMI Shell) + 1 `useRegistryView` hook unifying registry list behavior + Drift Decisions A+B (variant prop migration, registry-view shape).
+
+### Test count
+
+- **Baseline (post PROMPT_PNE_SEED_CLEANUP)**: 770 (api 284 / domain 197 / ui 119 / web 38 / hmi 36 / schemas 29 / prisma 22 / cache 8 / storage 6 / queue 5 + 26 from PNE_SEED_CLEANUP rebaseline that brought 744 → 770 mid-flight)
+- **Final**: **898** (api 296 / domain 197 / ui 181 / web 97 / hmi 45 / schemas 39 / prisma 24 / cache 8 / storage 6 / queue 5)
+- **Delta**: **+128 tests** across PROMPT_DESIGN_ALIGNMENT (api +12 / ui +62 / web +59 / hmi +9 / schemas +10 / prisma +2). Zero regressions.
+
+### Architectural decisions (kept across batches)
+
+1. **Drift Decision A — Button variant prop migration**: The mockup `Button` primitive uses explicit `variant=` / `size=` props (e.g. `variant="ghost" size="sm"`) instead of class-name composition. D1 prep aligned the `@mes/ui` `Button` to this contract; D2 Batch 1 migrated every HMI `<Button>` callsite. Back-office migrations followed in D2 Batch 2-3. **Why**: callers no longer need to know the design-token internals; one prop swap per surface vs. line-by-line class rewrites.
+
+2. **Drift Decision B — `useRegistryView` shape**: Originally each registry list page open-coded filter / sort / multi-select / pagination state. D3 Batch 5 introduced `useRegistryView` (in `apps/web/src/lib/use-registry-view.ts`) with a single hook signature wired across 13 registries. **Why**: 13 list pages × 4 state slices = 52 ad-hoc useState/useReducer instances pre-Batch 5; one hook + per-registry config object post-Batch 5. New registries get the unified behavior with one import.
+
+3. **Plant Overview helpers location** (TODO-055 fix in D4 closure): `deriveEquipmentCounts` + `deriveBoxCounts` were originally co-located in `apps/web/src/app/(registries)/page.tsx` so the page test could import them without jumping files. Next.js 14 App Router rejects extra named exports from `page.tsx` files at build time (the `OmitWithTag` index-signature check on `.next/types/app/(registries)/page.ts` flags any non-allowlisted export). D4 closure moved both helpers to `apps/web/src/lib/dashboard-helpers.ts`; the page imports them at the call site, the test imports them from the helper module. **Build now passes.** Pattern lesson: pure helpers in `app/*/page.tsx` are a latent build break — keep them in `lib/` from the start.
+
+4. **WO BO 7-tab single-page layout (D3 Batch 9)**: The mockup `ScreenWO` component renders the WO detail as one route with 7 tab panels (Overview / Steps / Resources / Quality / Audit / Genealogy / Comments) inside a single shell. Implemented as `apps/web/src/app/(registries)/work-orders/[id]/page.tsx` with a `Tabs` primitive from `@mes/ui` and per-tab data fetching via TanStack Query (lazy on tab switch). **Why one route vs. nested**: tab state lives in `useState`, not URL — keeps the back-button behavior simple for the demo; nested routes (e.g. `/work-orders/[id]/steps`) are a post-MVP refinement if customer wants deep-linkable tabs.
+
+5. **Equipment Risorse tab (D3 Batch 8) — cross-tree query**: For `level=work_unit` or `level=work_center` equipment nodes, the Risorse tab renders the contents of the work_unit / work_center: child equipment + assigned operators + recipes scoped to that node. The query fans out across the equipment tree by walking `parentId` from the selected node. **Why scope-conditional**: leaf equipment (e.g. a single device) has no children — showing an empty Risorse tab would be visual noise. The tab is hidden for irrelevant levels.
+
+6. **5 D2 batches as separate commits**: Originally planned as one D2 monolithic commit. Split into 5 because (a) HMI variant migration touches 30+ files and is risky to bundle with back-office work, (b) `HMIShell` + `HMIBigBtn` are net-new primitives and deserve their own atomic commit for `@mes/ui` consumers to track, (c) trash page action button polish surfaced mid-stream and was opportunistic. **Why split commits**: each batch passes tests independently; a regression in one is one revert away from clean.
+
+### TODOs closed by PROMPT_DESIGN_ALIGNMENT
+
+- **TODO-039** — Design token migration `bg-primary-*` / `bg-success-*` (closed by D2 Batch 2 token alignment).
+- **TODO-055** — Move `deriveEquipmentCounts` helper out of Next.js page file (closed by D4 closure).
+
+### TODOs opened by PROMPT_DESIGN_ALIGNMENT
+
+- **TODO-049** — BoM lines not persisted on create/update (D3 Batch 7.1: frontend ships scalar-fidelity, repo gap to close in F2).
+- **TODO-050** — Recipe parameters/versions not persisted (D3 Batch 7.1: same pattern as TODO-049).
+- **TODO-052** — Equipment ISA-95 tree visualization (D3 Batch 7.2: `Tree` primitive missing in `@mes/ui`, deferred).
+- **TODO-053** — Skills × Operators matrix view (D3 Batch 7.2: `SkillsClient.matrix()` SDK declared but controller route missing).
+- **TODO-054** — Operator-Skill assignment editor (D3 Batch 7.2: same pattern as TODO-053 on `OperatorsController`).
+- **TODO-056 (NEW)** — Multi-level timer aggregation on WO BO Steps tab (D3 Batch 9: Steps tab shows per-step elapsed timers; aggregate roll-up to group / phase / WO levels deferred to PROMPT_9).
+
+### Verification (May 3, 2026)
+
+- ✅ All **898 tests pass** across 17 tasks (`pnpm test` — full Turborepo run, 13 cached + 4 fresh after D4 changes)
+- ✅ `pnpm --filter @mes/web type-check` clean (exit 0, fresh `.next/types/` regen)
+- ✅ `pnpm --filter @mes/web build` clean (exit 0, 33/33 routes generated, **was previously blocked by TODO-055**)
+- ✅ `pnpm --filter @mes/web test` 97 passing (54 test files; +59 vs baseline)
+- ⏳ Manual `pnpm dev` smoke pending in D4 closure (Phase 3a) — verify `/`, `/items`, `/equipment`, `/work-orders`, `/dev/showcase`, HMI `/`
+
+### Lessons learned (Lessons 59 + 60)
+
+- **Lesson 59 (Worktree corruption recovery via git plumbing)** — Mid-session, Claude Code worktrees can have stale `.git` references that prevent normal `git push` / `git merge` from the worktree. Recovery pattern: `GIT_DIR=<parent-repo>/.git` + plumbing-level `git commit-tree` + `git update-ref refs/heads/<branch>`. **Anti-pattern**: `git worktree remove --force` on an unmerged branch (loses uncommitted work). **Real case**: D2 Batch 4.5 + 5 worktree divergence — reconciled in 5 steps: (1) commit in worktree, (2) push branch, (3) ff-merge to main from parent repo, (4) push main from parent, (5) cleanup worktree.
+
+- **Lesson 60 (Worktree consolidation discipline)** — Each Claude Code session may create a worktree with its own `node_modules` (~700 MB - 1 GB). Accumulated zombie worktrees waste disk and create symlink hell on Windows. **Pattern**: after EVERY batch closure, consolidate to main + `git worktree remove` + `git branch -D` (local) + `git push origin --delete` (remote). **On Windows specifically**: `git worktree remove` can fail with "Result too large" when path length > 260 chars — git de-registers the worktree but the physical folder remains. **Workaround**: `robocopy /MIR <empty-folder> <stale-worktree-path>` to truncate-then-`Remove-Item`. Apply discipline retroactively — long-running projects accumulate orphans fast.
+
+### Files changed (D4 closure)
+
+```
+apps/web/src/lib/dashboard-helpers.ts                              (NEW)
+apps/web/src/app/(registries)/page.tsx                             (extracted helpers)
+apps/web/src/app/(registries)/page.test.tsx                        (import path updated)
+STATUS.md                                                          (this entry + Lesson 59/60)
+ROADMAP.md                                                         (F1.7 added + change log)
+TODO.md                                                            (TODO-055 closed; TODO-056 added)
+MASTER_BACKLOG.md                                                  (§ 1 status / § 2 TODO / § 10 update log)
+```
 
 ---
 
@@ -696,6 +783,12 @@ infrastructure in repo). Suggested checks:
 55. **TypeScript constructor params with function default values trigger Nest DI Function-resolution attempts**: Symptom: `Nest can't resolve dependencies of X (..., ?)` at boot, despite test-green via direct instantiation. Cause: TS emits `Function` parameter metadata for `random: () => number = Math.random`; Nest tries to resolve a `Function` provider for that index and fails. Fix: `@Optional()` decorator on the parameter so Nest skips DI and uses the default value. Detection gap: unit tests using `new ServiceX(...)` bypass the DI container entirely; only runtime smoke (`pnpm dev`) catches it. Going forward: when introducing services with function-typed default-value constructor args, either (a) add `@Optional()` proactively, or (b) add a minimal NestJS-bootstrap integration test that wires through the DI container, not just direct instantiation. (Encountered: PROMPT_PNE_3 D4 hotfix, May 3, 2026 — affected MockLeakTester / MockCameraTester / MockCrimpPress.)
 
 56. **Auth-strategy decisions must be explicit per controller; method-level gating runs AFTER guard**: Symptom: `/api/internal/mock-devices` returned 401 instead of the expected 404-when-DEMO_MODE-off, blocking the back-office /demo page. Cause: PNE_3 added `@UseGuards(JwtAuthGuard)` at the class level on both mock controllers, but the DEMO_MODE check (which throws 404) lives inside the method body — guards always fire first, so the demo page got 401 before the method ever ran. Architectural note: this codebase has NO global JWT guard and NO `@Public()` decorator — auth is opt-in per controller via `@UseGuards`. To make a route public, simply omit the decorator. Fix: removed `@UseGuards` from both `/api/internal/*` controllers; FastForward (which uses `req.user.id`/`plantId` for audit) now falls back to `DEMO_USER_ID`/`DEMO_PLANT_ID` env vars when no session is present. Detection gap: same as Lesson 55 — unit tests instantiate controllers directly and synthesize `req.user`, so neither the guard nor the missing-user path is exercised; only HTTP-level smoke catches it. Going forward: when introducing a new controller, write a one-line comment at class declaration stating the auth posture (Public / Authenticated / Role-Based) and the rationale, so the choice is reviewable rather than implicit. (Encountered: PROMPT_PNE_3 D4 hotfix #2, May 3, 2026.)
+
+### PROMPT_DESIGN_ALIGNMENT D4 closure — 2 new (Lessons 59 + 60)
+
+59. **Worktree corruption recovery via git plumbing**: Mid-session, Claude Code worktrees can develop stale `.git` references that prevent normal `git push` / `git merge` from inside the worktree (symptom: "fatal: not a git repository" when the worktree's `.git` file points at a removed entry in `<parent>/.git/worktrees/`). **Recovery pattern**: from the parent repo, set `GIT_DIR=<parent>/.git` and use plumbing — `git commit-tree` to materialize the worktree state as a commit + `git update-ref refs/heads/<branch>` to attach it. **Anti-pattern**: `git worktree remove --force` on an unmerged branch destroys uncommitted work. **Real case**: D2 Batch 4.5 + 5 worktree divergence — reconciled in 5 steps: (1) commit in worktree, (2) push branch, (3) ff-merge to main from parent repo, (4) push main from parent, (5) cleanup worktree. Going forward: never `--force` a worktree remove without first verifying the branch is fully merged upstream. (Encountered: PROMPT_DESIGN_ALIGNMENT D2-D3 transition, May 3, 2026.)
+
+60. **Worktree consolidation discipline**: Each Claude Code session that uses an isolated worktree creates a `node_modules/` of ~700 MB - 1 GB. Accumulated zombie worktrees waste disk and create symlink hell on Windows long-path projects. **Pattern**: after EVERY batch closure, consolidate to main + `git worktree remove <path>` + `git branch -D <branch>` (local) + `git push origin --delete <branch>` (remote). **On Windows specifically**: `git worktree remove` can fail with "Result too large" when path length > 260 chars — git de-registers the worktree internally but the physical folder remains. **Workaround**: `robocopy /MIR <empty-folder> <stale-worktree-path>` to truncate the directory contents below the path-length limit, then `Remove-Item -Recurse -Force` succeeds. Apply discipline retroactively — long-running projects accumulate orphans fast. (Encountered: PROMPT_DESIGN_ALIGNMENT D3 batches 6-9, May 3, 2026.)
 
 ---
 

@@ -1,7 +1,7 @@
 # MASTER BACKLOG — RAMS Reflexallen MES
 
 > **Purpose**: Single source of truth for ALL residual work beyond the PROMPT roadmap.
-> **Last updated**: 2026-05-03 (after D2 Batch 1+2 of PROMPT_DESIGN_ALIGNMENT)
+> **Last updated**: 2026-05-03 (PROMPT_DESIGN_ALIGNMENT D4 closure — full app aligned to mockup, +128 tests, 898 total)
 > **Owners**: Antonella + Claude (planning), Claude Code (implementation)
 > **Status**: Living document — update at every PROMPT closure
 
@@ -27,8 +27,8 @@ Order of execution + status. **This is what gets done in PROMPTs**.
 
 | # | PROMPT | Effort CC | Calendar | Status |
 |---|---|---|---|---|
-| 1 | **PROMPT_DESIGN_ALIGNMENT** (full app + ex-PROMPT_7 D2/D3) | ~19-22h | 3-7 mag | 🟡 D2 Batch 1+2 done |
-| 2 | **PROMPT_7_RESUME** (HMI runtime recoveryConfig + pre-retry execution) | 1h | 7-8 mag | ⏳ |
+| 1 | **PROMPT_DESIGN_ALIGNMENT** (full app + ex-PROMPT_7 D2/D3) | ~22h actual | 3-7 mag | ✅ done 2026-05-03 |
+| 2 | **PROMPT_7_RESUME** (HMI runtime recoveryConfig + pre-retry execution) | 1-2h | 7-8 mag | ⏳ next |
 | 3 | **PROMPT_3c** (Workflow Live Preview state-driven) | 1.5-2h | 8-9 mag | ⏳ |
 | 4 | **PROMPT_AUTH_BASIC** (NEW — login web + ruoli base + permission checks) | 6-7h | 9-11 mag | ⏳ TBD inserire (Tier 1) |
 | 5 | **PROMPT_9** (Equipment + Maintenance + Tool Wear + Recovery 4-stage) | 3-4h | 11-13 mag | ⏳ |
@@ -51,25 +51,34 @@ Order of execution + status. **This is what gets done in PROMPTs**.
 
 ## 2. TODO numerati tracciati
 
-12 TODO aperti dai docs di progetto.
+Open numbered TODOs in the project. Last review: 2026-05-03 post DESIGN_ALIGNMENT D4 closure.
 
 | # | TODO | Effort | Owner | Status |
 |---|---|---|---|---|
-| TODO-033 | Audit adapter | 30 min | PROMPT_DESIGN_ALIGNMENT D2 | 🟡 in corso |
+| TODO-033 | Audit adapter API row → AuditTimelineEntry | 30 min | F2 / PROMPT_7 | ⏳ |
 | TODO-035 | Parallel view editing | 1h | F2 backlog post-demo | ⏳ |
 | TODO-036 | Decision step schema fields | 1h | F2 backlog post-demo | ⏳ |
-| TODO-037 | @mes/ui Edge harmonization | 30 min | PROMPT_DESIGN_ALIGNMENT D2 | 🟡 in corso |
-| TODO-038 | Workflow-meta editing topbar | 30 min | PROMPT_DESIGN_ALIGNMENT D2 | 🟡 in corso |
-| TODO-039 | Design token migration `bg-primary-*` | 30 min | PROMPT_DESIGN_ALIGNMENT D2 (assorbito Batch 2) | ✅ done |
-| TODO-040 | Recovery runtime + pre-retry execution | 1h | PROMPT_7_RESUME | ⏳ |
-| TODO-041 | Split FaultCode da CauseCode | 1h | post-demo | ⏳ |
+| TODO-037 | @mes/ui Edge harmonization | 30 min | F2 (Option B documented) | ⏳ |
+| TODO-038 | Workflow-meta editing topbar | 30 min | F2 / PROMPT_7 | ⏳ |
+| TODO-039 | Design token migration `bg-primary-*` | 30 min | DESIGN_ALIGNMENT D2 Batch 2 | ✅ done 2026-05-03 |
+| TODO-040 | Recovery runtime + pre-retry execution | 1-2h | PROMPT_7_RESUME (next) | ⏳ |
+| TODO-041 | Split FaultCode da CauseCode | 1h | post-demo F2 | ⏳ |
 | TODO-042 | PROMPT spec rewrite hygiene | 30 min | meta-task ongoing | 🟡 |
-| TODO-044 | WebSocket /demo cache invalidation | 1.5h | post-demo | ⏳ |
+| TODO-044 | DemoToggle WebSocket replace polling | 1.5h | post-demo F2 / PROMPT_7 | ⏳ |
 | TODO-045 | Resource Mobility (start location + allowed workflows) | 1.5-2h | post-demo F2 | ⏳ |
-| TODO-046 | Lesson 59 worktree recovery (doc) | 15 min | DESIGN_ALIGNMENT D4 closure | ⏳ |
-| TODO-047 (NEW) | HMIBOMCheck dedicated gate (mockup feature) | 2h | post-demo polish | ⏳ |
+| TODO-046 | Lesson 59 worktree recovery (doc) | 15 min | DESIGN_ALIGNMENT D4 closure | ✅ done 2026-05-03 (in STATUS.md Lessons 59+60) |
+| TODO-047 | HMIBOMCheck dedicated gate (mockup feature) | 2h | post-demo polish | ⏳ |
+| TODO-049 (NEW) | BoM lines not persisted on create/update | 2h backend + 2h FE | post-demo F2 | ⏳ opened DESIGN_ALIGNMENT D3 Batch 7.1 |
+| TODO-050 (NEW) | Recipe parameters/versions not persisted | 2h backend + 2h FE | post-demo F2 | ⏳ opened DESIGN_ALIGNMENT D3 Batch 7.1 |
+| TODO-052 (NEW) | Equipment ISA-95 tree visualization (`Tree` primitive missing) | 3h DS + 2h FE | F3.2 PROMPT_9 | ⏳ opened DESIGN_ALIGNMENT D3 Batch 7.2 |
+| TODO-053 (NEW) | Skills × Operators matrix view (controller route missing) | 2h backend + 3h FE | F3.6 PROMPT_13 | ⏳ opened DESIGN_ALIGNMENT D3 Batch 7.2 |
+| TODO-054 (NEW) | Operator-Skill assignment editor (controller routes missing) | 3h backend + 3h FE | F3.6 PROMPT_13 | ⏳ opened DESIGN_ALIGNMENT D3 Batch 7.2 |
+| TODO-055 | Move `deriveEquipmentCounts` helper out of Next.js page file | 15 min | DESIGN_ALIGNMENT D4 closure | ✅ done 2026-05-03 |
+| TODO-056 (NEW) | Multi-level timer aggregation on WO BO Steps tab | 2h | F3.2 PROMPT_9 | ⏳ opened DESIGN_ALIGNMENT D3 Batch 9 |
 
-**Totale TODO non-assorbiti**: ~9.5h post-demo.
+**Totale TODO non-assorbiti aperti**: ~22-30h post-demo (was ~9.5h pre-DESIGN_ALIGNMENT — net +12h from Batch 7.x surfaced gaps and Batch 9 timer aggregation).
+
+**Closed by DESIGN_ALIGNMENT**: TODO-039 (D2 Batch 2 token alignment), TODO-046 (D4 closure Lessons 59+60), TODO-055 (D4 closure helpers extract).
 
 ---
 
@@ -395,6 +404,8 @@ Sound HMI feedback è quick win 30 min. Lo inseriamo in PROMPT_DESIGN_ALIGNMENT 
 
 **Mia raccomandazione**: inserire in HMI Shell batch 4.5 (no overhead extra).
 
+**STATUS post DESIGN_ALIGNMENT closure (2026-05-03)**: D2 Batch 4.5 shipped `HMIShell` + `HMIBigBtn` primitives but did NOT include sound HMI feedback. Decision still open — handle as standalone 30-min patch pre-demo.
+
 ### D3 — Auth basic timing (decide post Tier 1 commit)
 
 PROMPT_AUTH_BASIC va prima o dopo PROMPT_9?
@@ -420,6 +431,7 @@ Tu scrivi docs (10h) o assumiamo a Claude Code (1-2h con tuo review)?
 | Date | Update |
 |---|---|
 | 2026-05-03 | Initial document v1.0 — full inventory after PROMPT_7 D1 merged + DESIGN_ALIGNMENT D2 Batch 1+2 done |
+| 2026-05-03 | **PROMPT_DESIGN_ALIGNMENT closed** (D4 closure): § 1 status updated (item 1 ✅ done, item 2 ⏳ next), § 2 TODO list refreshed (TODO-039/046/055 ✅ done; TODO-049/050/052/053/054/056 NEW opened), § 9 D2 status note added. Smoke gate verified (`pnpm dev` 6/7 routes 200; `/work-orders` 404 expected). Total tests 770 → 898 (+128, zero regressions). |
 
 ---
 
