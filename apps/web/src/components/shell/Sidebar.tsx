@@ -1,25 +1,45 @@
 import Link from 'next/link'
-import { BarChart3 } from 'lucide-react'
+import {
+  AlertTriangle,
+  Award,
+  BarChart3,
+  Bell,
+  BookOpen,
+  Cog,
+  Factory,
+  GitBranch,
+  HardHat,
+  Layers,
+  MonitorSmartphone,
+  Package,
+  Package2,
+  PackageOpen,
+  Trash2,
+  User,
+  Wrench,
+} from 'lucide-react'
 import { NavItem } from './NavItem'
 import { RecentlyViewed } from './RecentlyViewed'
 import { FavoritesBar } from './FavoritesBar'
 
+const ICON_CLS = 'w-3.5 h-3.5'
+
 const REGISTRY_NAV = [
-  { href: '/items',              icon: '📦', label: 'Articoli' },
-  { href: '/bom',                icon: '🔩', label: 'Distinte base' },
-  { href: '/equipment',          icon: '🏭', label: 'Gerarchia impianti' },
-  { href: '/workstations',       icon: '⚙️',  label: 'Postazioni' },
-  { href: '/recipes',            icon: '📋', label: 'Ricette' },
-  { href: '/skills',             icon: '🎓', label: 'Competenze' },
-  { href: '/operators',          icon: '👷', label: 'Operatori' },
-  { href: '/cause-codes',        icon: '⚠️',  label: 'Codici causa' },
-  { href: '/attention-points',   icon: '🔔', label: 'Punti attenzione' },
-  { href: '/tools',              icon: '🔧', label: 'Attrezzatura' },
-  { href: '/maintenance-orders', icon: '🛠️',  label: 'Manutenzioni' },
-  { href: '/box-types',          icon: '📫', label: 'Tipi imballo' },
-  { href: '/boxes',              icon: '📮', label: 'Imballi' },
-  { href: '/auto-gen-rules',     icon: '🤖', label: 'Regole auto-gen' },
-  { href: '/workflows',          icon: '🔀', label: 'Flussi di lavoro' },
+  { href: '/items',              icon: <Package className={ICON_CLS} />,            label: 'Articoli' },
+  { href: '/bom',                icon: <Layers className={ICON_CLS} />,             label: 'Distinte base' },
+  { href: '/equipment',          icon: <Factory className={ICON_CLS} />,            label: 'Gerarchia impianti' },
+  { href: '/workstations',       icon: <MonitorSmartphone className={ICON_CLS} />,  label: 'Postazioni' },
+  { href: '/recipes',            icon: <BookOpen className={ICON_CLS} />,           label: 'Ricette' },
+  { href: '/skills',             icon: <Award className={ICON_CLS} />,              label: 'Competenze' },
+  { href: '/operators',          icon: <User className={ICON_CLS} />,               label: 'Operatori' },
+  { href: '/cause-codes',        icon: <AlertTriangle className={ICON_CLS} />,      label: 'Codici causa' },
+  { href: '/attention-points',   icon: <Bell className={ICON_CLS} />,               label: 'Punti attenzione' },
+  { href: '/tools',              icon: <Wrench className={ICON_CLS} />,             label: 'Attrezzatura' },
+  { href: '/maintenance-orders', icon: <HardHat className={ICON_CLS} />,            label: 'Manutenzioni' },
+  { href: '/box-types',          icon: <PackageOpen className={ICON_CLS} />,        label: 'Tipi imballo' },
+  { href: '/boxes',              icon: <Package2 className={ICON_CLS} />,           label: 'Imballi' },
+  { href: '/auto-gen-rules',     icon: <Cog className={ICON_CLS} />,                label: 'Regole auto-gen' },
+  { href: '/workflows',          icon: <GitBranch className={ICON_CLS} />,          label: 'Flussi di lavoro' },
 ]
 
 export function Sidebar() {
@@ -34,7 +54,7 @@ export function Sidebar() {
 
       <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
         <div className="uppercase-label px-2 py-1 mt-1 mb-0.5">Panoramica</div>
-        <NavItem href="/" icon={<BarChart3 className="w-3.5 h-3.5" />} label="Dashboard" />
+        <NavItem href="/" icon={<BarChart3 className={ICON_CLS} />} label="Dashboard" />
 
         <div className="uppercase-label px-2 py-1 mt-3 mb-0.5">Anagrafiche</div>
         {REGISTRY_NAV.map((item) => (
@@ -42,7 +62,7 @@ export function Sidebar() {
         ))}
 
         <div className="uppercase-label px-2 py-1 mt-3 mb-0.5">Sistema</div>
-        <NavItem href="/trash" icon="🗑️" label="Cestino" />
+        <NavItem href="/trash" icon={<Trash2 className={ICON_CLS} />} label="Cestino" />
       </nav>
 
       <div className="hairline-t">

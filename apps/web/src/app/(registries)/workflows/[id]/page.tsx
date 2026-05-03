@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels'
-import { PageHeader, StatusBadge } from '@mes/ui'
+import { PageHeader, StatusBadge, useRegistryView } from '@mes/ui'
 import { sdk } from '../../../../lib/sdk'
 import { WorkflowCanvas } from '../../../../components/workflow/WorkflowCanvas'
+import { WorkflowHierarchyTable } from '../../../../components/workflow/WorkflowHierarchyTable'
+import { WorkflowCardView } from '../../../../components/workflow/WorkflowCardView'
 import { WorkflowPalette } from '../../../../components/workflow/WorkflowPalette'
 import { WorkflowInspector } from '../../../../components/workflow/WorkflowInspector'
 import { ValidationPanel } from '../../../../components/workflow/ValidationPanel'
@@ -38,6 +40,17 @@ export default function WorkflowEditorPage() {
   const closeAddGroupModal = useWorkflowStore((s) => s.closeAddGroupModal)
   const validateDrawer = useWorkflowStore((s) => s.validateDrawer)
   const closeValidateDrawer = useWorkflowStore((s) => s.closeValidateDrawer)
+
+  // PROMPT_VIEWSWITCHER_WORKFLOWS — 3-mode toggle (Flusso default + Tabella + Card).
+  // The canvas stays mounted even when not active so its useEffect keeps the
+  // store's nodes[] seeded — Inspector + Live Preview lookups continue to work
+  // when the engineer clicks rows in Tabella or cards in Card view.
+  const { view: workflowView, switcher: workflowSwitcher } = useRegistryView({
+    registryId: 'workflows',
+    availableViews: ['flow', 'list', 'card'],
+    defaultView: 'flow',
+    labels: { list: 'Tabella' },
+  })
 
   const { data: workflow, isLoading } = useQuery({
     queryKey: ['workflows', id],
@@ -118,6 +131,7 @@ export default function WorkflowEditorPage() {
               Rilascia WO
             </button>
           )}
+          {workflowSwitcher}
           <button
             type="button"
             onClick={() => setPreviewOpen((v) => !v)}
@@ -164,14 +178,32 @@ export default function WorkflowEditorPage() {
 
           <PanelResizeHandle className="w-1 bg-neutral-200 hover:bg-primary-400 transition-colors cursor-col-resize" />
 
-          {/* Canvas pane — 35% */}
+          {/* Canvas / Tabella / Card pane — 35% */}
           <Panel defaultSize={35} minSize={25}>
             <div className="h-full flex flex-col bg-neutral-50 hairline-r overflow-hidden">
               <div className="px-3 py-2 hairline-b flex-shrink-0">
-                <span className="uppercase-label">Canvas</span>
+                <span className="uppercase-label">
+                  {workflowView === 'flow'
+                    ? 'Canvas'
+                    : workflowView === 'list'
+                      ? 'Tabella'
+                      : 'Schede'}
+                </span>
               </div>
-              <div className="flex-1 overflow-hidden">
-                <WorkflowCanvas workflow={workflow} />
+              <div className="flex-1 overflow-hidden relative">
+                {/* Canvas always mounted so the workflow store's nodes[] stays
+                    seeded for Inspector + Live Preview, regardless of which
+                    view is active. Hidden via `display:none` when not in
+                    flow mode — preserves auto-save, history, keyboard wiring. */}
+                <div className={workflowView === 'flow' ? 'h-full' : 'hidden'}>
+                  <WorkflowCanvas workflow={workflow} />
+                </div>
+                {workflowView === 'list' && (
+                  <WorkflowHierarchyTable workflow={workflow} />
+                )}
+                {workflowView === 'card' && (
+                  <WorkflowCardView workflow={workflow} />
+                )}
               </div>
             </div>
           </Panel>

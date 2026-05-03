@@ -2,7 +2,7 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-04 (PROMPT_9 reduced-scope closure — opened TODO-062/063/064/065 for deferred Equipment+Maintenance items, Tailwind palette tokens, registry ViewSwitcher, Workflow ViewSwitcher pre-demo)
+> **Last updated**: 2026-05-05 (PROMPT_VIEWSWITCHER_WORKFLOWS closure — TODO-065 RESOLVED, sidebar Lucide migration shipped, WO Detail Snapshot tab now uses hierarchical table)
 >
 > **Tier guidance** (post DESIGN_ALIGNMENT closure, May 3 2026):
 > - **Tier 1 (critical pre-MVP)**: TODO-017 (Argon2id PIN auth + JWT cookies), TODO-021 (WO release flow), TODO-018 (full 11-state step machine), TODO-019 (parallel ops), TODO-020 (recovery 4-stage)
@@ -789,20 +789,16 @@ WARNING  no output files found for task @mes/storage#build. Please check your `o
 ### TODO-065 — Workflow editor ViewSwitcher with hierarchical table + card view (PRE-DEMO, separate batch)
 
 **Discovered**: 2026-05-04 (PROMPT_9 manual smoke; user request)
-**Status**: 🟢 PENDING — Tier 1 PRE-DEMO scope. Schedule: **5-6 mag (next batch after PROMPT_9)**.
-**Toggle modes**:
-- **Flusso** (current default — canvas drag-drop with `@xyflow/react`)
-- **Tabella** (NEW — hierarchical treetable: Phase > Group > Step with expand/collapse triangles, indented rows, columns: name, duration, type, status)
-- **Card** (NEW — vertical cards grouped by phase, each card shows step summary)
-**Behavior**:
-- User selects mode via ViewSwitcher in workflow editor toolbar; selection persisted in localStorage per registry.
-- Click step row in Tabella → `useWorkflowStore.setSelectedNode(stepId)` → Inspector + Live Preview sync.
-- Same for Card click.
-- Edit form fields in Inspector reflect in current view (table reorders if reorderable, card content updates).
-**Bonus reuse**:
-- `WorkflowHierarchyTable` component reused in WO Detail Snapshot tab + Genealogy tab (currently amber-notice placeholders) — double ROI on this work.
-**Estimated effort**: ~3-4h (separate batch AFTER PROMPT_9).
-**Blocker for**: pre-demo workflow visualization improvements; bonus closes 2 placeholder tabs in WO Detail.
+**Status**: ✅ RESOLVED — 2026-05-05 (PROMPT_VIEWSWITCHER_WORKFLOWS).
+**Resolution**:
+- `ViewSwitcher` wired into workflow editor toolbar with 3 modes (Flusso default + Tabella + Card); mode persisted in `localStorage` under `rams.view.workflows`.
+- New `WorkflowHierarchyTable` (Phase > Group > Step indented HTML table with expand/collapse chevrons; columns Nome / Tipo / Durata / Stato; phase rows carry the accent CSS-var border) + 6 Vitest cases.
+- New `WorkflowCardView` (vertical sections grouped by phase; one card per step with name, group, type badge, duration) + 3 Vitest cases.
+- Click on any row/card calls `useWorkflowStore.selectNode(id, kind)` so Inspector + Live Preview stay in sync regardless of view mode.
+- Bonus delivered: WO Detail Snapshot tab now reuses `WorkflowHierarchyTable readOnly` (replaces the earlier 2-column PhaseCard grid). Genealogy tab unchanged this batch.
+- Implementation note: `WorkflowCanvas` stays mounted (CSS `hidden`) when not in Flusso view so its store-seeding `useEffect` keeps `nodes[]` populated for Inspector + Live Preview lookups.
+- Companion change: 16 sidebar emoji icons migrated to Lucide React (Package, Layers, Factory, MonitorSmartphone, BookOpen, Award, User, AlertTriangle, Bell, Wrench, HardHat, PackageOpen, Package2, Cog, GitBranch, Trash2).
+- Companion change: `ViewSwitcher` extended with optional `labels` override prop (Workflows uses `{ list: 'Tabella' }`); `useRegistryView` forwards the override. Backwards-compatible — existing 3 vitest cases on ViewSwitcher untouched.
 
 ---
 

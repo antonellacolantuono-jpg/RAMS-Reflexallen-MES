@@ -17,6 +17,12 @@ export interface UseRegistryViewOptions {
   defaultView?: ViewMode
   /** Optional callback fired whenever the view changes (post-state-update). */
   onChange?: (next: ViewMode) => void
+  /**
+   * Optional per-mode label override forwarded to the inner ViewSwitcher.
+   * Useful when a registry repurposes a view (e.g. Workflows uses `list`
+   * for a hierarchical tree and labels it "Tabella" rather than "Lista").
+   */
+  labels?: Partial<Record<ViewMode, string>>
 }
 
 export interface UseRegistryViewResult {
@@ -77,6 +83,7 @@ export function useRegistryView({
   availableViews,
   defaultView,
   onChange,
+  labels,
 }: UseRegistryViewOptions): UseRegistryViewResult {
   if (availableViews.length === 0) {
     throw new Error('useRegistryView: availableViews must contain at least one view')
@@ -105,10 +112,10 @@ export function useRegistryView({
     [registryId, onChange],
   )
 
-  const switcher =
-    availableViews.length > 1 ? (
-      <ViewSwitcher value={view} onChange={setView} views={availableViews} />
-    ) : null
+  const switcherProps = labels
+    ? { value: view, onChange: setView, views: availableViews, labels }
+    : { value: view, onChange: setView, views: availableViews }
+  const switcher = availableViews.length > 1 ? <ViewSwitcher {...switcherProps} /> : null
 
   return { view, setView, switcher }
 }

@@ -19,23 +19,31 @@ export interface ViewSwitcherProps {
   value: ViewMode
   onChange: (next: ViewMode) => void
   views: ViewMode[]
+  /**
+   * Optional per-mode label override. Useful when a registry uses a view in a
+   * non-default way — e.g. Workflows uses the `list` mode to render a
+   * hierarchical tree and labels it "Tabella" instead of the default "Lista".
+   * Modes not present here fall back to {@link VIEW_META}'s default labels.
+   */
+  labels?: Partial<Record<ViewMode, string>>
   className?: string
 }
 
-export function ViewSwitcher({ value, onChange, views, className }: ViewSwitcherProps) {
+export function ViewSwitcher({ value, onChange, views, labels, className }: ViewSwitcherProps) {
   return (
     <div role="group" aria-label="Cambia vista" className={cn('inline-flex rounded-1 border border-line bg-paper overflow-hidden', className)}>
       {views.map((v, i) => {
         const meta = VIEW_META[v]
+        const label = labels?.[v] ?? meta.label
         const isActive = value === v
         return (
           <button
             key={v}
             type="button"
             onClick={() => onChange(v)}
-            title={meta.label}
+            title={label}
             aria-pressed={isActive}
-            aria-label={meta.label}
+            aria-label={label}
             className={cn(
               'h-8 w-9 flex items-center justify-center transition-colors',
               i > 0 && 'border-l border-line',

@@ -30,8 +30,8 @@ Order of execution + status. **This is what gets done in PROMPTs**.
 | 1 | **PROMPT_DESIGN_ALIGNMENT** (full app + ex-PROMPT_7 D2/D3) | ~22h actual | 3-7 mag | ✅ done 2026-05-03 |
 | 2 | **PROMPT_7_RESUME** (HMI runtime recoveryConfig + pre-retry execution) | 1-2h | 7-8 mag | ✅ done 2026-05-03 |
 | 3 | **PROMPT_3c** (Workflow Live Preview state-driven) | 1.5-2h | 8-9 mag | ✅ done 2026-05-03 (commit `cac1390`) |
-| 4 | **PROMPT_9** (Equipment + Maintenance + Tool Wear) — **REDUCED SCOPE** (no Recovery 4-stage; tool wear hook + MaintenanceOrder CRUD + Dashboard nav only) | ~2-2.5h | **5-7 mag** (anticipated, was 11-13 mag) | ⏳ in flight 2026-05-04 |
-| 5 | **PROMPT_VIEWSWITCHER_WORKFLOWS** (NEW — Tabella gerarchica + Card view + ViewSwitcher; bonus reuse in WO Detail Snapshot/Genealogy tabs) | ~3-4h | 5-6 mag | ⏳ next batch after PROMPT_9 |
+| 4 | **PROMPT_9** (Equipment + Maintenance + Tool Wear) — **REDUCED SCOPE** (no Recovery 4-stage; tool wear hook + MaintenanceOrder CRUD + Dashboard nav only) | ~2-2.5h | **5-7 mag** (anticipated, was 11-13 mag) | ✅ done 2026-05-04 (commit `4a1d875`) |
+| 5 | **PROMPT_VIEWSWITCHER_WORKFLOWS** (Tabella gerarchica + Card view + ViewSwitcher; sidebar Lucide migration; bonus WO Detail Snapshot tab) | ~3-3.5h | 5-6 mag | ✅ done 2026-05-05 |
 | 6 | **DEMO PREP** (slide + dress rehearsal) | — (tuo) | 14-17 mag | ⏳ |
 | 7 | **🎯 DEMO REFLEX ALLEN** | — | **18-22 mag** | 🎯 |
 | 8 | Post-demo feedback absorb | — | 23-24 mag | ⏳ |
@@ -447,6 +447,7 @@ Customer feedback determina priorità. Possibili outcomes:
 | 2026-05-03 | Initial document v1.0 — full inventory after PROMPT_7 D1 merged + DESIGN_ALIGNMENT D2 Batch 1+2 done |
 | 2026-05-03 | **PROMPT_DESIGN_ALIGNMENT closed** (D4 closure): § 1 status updated (item 1 ✅ done, item 2 ⏳ next), § 2 TODO list refreshed (TODO-039/046/055 ✅ done; TODO-049/050/052/053/054/056 NEW opened), § 9 D2 status note added. Smoke gate verified (`pnpm dev` 6/7 routes 200; `/work-orders` 404 expected). Total tests 770 → 898 (+128, zero regressions). |
 | 2026-05-04 | **PROMPT_9 reduced scope in flight + Dashboard nav fix + manual smoke findings.** § 1 Roadmap: PROMPT_7_RESUME + PROMPT_3c marked ✅ done; PROMPT_9 anticipated to 5-7 mag (was 11-13 mag) with reduced scope (no Recovery 4-stage; tool wear hook + MaintenanceOrder CRUD + Dashboard nav only); NEW PROMPT_VIEWSWITCHER_WORKFLOWS scheduled 5-6 mag. § 3.1 PROMPT_AUTH_BASIC marked DEFERRED post-demo (merged with PROMPT_DEPLOYMENT, total Tier 1 effort 18-21h → 24-28h). § 9 Decision queue overhauled: D1 (Strategy B Realistic, ship 18-22 giu), D2 (Sound HMI deferred TODO-057), D3 (AUTH_BASIC deferred post-demo), D4 (PROMPT_PNE_5 deferred), D5 (ViewSwitcher Workflows pre-demo) all DECIDED. D6 (docs owner) + D7 (Andon post-demo) OPEN. NEW TODOs in TODO.md: TODO-062 (PROMPT_9 deferred items + photo storage S3 migration note), TODO-063 (Tailwind palette tokens), TODO-064 (registry ViewSwitcher), TODO-065 (Workflow ViewSwitcher pre-demo). |
+| 2026-05-05 | **PROMPT_VIEWSWITCHER_WORKFLOWS done.** § 1 item 5 marked ✅ done. § 1 item 4 (PROMPT_9) closure formalized with commit ref `4a1d875`. TODO-065 (workflow editor 3-mode toggle) RESOLVED — `WorkflowHierarchyTable` (Phase>Group>Step indented table with chevron expand/collapse, +6 tests) + `WorkflowCardView` (vertical cards by phase, +3 tests) + ViewSwitcher wired with localStorage `rams.view.workflows`. Sidebar Lucide migration shipped (16 emoji → Lucide React). WO Detail Snapshot tab refactored to reuse `WorkflowHierarchyTable readOnly`. ViewSwitcher extended with optional `labels` override prop (non-breaking). Test count 971 → ~980 (+9). Remaining D5 follow-up TODO-064 (registry ViewSwitcher across 10 registries, post-demo Tier 3) still open. |
 
 ---
 

@@ -1,8 +1,56 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 4, 2026 (PROMPT_9 reduced scope — tool wear hook + MaintenanceOrder CRUD + Dashboard nav)
+> **Last update**: May 5, 2026 (PROMPT_VIEWSWITCHER_WORKFLOWS — Workflow editor 3-mode toggle + Sidebar Lucide migration + WO Detail Snapshot tab refactor)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ PROMPT_VIEWSWITCHER_WORKFLOWS — Workflow editor view modes + Sidebar Lucide (May 5, 2026)
+
+Pre-demo polish batch closing TODO-065 (Tier 1 PRE-DEMO). Two coordinated changes:
+
+### Scope delivered
+
+| Component | File | Notes |
+|---|---|---|
+| Sidebar Lucide icons | [`apps/web/src/components/shell/Sidebar.tsx`](apps/web/src/components/shell/Sidebar.tsx) | All 16 emoji icons (Articoli/BoM/Equipment/Workstations/Recipes/Skills/Operators/CauseCodes/AttentionPoints/Tools/MaintenanceOrders/BoxTypes/Boxes/AutoGenRules/Workflows + Cestino) replaced with Lucide React components (Package, Layers, Factory, MonitorSmartphone, BookOpen, Award, User, AlertTriangle, Bell, Wrench, HardHat, PackageOpen, Package2, Cog, GitBranch, Trash2). NavItem unchanged — already accepts `string \| ReactNode`. |
+| ViewSwitcher labels override | [`packages/ui/src/components/view-switcher.tsx`](packages/ui/src/components/view-switcher.tsx) + [`use-registry-view.tsx`](packages/ui/src/components/use-registry-view.tsx) | Optional `labels?: Partial<Record<ViewMode, string>>` prop on `ViewSwitcher`; `useRegistryView` forwards. Backwards-compatible — existing Lista / Schede / Flusso labels remain default. Workflows uses `{ list: 'Tabella' }`. |
+| WorkflowHierarchyTable | [`apps/web/src/components/workflow/WorkflowHierarchyTable.tsx`](apps/web/src/components/workflow/WorkflowHierarchyTable.tsx) (NEW) | Hierarchical Phase > Group > Step indented HTML table with chevron expand/collapse per phase + group. Columns: Nome / Tipo / Durata / Stato. Phase rows carry the accent CSS-var border (`--c-{category}`). Click drives `useWorkflowStore.selectNode(id, kind)` for Inspector + Live Preview sync. `readOnly` prop disables click handler (used by WO Detail snapshot tab). +6 Vitest cases. |
+| WorkflowCardView | [`apps/web/src/components/workflow/WorkflowCardView.tsx`](apps/web/src/components/workflow/WorkflowCardView.tsx) (NEW) | Vertical card sections grouped by phase. Phase header carries the accent border + AUTO-GEN badge if applicable + step count + total duration. One card per step with name, group name, type badge, duration. Click drives selection sync. +3 Vitest cases. |
+| Phase color helper | [`apps/web/src/lib/phase-color.ts`](apps/web/src/lib/phase-color.ts) (NEW) | Lifted `PHASE_COLOR` map (6 categories → CSS vars) from WO Detail page; `phaseColor(category)` falls back to `var(--ink-3)` for unknown values. Reused by WorkflowHierarchyTable, WorkflowCardView, WO Detail Snapshot tab. |
+| Workflow editor toolbar | [`apps/web/src/app/(registries)/workflows/[id]/page.tsx`](apps/web/src/app/(registries)/workflows/%5Bid%5D/page.tsx) | `useRegistryView({ registryId: 'workflows', availableViews: ['flow','list','card'], defaultView: 'flow', labels: { list: 'Tabella' } })`. Switcher rendered in toolbar between "Rilascia WO" and "Anteprima". Mode persisted under `localStorage['rams.view.workflows']`. Canvas pane conditionally renders Canvas/Tabella/Card; canvas stays mounted (CSS `hidden`) when not active so Inspector + Live Preview lookups continue to work via the seeded `useWorkflowStore.nodes[]`. |
+| WO Detail Snapshot tab refactor | [`apps/web/src/app/(registries)/work-orders/[id]/page.tsx`](apps/web/src/app/(registries)/work-orders/%5Bid%5D/page.tsx) | Bonus: replaced 2-column PhaseCard grid (~50 LOC) with `WorkflowHierarchyTable readOnly` driven by a small `snapshotToWorkflowModel` adapter that fills missing SDK fields (snapshot Step shape is reduced vs full WorkflowStepModel). Existing test "Snapshot bloccato al rilascio" + "Estrusione" + "Avvio linea" + "Scan ricetta" still pass — all rendered by hierarchy table. |
+
+### Architectural decisions
+
+- **S6 (resolved)** — ViewSwitcher tooltip "Lista" vs user-requested "Tabella": optional `labels` override prop (6-line non-breaking extension) was the chosen path. `Workflows` is the only consumer using the override today; other registries (TODO-064 pending) keep the default "Lista".
+- **S7 (resolved)** — Inspector + Live Preview rely on `useWorkflowStore.nodes[]` seeded by `WorkflowCanvas`'s `useEffect`. Keeping the canvas mounted with `display:none` when in Tabella/Card view preserves the seeding without any refactor of the seeding logic itself. Trade-off: one initial dagre layout computation per page load (≤30 nodes for the demo workflow, imperceptible).
+- **S9 (resolved)** — Lifting `PHASE_COLOR` to `lib/phase-color.ts` succeeded; the WO Detail page imports it from the new path. No fallback inline duplication needed.
+
+### Test count delta
+
+- **Baseline (PROMPT_9 close)**: 971 tests across 10 packages
+- **This batch adds**: WorkflowHierarchyTable.test.tsx (+6), WorkflowCardView.test.tsx (+3) = **+9 tests**
+- **Expected total ≈ 980 tests**. Final figure verified in DoD below.
+
+### Files changed
+
+```
+apps/web/src/components/shell/Sidebar.tsx                               (16 emoji → Lucide)
+apps/web/src/lib/phase-color.ts                                         (NEW)
+apps/web/src/components/workflow/WorkflowHierarchyTable.tsx             (NEW)
+apps/web/src/components/workflow/WorkflowHierarchyTable.test.tsx        (NEW, 6 cases)
+apps/web/src/components/workflow/WorkflowCardView.tsx                   (NEW)
+apps/web/src/components/workflow/WorkflowCardView.test.tsx              (NEW, 3 cases)
+apps/web/src/app/(registries)/workflows/[id]/page.tsx                   (toolbar + conditional canvas/table/card)
+apps/web/src/app/(registries)/work-orders/[id]/page.tsx                 (Snapshot tab uses WorkflowHierarchyTable readOnly)
+packages/ui/src/components/view-switcher.tsx                            (optional labels prop)
+packages/ui/src/components/use-registry-view.tsx                        (forward labels prop)
+TODO.md                                                                 (TODO-065 → RESOLVED)
+STATUS.md                                                               (this entry)
+docs/MASTER_BACKLOG.md                                                  (§ 1 + § 10 update log)
+```
 
 ---
 
