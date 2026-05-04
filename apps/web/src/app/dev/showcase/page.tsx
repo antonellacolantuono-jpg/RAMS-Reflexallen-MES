@@ -135,8 +135,8 @@ function ShowcaseInner() {
       <header className="flex items-center justify-between px-6 py-4 border-b border-line">
         <div className="flex items-center gap-3">
           <picture>
-            <source srcSet="/brand/logo-dark.svg" media="(prefers-color-scheme: dark)" />
-            <img src="/brand/logo-light.svg" alt="Reflexallen" className="h-8" />
+            <source srcSet="/brand/rams-logo-dark.svg" media="(prefers-color-scheme: dark)" />
+            <img src="/brand/rams-logo-light.svg" alt="RAMS" className="h-8" />
           </picture>
           <span className="text-ink-3 text-sm">Design System Showcase</span>
         </div>

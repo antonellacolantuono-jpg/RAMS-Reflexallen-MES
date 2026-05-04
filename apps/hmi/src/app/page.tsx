@@ -63,7 +63,7 @@ export default function HMILoginPage() {
         title="Accesso Operatore"
         sub="Reflexallen MES · Sign-in"
         headerRight={
-          <img src="/brand/logo-light.svg" alt="Reflexallen" className="h-7" />
+          <img src="/brand/rams-logo-light.svg" alt="RAMS" className="h-7" />
         }
       >
         <div className="w-full max-w-xs mx-auto glass rounded-3 p-6 flex flex-col gap-5 mt-12">

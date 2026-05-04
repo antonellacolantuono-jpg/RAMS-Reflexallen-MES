@@ -48,7 +48,7 @@ export function Sidebar() {
       <div className="h-12 hairline-b flex items-center px-4 gap-2">
         <Link href="/" className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/rams-light.svg" alt="RAMS" className="h-6" />
+          <img src="/brand/rams-logo-light.svg" alt="RAMS" className="h-6" />
         </Link>
       </div>
 
