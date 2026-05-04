@@ -76,3 +76,26 @@ describe('StepCard — step.data overrides (PROMPT_7 D4)', () => {
     expect(screen.queryByText('apply_label')).toBeNull()
   })
 })
+
+describe('StepCard — Postazione (PROMPT_15)', () => {
+  it('renders the Postazione chip when step.workUnit is set', () => {
+    render(
+      <StepCard
+        step={makeStep({
+          workUnitId: 'wu-1',
+          workUnit: { id: 'wu-1', code: 'WS-LEAK-01', name: 'Postazione Leak 1' },
+        })}
+        index={1}
+        totalSteps={5}
+      />,
+    )
+    const chip = screen.getByTestId('step-card-postazione')
+    expect(chip.textContent).toContain('WS-LEAK-01')
+    expect(chip.textContent).toContain('Postazione')
+  })
+
+  it('does not render the Postazione chip when step.workUnit is null', () => {
+    render(<StepCard step={makeStep({ workUnit: null })} index={1} totalSteps={5} />)
+    expect(screen.queryByTestId('step-card-postazione')).toBeNull()
+  })
+})

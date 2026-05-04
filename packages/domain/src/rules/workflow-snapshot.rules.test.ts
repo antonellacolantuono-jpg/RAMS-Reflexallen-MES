@@ -14,6 +14,7 @@ function makeStep(
     actionType: string
     deviceCategory: string | null
     isRequired: boolean
+    workUnitId: string | null
   }> = {},
 ) {
   return {
@@ -30,6 +31,7 @@ function makeStep(
     deviceId: null,
     recipeId: null,
     toolId: null,
+    workUnitId: overrides.workUnitId ?? null,
     standardTimeSec: 60,
     isRequired: overrides.isRequired ?? true,
     partReference: null,
@@ -139,6 +141,23 @@ describe('cloneWorkflowTree', () => {
     const cloned = cloneWorkflowTree(makeWorkflow())
     expect(cloned.phases[0]?.imageUrl).toBeNull()
     expect(cloned.phases[1]?.imageUrl).toBe('data:image/png;base64,PRODimg')
+  })
+
+  it('preserves workUnitId on each cloned step (PROMPT_15 contract)', () => {
+    const source = makeWorkflow()
+    const productionGroup = source.phases[0]?.groups[0]
+    if (productionGroup && productionGroup.steps[0]) {
+      productionGroup.steps[0].workUnitId = 'wu-leak-01'
+    }
+    const cloned = cloneWorkflowTree(source)
+    const productionPhase = cloned.phases[1]
+    if (!productionPhase) throw new Error('expected phase-2 in clone output')
+    const clonedGroup = productionPhase.groups[0]
+    if (!clonedGroup) throw new Error('expected group in phase-2')
+    const stepC = clonedGroup.steps.find((s) => s.id === 'step-c')
+    const stepA = clonedGroup.steps.find((s) => s.id === 'step-a')
+    expect(stepC?.workUnitId).toBe('wu-leak-01')
+    expect(stepA?.workUnitId).toBeNull()
   })
 
   it('preserves deviceCategory on parallel swimlane steps (D4 contract)', () => {

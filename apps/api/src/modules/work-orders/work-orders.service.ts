@@ -104,6 +104,11 @@ export type WorkflowSnapshotProjection = {
         deviceCategory: string | null
         partReference: string | null
         standardTimeSec: number | null
+        // PROMPT_15 — Step.workUnitId carried through snapshot to HMI step card.
+        // workUnit is hydrated post-parse from EquipmentNode (code+name) so the
+        // HMI can render "Postazione: WU-LEAK" without a second round-trip.
+        workUnitId: string | null
+        workUnit: { id: string; code: string; name: string } | null
       }>
     }>
   }>
@@ -208,6 +213,33 @@ export class WorkOrdersService {
     const snapshotProjection = wo.workflowSnapshot
       ? parseSnapshotData(wo.workflowSnapshot.snapshotData)
       : null
+
+    // PROMPT_15 — Hydrate workUnit (code+name) for each step that carries a
+    // workUnitId. Single batched query keeps cost flat regardless of step count.
+    if (snapshotProjection) {
+      const workUnitIds = new Set<string>()
+      for (const ph of snapshotProjection.phases) {
+        for (const gr of ph.groups) {
+          for (const st of gr.steps) {
+            if (st.workUnitId) workUnitIds.add(st.workUnitId)
+          }
+        }
+      }
+      if (workUnitIds.size > 0) {
+        const workUnits = await this.prisma.equipmentNode.findMany({
+          where: { id: { in: Array.from(workUnitIds) } },
+          select: { id: true, code: true, name: true },
+        })
+        const byId = new Map(workUnits.map((w) => [w.id, w]))
+        for (const ph of snapshotProjection.phases) {
+          for (const gr of ph.groups) {
+            for (const st of gr.steps) {
+              st.workUnit = st.workUnitId ? byId.get(st.workUnitId) ?? null : null
+            }
+          }
+        }
+      }
+    }
 
     return {
       id: wo.id,
@@ -325,6 +357,8 @@ function parseSnapshotData(raw: string): WorkflowSnapshotProjection | null {
                 deviceCategory: st['deviceCategory'] != null ? String(st['deviceCategory']) : null,
                 partReference: st['partReference'] != null ? String(st['partReference']) : null,
                 standardTimeSec: st['standardTimeSec'] != null ? Number(st['standardTimeSec']) : null,
+                workUnitId: st['workUnitId'] != null ? String(st['workUnitId']) : null,
+                workUnit: null, // hydrated by findDetail after parse
               }
             }),
           }

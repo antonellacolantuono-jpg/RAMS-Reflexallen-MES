@@ -54,6 +54,7 @@ export const WorkflowStepInputSchema = z.object({
   deviceId: z.string().cuid().optional(),
   recipeId: z.string().cuid().optional(),
   toolId: z.string().cuid().optional(),
+  workUnitId: z.string().cuid().nullish(),
   standardTimeSec: z.number().int().positive().optional(),
   isRequired: z.boolean().default(true),
   partReference: z.string().optional(),

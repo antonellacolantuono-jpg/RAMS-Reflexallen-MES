@@ -6,7 +6,13 @@ import type { AuditEntry } from '@mes/ui'
 import { sdk } from '../../../../lib/sdk'
 import Link from 'next/link'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { ItemBomPanel } from '../../../../components/items/detail-360/ItemBomPanel'
+import { ItemToolsPanel } from '../../../../components/items/detail-360/ItemToolsPanel'
+import { ItemSkillsPanel } from '../../../../components/items/detail-360/ItemSkillsPanel'
+import { ItemWorkflowsPanel } from '../../../../components/items/detail-360/ItemWorkflowsPanel'
+import { ItemWorkLocationsPanel } from '../../../../components/items/detail-360/ItemWorkLocationsPanel'
+import { ItemProductionStatsCard } from '../../../../components/items/detail-360/ItemProductionStatsCard'
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
   finished_good: 'Prodotto Finito',
@@ -16,15 +22,43 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
   consumable: 'Consumabile',
 }
 
+const VALID_TABS = ['details', 'risorse', 'workflows', 'postazioni', 'activity'] as const
+type TabKey = (typeof VALID_TABS)[number]
+
 export default function ItemDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const qc = useQueryClient()
   const { id } = params
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  // PROMPT_15 — URL-synced tab state. Defaults to 'details' when no ?tab=
+  // is present or value is invalid.
+  const tabParam = searchParams.get('tab') ?? ''
+  const activeTab: TabKey = (VALID_TABS as readonly string[]).includes(tabParam)
+    ? (tabParam as TabKey)
+    : 'details'
+  const onTabChange = (key: string) => {
+    const next = new URLSearchParams(searchParams.toString())
+    if (key === 'details') next.delete('tab')
+    else next.set('tab', key)
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
+
   const { data: item, isLoading } = useQuery({
     queryKey: ['items', id],
     queryFn: () => sdk.items.get(id),
+  })
+
+  // Item 360 aggregate — only fires when a non-Overview tab is requested
+  // OR after the basic item record loads (it's lightweight enough to fetch
+  // unconditionally so the user can switch tabs without a perceived delay).
+  const { data: itemDetail, isLoading: is360Loading } = useQuery({
+    queryKey: ['items', id, '360'],
+    queryFn: () => sdk.items.get360(id),
+    enabled: !!item,
   })
 
   const [auditPage, setAuditPage] = useState(1)
@@ -89,6 +123,38 @@ export default function ItemDetailPage({ params }: { params: { id: string } }) {
       ) : null,
     },
     {
+      key: 'risorse',
+      label: 'Risorse',
+      content: itemDetail ? (
+        <div className="flex flex-col gap-4">
+          <ItemBomPanel bom={itemDetail.bom} />
+          <ItemToolsPanel tools={itemDetail.toolsUsed} />
+          <ItemSkillsPanel skills={itemDetail.skillsRequired} />
+          <ItemProductionStatsCard stats={itemDetail.productionStats} />
+        </div>
+      ) : (
+        <Loading360 isLoading={is360Loading} />
+      ),
+    },
+    {
+      key: 'workflows',
+      label: 'Workflow',
+      content: itemDetail ? (
+        <ItemWorkflowsPanel workflows={itemDetail.workflows} />
+      ) : (
+        <Loading360 isLoading={is360Loading} />
+      ),
+    },
+    {
+      key: 'postazioni',
+      label: 'Postazioni',
+      content: itemDetail ? (
+        <ItemWorkLocationsPanel workCenters={itemDetail.workCenters} />
+      ) : (
+        <Loading360 isLoading={is360Loading} />
+      ),
+    },
+    {
       key: 'activity',
       label: 'Attività',
       content: (
@@ -134,6 +200,8 @@ export default function ItemDetailPage({ params }: { params: { id: string } }) {
           ) : undefined
         }
         tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={onTabChange}
         onNavigate={(href) => router.push(href)}
       />
 
@@ -147,6 +215,15 @@ export default function ItemDetailPage({ params }: { params: { id: string } }) {
         variant="danger"
         isLoading={deleteMutation.isPending}
       />
+    </div>
+  )
+}
+
+function Loading360({ isLoading }: { isLoading: boolean }) {
+  if (!isLoading) return <div className="p-6 text-sm text-neutral-500">Dati non disponibili.</div>
+  return (
+    <div className="p-6 text-sm text-neutral-500" data-testid="item-360-loading">
+      Caricamento risorse...
     </div>
   )
 }

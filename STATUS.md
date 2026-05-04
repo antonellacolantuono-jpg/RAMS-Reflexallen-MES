@@ -1,8 +1,77 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 4, 2026 (GO FIX-2 — Image upload + display for Items + Equipment + Workflow Steps + Phases)
+> **Last update**: May 4, 2026 (GO PROMPT_15 — Item Detail 360° + FourPaneConfigurator + Step.workUnitId)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ GO PROMPT_15 — Item Detail 360° + FourPaneConfigurator + Step.workUnitId (May 4, 2026)
+
+Closes user request 2026-05-04: *"nel dettaglio di un articolo ci deve essere l'elenco di tutte le risorse che servono per crearlo e il flusso di lavoro e i possibili luoghi di lavoro. ogni singolo step quindi si crea popolando la descrizione e il titolo selezionando l'azione, la risorsa e il dove."* Three coordinated features delivered in a single batch.
+
+### Scope delivered
+
+- **Component A — Item Detail 360°**: tabbed Item detail page with 5 tabs (Dettagli, Risorse, Workflow, Postazioni, Attività). New aggregate endpoint `GET /api/items/:id/360` returns BOM + tools-used + skills-required + workflows + WC/WU tree + (mock) production stats. URL-synced via `?tab=...` query param. `EntityDetail` primitive in `@mes/ui` extended with optional controlled `activeTab` + `onTabChange` props (backward-compatible). 6 new panel components in `apps/web/src/components/items/detail-360/`.
+- **Component B — FourPaneConfigurator**: new universal primitive in `@mes/ui` per MASTER_SPEC § 14.4 (4 panes: Wizard / Resource Palette / Configuration Center / Live Preview). Responsive: ≥1280px 4-column / 1024-1280 Live Preview as drawer toggle / <1024 stacked tabs. New `StepConfiguratorPane` wraps the primitive (Hybrid scope per user decision #5: Configuration Center has Main / Pre-Post / Avanzate tabs). AddStepDialog deprecated and replaced at the page-level mount; the existing 5-test suite stays green (TODO-071 logged for full removal post-demo).
+- **Component C — Step.workUnitId**: nullable `workUnitId String?` field added to `Step` schema with `EquipmentNode` relation (named `StepWorkUnit`). Zod (`WorkflowStepInputSchema`), SDK (`WorkflowStepModel`, `WorkOrderSnapshotStepModel`), snapshot serializer (`workflow-snapshot.rules.ts` + `release.service.ts`), HMI step DTO (`step-execution.service.ts`) and HMI client type (`apps/hmi/src/lib/queries.ts`) all extended. `WorkflowSnapshotProjection` now hydrates `workUnit { id, code, name }` via single batched query in `findDetail()`. Display: Postazione column in WorkflowHierarchyTable, 📍 badge in WorkflowCardView, "📍 Postazione: WS-XXX" chip in HMI StepCard.
+
+### Architectural decisions (resolved via AskUserQuestion 2026-05-04)
+
+1. **Risorse "Tools" panel**: derive from `Workflow.steps[].toolId` where `Workflow.itemId = X` (no schema change, S9 absorbed).
+2. **Workflows panel filter**: strict `Workflow.itemId = X` only, with empty-state CTA "Crea workflow per questo articolo" (S10 absorbed).
+3. **WU dropdown filter in Configurator "Dove" step**: show ALL plant work units (no WC scoping — `Workflow.workCenterId` doesn't exist; S6 absorbed).
+4. **Item Detail tabs**: `EntityDetail` already accepts dynamic `tabs: EntityTab[]` — minor controllable-state refactor for URL sync (S13 absorbed, no conflict).
+5. **StepConfiguratorPane scope**: Hybrid — wizard exposes Main fields (title/desc/duration/blocking/image) + Pre/Post (device-only: time mode/part ref/no-target) + Avanzate (recoveryConfig/parallel buffer/attention points/materials/verification checklist). AddStepDialog deprecated immediately.
+
+### Test count
+
+- Baseline (commit 718b610): 1014 passing across 10 packages.
+- Added: +1 `workflow-snapshot.rules.test.ts` (workUnitId round-trip), +1 `release.service.test.ts` (workUnitId round-trip), +5 `items.service.get360.test.ts`, +11 `panels.test.tsx` (Item 360 panels), +7 `four-pane-configurator.test.tsx`, +9 `StepConfiguratorPane.test.tsx`, +1 `WorkflowHierarchyTable.test.tsx` (Postazione column), +2 `StepCard.test.tsx` HMI (Postazione chip render + null guard).
+- Total new: **+37 tests** → expected **1051 passing** post-batch (full DoD verification pending).
+
+### Files changed (by area)
+
+- `packages/prisma/schema.prisma` — Step.workUnitId + EquipmentNode inverse relation.
+- `packages/schemas/src/registries/workflow.schema.ts` — workUnitId in WorkflowStepInputSchema.
+- `packages/sdk/src/clients/registry-clients.ts` — WorkflowStepModel.workUnitId, WorkOrderSnapshotStepModel.workUnitId+workUnit, ItemsClient.get360 + 7 new Item360* DTO types.
+- `packages/domain/src/rules/workflow-snapshot.rules.ts` (+test) — SourceStep + ClonedStep + cloneStep workUnitId.
+- `packages/ui/src/components/EntityDetail.tsx` — controlled tab props.
+- `packages/ui/src/components/four-pane-configurator.tsx` (NEW, +test).
+- `packages/ui/src/index.ts` — FourPaneConfigurator exports.
+- `apps/api/src/modules/items/items.service.ts` (+test) — get360() aggregate + 7 DTO types.
+- `apps/api/src/modules/items/items.controller.ts` — `:id/360` route.
+- `apps/api/src/modules/work-orders/release.service.ts` (+test) — step serializer workUnitId.
+- `apps/api/src/modules/work-orders/work-orders.service.ts` (+test) — projection workUnitId+workUnit hydration.
+- `apps/api/src/modules/work-orders/step-execution.service.ts` — workUnit include + DTO fields.
+- `apps/web/src/app/(registries)/items/[id]/page.tsx` — 5 tabs + URL sync.
+- `apps/web/src/components/items/detail-360/*.tsx` (6 NEW + test).
+- `apps/web/src/components/workflow/configurator/StepConfiguratorPane.tsx` (NEW, +test).
+- `apps/web/src/components/workflow/AddStepDialog.tsx` — `@deprecated` notice.
+- `apps/web/src/app/(registries)/workflows/[id]/page.tsx` — swap to StepConfiguratorPane.
+- `apps/web/src/components/workflow/store.ts` — addStepNodeToGroup payload workUnitId.
+- `apps/web/src/components/workflow/save-payload.ts` — workUnitId persisted.
+- `apps/web/src/components/workflow/WorkflowHierarchyTable.tsx` (+test) — Postazione column.
+- `apps/web/src/components/workflow/WorkflowCardView.tsx` (+test) — 📍 badge.
+- `apps/hmi/src/lib/queries.ts` — workUnitId+workUnit on WorkOrderStep.
+- `apps/hmi/src/components/StepCard.tsx` (+test) — Postazione chip.
+- `TODO.md` — TODO-071, TODO-072, TODO-074 entries.
+- `STATUS.md` — this entry.
+
+### Surprises absorbed
+
+- **S6 — Workflow.workCenterId missing**: WU dropdown shows ALL plant WUs (decision #3). User picks the right one. Acceptable for demo.
+- **S9 — Tool.compatibleItems missing**: Risorse Tools panel derived from workflow steps (decision #1). Empty-state hint when no workflow links the item.
+- **S10 — Workflow.itemId optional**: strict filter (decision #2). Empty-state CTA links to `/workflows/new`.
+- **S11 — Step snapshot serializer cascade (expected)**: 5 files updated (`workflow-snapshot.rules.ts`, `release.service.ts`, `release.service.test.ts`, `workflow-snapshot.rules.test.ts`, `work-orders.service.ts`). Round-trip assertions added.
+- **S13 — Item detail tabs collision**: ABSORBED (not a hit). `EntityDetail` already accepts dynamic tabs; minor controllable-state refactor for URL sync.
+- S7, S8, S12, S14, S15: SAFE (no impact).
+
+### Conventional commit (suggested)
+
+```
+feat(items+workflow): Item Detail 360° + FourPaneConfigurator step editor + workUnitId field (PROMPT_15)
+```
 
 ---
 

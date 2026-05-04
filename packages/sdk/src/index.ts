@@ -24,6 +24,13 @@ export {
 
 export type {
   ItemModel,
+  Item360Response,
+  Item360BomLine,
+  Item360ToolUsed,
+  Item360SkillRequired,
+  Item360WorkflowSummary,
+  Item360WorkLocation,
+  Item360ProductionStats,
   BomModel,
   BomLineModel,
   EquipmentNodeModel,

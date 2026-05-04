@@ -29,6 +29,7 @@ interface MockStep {
   deviceId: string | null
   recipeId: string | null
   toolId: string | null
+  workUnitId: string | null
   standardTimeSec: number | null
   isRequired: boolean
   partReference: string | null
@@ -91,6 +92,7 @@ const buildStep = (
   deviceId: null,
   recipeId: null,
   toolId: null,
+  workUnitId: null,
   standardTimeSec: 30,
   isRequired: true,
   partReference: null,
@@ -353,6 +355,29 @@ describe('ReleaseService.release — happy path', () => {
       operatorId: 'op-2',
     })
     expect(assignedCall.code).toMatch(/^WO-\d{8}-001$/)
+  })
+
+  it('persists workUnitId on each cloned step (PROMPT_15 S11 round-trip)', async () => {
+    const wf = buildWorkflow()
+    // pin a workUnitId on step-2 to assert the round-trip
+    const group = wf.workflowVersions[0]?.phases[0]?.groups[0]
+    if (group && group.steps[1]) group.steps[1].workUnitId = 'wu-leak-01'
+    const mocks = makeService({
+      manager: { id: 'op-mgr', badge: 'OP-001', skills: ['MANAGER'] },
+      workflow: wf,
+      item: { id: 'item-1' },
+      assignedOperator: { id: 'op-2', badge: 'OP-002', skills: [] },
+    })
+    await mocks.service.release(baseRequest())
+    const snapData = mocks.snapshotCreate.mock.calls[0]?.[0]?.data
+      ?.snapshotData as string
+    const parsed = JSON.parse(snapData) as {
+      phases: Array<{ groups: Array<{ steps: Array<{ id: string; workUnitId: string | null }> }> }>
+    }
+    const steps = parsed.phases[0]?.groups[0]?.steps ?? []
+    expect(steps.find((s) => s.id === 'step-1')?.workUnitId).toBeNull()
+    expect(steps.find((s) => s.id === 'step-2')?.workUnitId).toBe('wu-leak-01')
+    expect(steps.find((s) => s.id === 'step-3')?.workUnitId).toBeNull()
   })
 
   it('persists snapshot JSON containing all source step IDs', async () => {

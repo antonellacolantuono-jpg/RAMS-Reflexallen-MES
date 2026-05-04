@@ -6,10 +6,12 @@
 // Click on a step card drives `useWorkflowStore.selectNode(id, 'stepNode')`
 // so Inspector + Live Preview stay in sync regardless of view mode.
 
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { Pencil, Plus, Trash2, type LucideIcon } from 'lucide-react'
-import type { WorkflowModel, WorkflowStepModel } from '@mes/sdk'
+import { useQuery } from '@tanstack/react-query'
+import type { WorkflowModel, WorkflowStepModel, EquipmentNodeModel } from '@mes/sdk'
 import { Badge, ImageDisplay } from '@mes/ui'
+import { sdk } from '../../lib/sdk'
 import { useWorkflowStore } from './store'
 import { phaseColor } from '../../lib/phase-color'
 import { parseStepData } from './save-payload'
@@ -61,9 +63,10 @@ interface StepCardProps {
   selected: boolean
   onSelect: () => void
   actionsNode?: ReactNode
+  workUnitLabel?: string | null
 }
 
-function StepCard({ step, groupName, selected, onSelect, actionsNode }: StepCardProps) {
+function StepCard({ step, groupName, selected, onSelect, actionsNode, workUnitLabel }: StepCardProps) {
   const stepData = parseStepData(step.data ?? null)
   return (
     <div
@@ -108,6 +111,14 @@ function StepCard({ step, groupName, selected, onSelect, actionsNode }: StepCard
           </div>
           <div className="mt-2 flex items-center gap-2 text-[11px] text-ink-3 tabular">
             <span>Durata: {formatDuration(step.standardTimeSec)}</span>
+            {workUnitLabel && (
+              <span
+                className="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-medium text-primary-700"
+                data-testid={`card-postazione-${step.id}`}
+              >
+                📍 {workUnitLabel}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -126,6 +137,22 @@ export function WorkflowCardView({ workflow }: WorkflowCardViewProps) {
   const openAddGroupModal = useWorkflowStore((s) => s.openAddGroupModal)
   const openAddStepDialog = useWorkflowStore((s) => s.openAddStepDialog)
   const openDeleteConfirm = useWorkflowStore((s) => s.openDeleteConfirm)
+  // PROMPT_15 C.5 — Hydrate workUnit code+name for the Postazione badge.
+  const { data: equipmentTree } = useQuery({
+    queryKey: ['equipment', 'tree'],
+    queryFn: () => sdk.equipment.tree(),
+  })
+  const workUnitById = useMemo(() => {
+    const out = new Map<string, { code: string; name: string }>()
+    function walk(nodes: EquipmentNodeModel[]) {
+      for (const n of nodes) {
+        if (n.level === 'work_unit') out.set(n.id, { code: n.code, name: n.name })
+        if (n.children) walk(n.children)
+      }
+    }
+    if (equipmentTree) walk(equipmentTree)
+    return out
+  }, [equipmentTree])
 
   if (phases.length === 0) {
     return (
@@ -241,6 +268,9 @@ export function WorkflowCardView({ workflow }: WorkflowCardViewProps) {
                         groupName={group.name}
                         selected={selectedNodeId === step.id}
                         onSelect={() => selectNode(step.id, 'stepNode')}
+                        workUnitLabel={
+                          step.workUnitId ? workUnitById.get(step.workUnitId)?.code ?? null : null
+                        }
                         actionsNode={
                           <>
                             <CardActionButton

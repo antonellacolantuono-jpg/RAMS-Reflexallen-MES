@@ -62,6 +62,10 @@ vi.mock('../../../../components/workflow/versioning/VersionHistorySidebar', () =
 vi.mock('../../../../components/workflow/AddStepDialog', () => ({
   AddStepDialog: () => null,
 }))
+// PROMPT_15 — page now mounts StepConfiguratorPane in place of AddStepDialog.
+vi.mock('../../../../components/workflow/configurator/StepConfiguratorPane', () => ({
+  StepConfiguratorPane: () => null,
+}))
 vi.mock('../../../../components/workflow/AddPhaseDrawer', () => ({
   AddPhaseDrawer: () => null,
 }))

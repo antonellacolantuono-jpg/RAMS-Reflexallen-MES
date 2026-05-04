@@ -204,6 +204,14 @@ export function StepCard({
               <Badge tone={STATUS_TONE[status]} dot>
                 {STATUS_LABEL[status]}
               </Badge>
+              {step.workUnit && (
+                <span
+                  className="rounded bg-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-accent-ink"
+                  data-testid="step-card-postazione"
+                >
+                  📍 Postazione: {step.workUnit.code}
+                </span>
+              )}
             </div>
             <h3
               className={[

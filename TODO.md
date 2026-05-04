@@ -863,6 +863,53 @@ WARNING  no output files found for task @mes/storage#build. Please check your `o
 
 ---
 
+### TODO-071 — Remove deprecated AddStepDialog post-demo
+
+**Discovered**: 2026-05-04 (PROMPT_15 B.3)
+**Status**: Open. AddStepDialog has been superseded by `StepConfiguratorPane` (FourPaneConfigurator-based). The dialog component remains in the tree, marked `@deprecated`, with the page-level mount swapped to `<StepConfiguratorPane />`. Existing test suite (5 tests) stays green.
+**File**: `apps/web/src/components/workflow/AddStepDialog.tsx` (469 LOC) + `apps/web/src/components/workflow/AddStepDialog.test.tsx` (272 LOC)
+**Acceptance criterion**:
+- Remove `AddStepDialog.tsx` + its test file after the Reflex Allen demo (post 2026-05-22).
+- Verify no remaining call sites import from `./AddStepDialog`.
+- Confirm `<StepConfiguratorPane />` is mounted at `apps/web/src/app/(registries)/workflows/[id]/page.tsx:311` (or wherever it lands).
+- All workflow editor tests pass.
+**Estimated effort**: 15 minutes (delete + grep verify + test run).
+**Blocker for**: nothing — it's a cleanup. Keeping the dialog is safer for the demo window in case StepConfiguratorPane regresses.
+
+---
+
+### TODO-072 — Wire Item Detail 360° production stats to real KPI engine
+
+**Discovered**: 2026-05-04 (PROMPT_15 A.1)
+**Status**: Open. `ItemsService.get360()` returns `productionStats: { woCompleted: 0, scrapRate: 0, avgCycleTimeSec: 0, isMock: true }` because no KPI engine exists yet. The Item Detail "Risorse" tab renders a "dati simulati" banner via `ItemProductionStatsCard`.
+**File**: `apps/api/src/modules/items/items.service.ts` (`get360` — search for `// TODO-072 — Mock production stats`)
+**Acceptance criterion**:
+- Replace the mock object with a real query that aggregates over `WorkOrder` (status='closed', itemId=:id) for `woCompleted`, `qtyScrap / qtyTarget` for `scrapRate`, and average `actualEnd-actualStart` over recent N WOs for `avgCycleTimeSec`.
+- Drop `isMock: true` from the response shape.
+- Update SDK type `Item360ProductionStats.isMock` to optional / removed.
+- Remove the "dati simulati" banner from `ItemProductionStatsCard.tsx`.
+- Cap the recent-WO window (suggest 90 days or last 50 WOs) so the query doesn't scan unbounded history.
+**Estimated effort**: 1.5 hours (query + caching + removing banner + 2 tests).
+**Blocker for**: nothing for the demo. Only Item Detail page UX accuracy.
+
+---
+
+### TODO-074 — Adopt FourPaneConfigurator for Workflow / BOM / Recipe configurators
+
+**Discovered**: 2026-05-04 (PROMPT_15 B.1)
+**Status**: Open. `FourPaneConfigurator` is a universal `@mes/ui` primitive (Strategy 2) currently consumed only by `StepConfiguratorPane`. The same wizard / palette / configuration / preview pattern fits Workflow editor (high-level), BOM editor, and Recipe editor — all three currently use ad-hoc layouts.
+**File**: `packages/ui/src/components/four-pane-configurator.tsx` (universal primitive — already shipped) + new wrappers in `apps/web/src/components/workflow/`, `apps/web/src/components/bom/`, `apps/web/src/components/recipes/`
+**Acceptance criterion** (per-configurator):
+- WorkflowConfiguratorPane: wizard steps "Articolo → Categoria fasi → Risorse globali → Riepilogo"; palette = Phase categories; preview = mini Flusso preview.
+- BomConfiguratorPane: wizard "Articolo padre → Componenti → Quantità → Riepilogo"; palette = Item registry filtered by type; preview = compact tree.
+- RecipeConfiguratorPane: wizard "Dispositivo → Parametri → Threshold → Riepilogo"; palette = Recipe templates; preview = parameter card.
+- Each consumer reuses existing form components (no duplicate validation logic).
+- Each gains 5+ unit tests.
+**Estimated effort**: 6-8 hours total (~2h per configurator + shared adapter primitives).
+**Blocker for**: nothing pre-demo. Post-demo polish to make the UX consistent across registries.
+
+---
+
 ### TODO-026 — Recovery flow: per-stage StepExecution model (deferred from D5)
 
 **Discovered**: 2026-05-01 (during PROMPT_5_FULL D5 implementation)

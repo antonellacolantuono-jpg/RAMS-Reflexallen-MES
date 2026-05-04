@@ -133,6 +133,8 @@ interface WorkflowCanvasStore {
       deviceId?: string | null
       recipeId?: string | null
       toolId?: string | null
+      // PROMPT_15 — Step.workUnitId (Postazione) selected via FourPaneConfigurator "Dove" wizard step.
+      workUnitId?: string | null
       materialIds?: string[]
       attentionPointIds?: string[]
       actionConfig?: Record<string, unknown>
@@ -384,6 +386,7 @@ export const useWorkflowStore = create<WorkflowCanvasStore>((set, get) => ({
         ...(payload.deviceId ? { deviceId: payload.deviceId } : {}),
         ...(payload.recipeId ? { recipeId: payload.recipeId } : {}),
         ...(payload.toolId ? { toolId: payload.toolId } : {}),
+        ...(payload.workUnitId ? { workUnitId: payload.workUnitId } : {}),
         // Session-only multi-select arrays + action config (TODO-040).
         ...(payload.materialIds && payload.materialIds.length > 0
           ? { materialIds: payload.materialIds }

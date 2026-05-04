@@ -22,6 +22,9 @@ export interface EntityDetailProps {
   actions?: React.ReactNode | undefined
   tabs: EntityTab[]
   defaultTab?: string | undefined
+  /** PROMPT_15 — controlled mode for URL-synced tab selection. Pair with onTabChange. */
+  activeTab?: string | undefined
+  onTabChange?: ((key: string) => void) | undefined
   isLoading?: boolean | undefined
   className?: string | undefined
   onNavigate?: ((href: string) => void) | undefined
@@ -35,11 +38,19 @@ export function EntityDetail({
   actions,
   tabs,
   defaultTab,
+  activeTab: controlledTab,
+  onTabChange,
   isLoading,
   className,
   onNavigate,
 }: EntityDetailProps) {
-  const [activeTab, setActiveTab] = React.useState(defaultTab ?? tabs[0]?.key ?? '')
+  const [internalTab, setInternalTab] = React.useState(defaultTab ?? tabs[0]?.key ?? '')
+  const isControlled = controlledTab !== undefined
+  const activeTab = isControlled ? controlledTab : internalTab
+  const setActiveTab = (key: string) => {
+    if (!isControlled) setInternalTab(key)
+    onTabChange?.(key)
+  }
 
   const currentTab = tabs.find((t) => t.key === activeTab) ?? tabs[0]
 

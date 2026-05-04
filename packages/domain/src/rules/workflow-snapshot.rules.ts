@@ -40,6 +40,7 @@ export interface SourceStep {
   deviceId: string | null
   recipeId: string | null
   toolId: string | null
+  workUnitId: string | null
   standardTimeSec: number | null
   isRequired: boolean
   partReference: string | null
@@ -96,6 +97,7 @@ export interface ClonedStep {
   deviceId: string | null
   recipeId: string | null
   toolId: string | null
+  workUnitId: string | null
   standardTimeSec: number | null
   isRequired: boolean
   partReference: string | null
@@ -220,6 +222,7 @@ function cloneStep(step: SourceStep): ClonedStep {
     deviceId: step.deviceId,
     recipeId: step.recipeId,
     toolId: step.toolId,
+    workUnitId: step.workUnitId,
     standardTimeSec: step.standardTimeSec,
     isRequired: step.isRequired,
     partReference: step.partReference,

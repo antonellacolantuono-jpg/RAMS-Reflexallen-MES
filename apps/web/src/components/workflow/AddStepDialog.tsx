@@ -1,5 +1,10 @@
 'use client'
 
+// @deprecated PROMPT_15 — Replaced by StepConfiguratorPane (FourPaneConfigurator).
+// Kept in tree for backward-compat tests until TODO-071 (full removal post-demo).
+// The page-level mount is now <StepConfiguratorPane />; this component is
+// no longer wired into any UI flow.
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Modal,

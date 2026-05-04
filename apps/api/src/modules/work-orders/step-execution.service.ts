@@ -109,6 +109,13 @@ export interface WorkOrderStepDto extends StepStateDto {
   toolId: string | null
   toolWearStatus: string | null
   toolIsExceeded: boolean
+  /**
+   * PROMPT_15 — Work Unit (Postazione) where the operator performs this step.
+   * Hydrated from the Step.workUnitId FK so HMI can render "Postazione: WU-XXX"
+   * on the step card without a follow-up query. Null when no work unit is set.
+   */
+  workUnitId: string | null
+  workUnit: { id: string; code: string; name: string } | null
 }
 
 /**
@@ -206,13 +213,19 @@ export class StepExecutionService {
     }
     const rows = await this.prisma.stepExecution.findMany({
       where: { workOrderId },
-      include: { step: { include: { group: true, device: true, tool: true } } },
+      include: {
+        step: {
+          include: { group: true, device: true, tool: true, workUnit: true },
+        },
+      },
       orderBy: { step: { order: 'asc' } },
     })
     return rows.map((r) => {
       const recovery = this.parseRecoveryData(r.data ?? null)
       // PROMPT_9 — surface tool wear info on the DTO for HMI badges.
       const tool = (r.step as { tool?: { id: string; currentCyclesCount: number; maxCycles: number | null; wearStatus: string } | null }).tool ?? null
+      // PROMPT_15 — surface workUnit (Postazione) for HMI step header.
+      const workUnit = (r.step as { workUnit?: { id: string; code: string; name: string } | null }).workUnit ?? null
       return {
         stepExecutionId: r.id,
         workOrderId: r.workOrderId,
@@ -241,6 +254,8 @@ export class StepExecutionService {
         toolId: tool?.id ?? null,
         toolWearStatus: tool?.wearStatus ?? null,
         toolIsExceeded: tool ? isToolExceeded({ currentCyclesCount: tool.currentCyclesCount, maxCycles: tool.maxCycles }) : false,
+        workUnitId: r.step.workUnitId ?? null,
+        workUnit: workUnit ? { id: workUnit.id, code: workUnit.code, name: workUnit.name } : null,
       }
     })
   }

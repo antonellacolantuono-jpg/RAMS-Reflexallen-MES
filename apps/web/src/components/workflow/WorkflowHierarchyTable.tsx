@@ -9,8 +9,10 @@
 
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
-import type { WorkflowModel } from '@mes/sdk'
+import { useQuery } from '@tanstack/react-query'
+import type { WorkflowModel, EquipmentNodeModel } from '@mes/sdk'
 import { Badge, ImageDisplay, type ImageDisplayCategory } from '@mes/ui'
+import { sdk } from '../../lib/sdk'
 import { useWorkflowStore } from './store'
 import { phaseColor } from '../../lib/phase-color'
 import { parseStepData } from './save-payload'
@@ -34,6 +36,7 @@ interface RowProps {
   actionsNode?: ReactNode
   imageUrl?: string | null
   imageCategory?: ImageDisplayCategory
+  workUnitLabel?: string | null
 }
 
 function formatDuration(seconds: number | null | undefined): string {
@@ -64,6 +67,7 @@ function HierarchyRow({
   actionsNode,
   imageUrl,
   imageCategory,
+  workUnitLabel,
 }: RowProps) {
   const indentPx = 8 + level * 16
   const Chevron = hasChildren ? (expanded ? ChevronDown : ChevronRight) : null
@@ -114,6 +118,15 @@ function HierarchyRow({
       </td>
       <td className="py-1.5 px-3 align-middle text-xs text-ink-3 font-mono whitespace-nowrap">
         {type}
+      </td>
+      <td className="py-1.5 px-3 align-middle text-xs text-ink-2 whitespace-nowrap" data-testid={`row-postazione-${id}`}>
+        {workUnitLabel ? (
+          <span className="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-medium text-primary-700">
+            📍 {workUnitLabel}
+          </span>
+        ) : (
+          <span className="text-ink-4">—</span>
+        )}
       </td>
       <td className="py-1.5 px-3 align-middle text-xs text-ink-2 tabular whitespace-nowrap">
         {formatDuration(durationSec)}
@@ -175,6 +188,23 @@ export function WorkflowHierarchyTable({ workflow, readOnly = false }: WorkflowH
     () => workflow.currentVersion?.phases ?? [],
     [workflow.currentVersion],
   )
+  // PROMPT_15 C.5 — Hydrate workUnit code+name for the Postazione column from
+  // the plant equipment tree. Single shared query (cached via TanStack key).
+  const { data: equipmentTree } = useQuery({
+    queryKey: ['equipment', 'tree'],
+    queryFn: () => sdk.equipment.tree(),
+  })
+  const workUnitById = useMemo(() => {
+    const out = new Map<string, { code: string; name: string }>()
+    function walk(nodes: EquipmentNodeModel[]) {
+      for (const n of nodes) {
+        if (n.level === 'work_unit') out.set(n.id, { code: n.code, name: n.name })
+        if (n.children) walk(n.children)
+      }
+    }
+    if (equipmentTree) walk(equipmentTree)
+    return out
+  }, [equipmentTree])
   const selectedNodeId = useWorkflowStore((s) => s.selectedNodeId)
   const selectNode = useWorkflowStore((s) => s.selectNode)
   const openAddGroupModal = useWorkflowStore((s) => s.openAddGroupModal)
@@ -243,6 +273,7 @@ export function WorkflowHierarchyTable({ workflow, readOnly = false }: WorkflowH
           <tr className="text-left text-[11px] uppercase tracking-wide text-ink-3">
             <th className="py-2 pl-3 pr-3 font-medium">Nome</th>
             <th className="py-2 px-3 font-medium">Tipo</th>
+            <th className="py-2 px-3 font-medium">Postazione</th>
             <th className="py-2 px-3 font-medium">Durata</th>
             <th className="py-2 px-3 font-medium">Stato</th>
             <th className="py-2 px-3 font-medium text-right" style={{ width: 110 }}>
@@ -345,6 +376,7 @@ export function WorkflowHierarchyTable({ workflow, readOnly = false }: WorkflowH
                         {groupExpanded &&
                           group.steps.map((step) => {
                             const stepData = parseStepData(step.data ?? null)
+                            const wu = step.workUnitId ? workUnitById.get(step.workUnitId) : null
                             return (
                             <HierarchyRow
                               key={`step-${step.id}`}
@@ -361,6 +393,7 @@ export function WorkflowHierarchyTable({ workflow, readOnly = false }: WorkflowH
                               durationSec={step.standardTimeSec ?? 0}
                               imageUrl={stepData?.photoUrl ?? null}
                               imageCategory="step"
+                              workUnitLabel={wu ? wu.code : null}
                               actionsNode={
                                 readOnly ? null : (
                                   <>

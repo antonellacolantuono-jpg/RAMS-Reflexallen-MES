@@ -1,8 +1,24 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import type { WorkflowModel } from '@mes/sdk'
+
+// PROMPT_15 C.5 — WorkflowCardView fetches the equipment tree to hydrate the
+// Postazione badge. Tests mock the SDK to a flat empty tree.
+vi.mock('../../lib/sdk', () => ({
+  sdk: {
+    equipment: { tree: vi.fn().mockResolvedValue([]) },
+  },
+}))
+
 import { WorkflowCardView } from './WorkflowCardView'
 import { useWorkflowStore } from './store'
+
+function renderWithQuery(node: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  return render(<QueryClientProvider client={client}>{node}</QueryClientProvider>)
+}
 
 function makeWorkflow(): WorkflowModel {
   const meta = {
@@ -133,7 +149,7 @@ describe('WorkflowCardView', () => {
   })
 
   it('renders one section per phase with all step cards inside', () => {
-    render(<WorkflowCardView workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowCardView workflow={makeWorkflow()} />)
     expect(screen.getByTestId('phase-section-phase-1')).toBeInTheDocument()
     expect(screen.getByTestId('phase-section-phase-2')).toBeInTheDocument()
     expect(screen.getByTestId('card-step-step-1')).toBeInTheDocument()
@@ -141,7 +157,7 @@ describe('WorkflowCardView', () => {
   })
 
   it('clicking a step card calls selectNode(stepId, "stepNode")', () => {
-    render(<WorkflowCardView workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowCardView workflow={makeWorkflow()} />)
     fireEvent.click(screen.getByTestId('card-step-step-2'))
     const state = useWorkflowStore.getState()
     expect(state.selectedNodeId).toBe('step-2')
@@ -149,7 +165,7 @@ describe('WorkflowCardView', () => {
   })
 
   it('phase header carries the correct phase color in inline style', () => {
-    render(<WorkflowCardView workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowCardView workflow={makeWorkflow()} />)
     const header = screen.getByTestId('phase-header-phase-1')
     expect(header.getAttribute('style')).toMatch(/var\(--c-production\)/)
     const header2 = screen.getByTestId('phase-header-phase-2')
@@ -157,7 +173,7 @@ describe('WorkflowCardView', () => {
   })
 
   it('group "+ Step" button opens AddStepDialog with the groupId pre-filled (no row select)', () => {
-    render(<WorkflowCardView workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowCardView workflow={makeWorkflow()} />)
     fireEvent.click(screen.getByTestId('card-add-step-group-1'))
     const state = useWorkflowStore.getState()
     expect(state.addStepDialog.open).toBe(true)
@@ -166,7 +182,7 @@ describe('WorkflowCardView', () => {
   })
 
   it('phase delete button opens the confirm slice for that phase', () => {
-    render(<WorkflowCardView workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowCardView workflow={makeWorkflow()} />)
     fireEvent.click(screen.getByTestId('card-delete-phase-1'))
     expect(useWorkflowStore.getState().deleteConfirm).toEqual({
       open: true,
@@ -176,7 +192,7 @@ describe('WorkflowCardView', () => {
   })
 
   it('step edit button calls selectNode and stops propagation', () => {
-    render(<WorkflowCardView workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowCardView workflow={makeWorkflow()} />)
     fireEvent.click(screen.getByTestId('card-edit-step-1'))
     const state = useWorkflowStore.getState()
     expect(state.selectedNodeId).toBe('step-1')

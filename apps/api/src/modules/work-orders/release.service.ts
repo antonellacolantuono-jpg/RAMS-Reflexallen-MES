@@ -194,6 +194,7 @@ export class ReleaseService {
             deviceId: s.deviceId ?? null,
             recipeId: s.recipeId ?? null,
             toolId: s.toolId ?? null,
+            workUnitId: s.workUnitId ?? null,
             standardTimeSec: s.standardTimeSec ?? null,
             isRequired: s.isRequired,
             partReference: s.partReference ?? null,

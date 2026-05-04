@@ -52,6 +52,7 @@ interface BuiltStep {
   deviceId?: string
   recipeId?: string
   toolId?: string
+  workUnitId?: string
   standardTimeSec?: number
   isRequired: boolean
   data?: Record<string, unknown>
@@ -129,6 +130,7 @@ export function buildSavePayload(nodes: Node[]): BuiltPhase[] {
             const deviceId = step.data['deviceId'] as string | undefined
             const recipeId = step.data['recipeId'] as string | undefined
             const toolId = step.data['toolId'] as string | undefined
+            const workUnitId = step.data['workUnitId'] as string | undefined
             const standardTimeSec =
               typeof step.data['standardTimeSec'] === 'number'
                 ? (step.data['standardTimeSec'] as number)
@@ -180,6 +182,7 @@ export function buildSavePayload(nodes: Node[]): BuiltPhase[] {
               ...(deviceId ? { deviceId } : {}),
               ...(recipeId ? { recipeId } : {}),
               ...(toolId ? { toolId } : {}),
+              ...(workUnitId ? { workUnitId } : {}),
               ...(typeof standardTimeSec === 'number' ? { standardTimeSec } : {}),
               isRequired,
               ...(hasData ? { data: dataPayload } : {}),

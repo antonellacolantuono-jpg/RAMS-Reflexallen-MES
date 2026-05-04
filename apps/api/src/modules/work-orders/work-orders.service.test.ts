@@ -366,6 +366,8 @@ describe('WorkOrdersService.findDetail', () => {
       deviceCategory: 'parallel',
       partReference: 'main',
       standardTimeSec: 90,
+      workUnitId: null,
+      workUnit: null,
     })
   })
 

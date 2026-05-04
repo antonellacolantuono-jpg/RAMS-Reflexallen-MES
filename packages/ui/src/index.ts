@@ -219,4 +219,11 @@ export type {
   ImageDisplayCategory,
 } from './components/image-display'
 
+export { FourPaneConfigurator } from './components/four-pane-configurator'
+export type {
+  FourPaneConfiguratorProps,
+  FourPaneWizardStep,
+  FourPanePaletteAdapter,
+} from './components/four-pane-configurator'
+
 export { cn } from './utils/cn'

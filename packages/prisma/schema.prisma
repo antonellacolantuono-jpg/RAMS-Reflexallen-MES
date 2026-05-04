@@ -331,6 +331,7 @@ model EquipmentNode {
   downtime          DowntimeEvent[]
   continuousRuns    ContinuousProductionRun[]
   molds             Mold[]
+  steps             Step[]              @relation("StepWorkUnit")
 
   @@unique([plantId, code])
   @@index([plantId, level])
@@ -761,6 +762,7 @@ model Step {
   deviceId        String? @map("device_id")
   recipeId        String? @map("recipe_id")
   toolId          String? @map("tool_id")
+  workUnitId      String? @map("work_unit_id")
   standardTimeSec Int?    @map("standard_time_sec")
   isRequired      Boolean @default(true) @map("is_required")
   partReference   String? @map("part_reference") // PartReference enum value
@@ -778,6 +780,7 @@ model Step {
   device         Device?         @relation(fields: [deviceId], references: [id])
   recipe         Recipe?         @relation(fields: [recipeId], references: [id])
   tool           Tool?           @relation(fields: [toolId], references: [id])
+  workUnit       EquipmentNode?  @relation("StepWorkUnit", fields: [workUnitId], references: [id])
   stepExecutions StepExecution[]
 
   @@index([groupId, order])

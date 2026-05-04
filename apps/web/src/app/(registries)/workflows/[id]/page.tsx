@@ -18,7 +18,9 @@ import { WorkflowValidationProvider } from '../../../../components/workflow/vali
 import { ApproveVersionModal } from '../../../../components/workflow/versioning/ApproveVersionModal'
 import { DeprecateVersionModal } from '../../../../components/workflow/versioning/DeprecateVersionModal'
 import { VersionHistorySidebar } from '../../../../components/workflow/versioning/VersionHistorySidebar'
-import { AddStepDialog } from '../../../../components/workflow/AddStepDialog'
+// PROMPT_15 B.3 — AddStepDialog replaced by StepConfiguratorPane (FourPaneConfigurator).
+// AddStepDialog kept in tree as deprecated until TODO-071 removes it.
+import { StepConfiguratorPane } from '../../../../components/workflow/configurator/StepConfiguratorPane'
 import { AddPhaseDrawer } from '../../../../components/workflow/AddPhaseDrawer'
 import { AddGroupModal } from '../../../../components/workflow/AddGroupModal'
 import { ValidateDrawer } from '../../../../components/workflow/ValidateDrawer'
@@ -308,7 +310,7 @@ export default function WorkflowEditorPage() {
           />
         </>
       )}
-      <AddStepDialog />
+      <StepConfiguratorPane />
       <AddPhaseDrawer
         open={addPhaseDrawer.open}
         onClose={closeAddPhaseDrawer}

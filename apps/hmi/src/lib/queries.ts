@@ -59,6 +59,12 @@ export type WorkOrderStep = {
    * this field; client treats `undefined` as `null`.
    */
   data?: StepData | null
+  /**
+   * PROMPT_15 — Work Unit (Postazione) hydrated server-side. Pre-PROMPT_15
+   * servers omit these fields; client treats `undefined` as `null`.
+   */
+  workUnitId?: string | null
+  workUnit?: { id: string; code: string; name: string } | null
 }
 
 /**

@@ -1,8 +1,25 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import type { WorkflowModel } from '@mes/sdk'
+
+// PROMPT_15 C.5 — WorkflowHierarchyTable now fetches the equipment tree to
+// hydrate the Postazione column. Tests mock the SDK to a flat empty tree so
+// the table renders without external dependencies.
+vi.mock('../../lib/sdk', () => ({
+  sdk: {
+    equipment: { tree: vi.fn().mockResolvedValue([]) },
+  },
+}))
+
 import { WorkflowHierarchyTable } from './WorkflowHierarchyTable'
 import { useWorkflowStore } from './store'
+
+function renderWithQuery(node: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  return render(<QueryClientProvider client={client}>{node}</QueryClientProvider>)
+}
 
 function makeWorkflow(): WorkflowModel {
   const meta = {
@@ -119,7 +136,7 @@ describe('WorkflowHierarchyTable', () => {
   })
 
   it('renders all phases, groups and steps from the workflow', () => {
-    render(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
     // Phase rows
     expect(screen.getByText('Estrusione')).toBeInTheDocument()
     expect(screen.getByText('Spedizione')).toBeInTheDocument()
@@ -133,7 +150,7 @@ describe('WorkflowHierarchyTable', () => {
   })
 
   it('clicking a step row calls selectNode(stepId, "stepNode")', () => {
-    render(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
     fireEvent.click(screen.getByTestId('row-stepNode-step-1'))
     const state = useWorkflowStore.getState()
     expect(state.selectedNodeId).toBe('step-1')
@@ -141,7 +158,7 @@ describe('WorkflowHierarchyTable', () => {
   })
 
   it('toggling a phase chevron collapses its descendant rows', () => {
-    render(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
     expect(screen.getByText('Estrusione PA12')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('chevron-phase-1'))
     expect(screen.queryByText('Estrusione PA12')).toBeNull()
@@ -152,7 +169,7 @@ describe('WorkflowHierarchyTable', () => {
 
   it('selected row gets accent-soft styling when selectedNodeId matches', () => {
     useWorkflowStore.setState({ selectedNodeId: 'step-1', selectedNodeType: 'stepNode' })
-    render(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
     const row = screen.getByTestId('row-stepNode-step-1')
     expect(row).toHaveAttribute('data-selected', 'true')
     expect(row.className).toMatch(/bg-accent-soft/)
@@ -163,14 +180,14 @@ describe('WorkflowHierarchyTable', () => {
       ...makeWorkflow(),
       currentVersion: { ...makeWorkflow().currentVersion!, phases: [] },
     }
-    render(<WorkflowHierarchyTable workflow={empty} />)
+    renderWithQuery(<WorkflowHierarchyTable workflow={empty} />)
     expect(screen.getByTestId('empty-state').textContent).toMatch(
       /Nessuna fase nel workflow/,
     )
   })
 
   it('readOnly mode does not call selectNode on row click', () => {
-    render(<WorkflowHierarchyTable workflow={makeWorkflow()} readOnly />)
+    renderWithQuery(<WorkflowHierarchyTable workflow={makeWorkflow()} readOnly />)
     fireEvent.click(screen.getByTestId('row-stepNode-step-1'))
     const state = useWorkflowStore.getState()
     expect(state.selectedNodeId).toBeNull()
@@ -178,7 +195,7 @@ describe('WorkflowHierarchyTable', () => {
   })
 
   it('phase row "+ Gruppo" button opens AddGroupModal with the phaseId pre-filled and does not select the row', () => {
-    render(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
     fireEvent.click(screen.getByTestId('row-add-group-phase-1'))
     const state = useWorkflowStore.getState()
     expect(state.addGroupModal.open).toBe(true)
@@ -188,7 +205,7 @@ describe('WorkflowHierarchyTable', () => {
   })
 
   it('group row "+ Step" button opens AddStepDialog with the groupId pre-filled', () => {
-    render(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
     fireEvent.click(screen.getByTestId('row-add-step-group-1'))
     const state = useWorkflowStore.getState()
     expect(state.addStepDialog.open).toBe(true)
@@ -197,7 +214,7 @@ describe('WorkflowHierarchyTable', () => {
   })
 
   it('delete button opens the confirm slice with the correct nodeId + kind', () => {
-    render(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
+    renderWithQuery(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
     fireEvent.click(screen.getByTestId('row-delete-phase-1'))
     expect(useWorkflowStore.getState().deleteConfirm).toEqual({
       open: true,
@@ -207,9 +224,15 @@ describe('WorkflowHierarchyTable', () => {
   })
 
   it('readOnly mode hides the action buttons entirely', () => {
-    render(<WorkflowHierarchyTable workflow={makeWorkflow()} readOnly />)
+    renderWithQuery(<WorkflowHierarchyTable workflow={makeWorkflow()} readOnly />)
     expect(screen.queryByTestId('row-add-group-phase-1')).toBeNull()
     expect(screen.queryByTestId('row-edit-step-1')).toBeNull()
     expect(screen.queryByTestId('row-delete-phase-1')).toBeNull()
+  })
+
+  it('PROMPT_15 — Postazione column shows "—" when step has no workUnitId', () => {
+    renderWithQuery(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
+    const cell = screen.getByTestId('row-postazione-step-1')
+    expect(cell.textContent).toBe('—')
   })
 })

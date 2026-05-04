@@ -47,6 +47,11 @@ export class ItemsController extends BaseRegistryController<ItemModel> {
     await this.service.softDelete(id, 'system')
   }
 
+  @Get(':id/360')
+  get360(@Param('id') id: string) {
+    return (this.service as ItemsService).get360(id)
+  }
+
   @Get(':id/where-used')
   async whereUsed(@Param('id') id: string) {
     // BOMLine.componentId → BOM.item (the parent item that uses this component)
