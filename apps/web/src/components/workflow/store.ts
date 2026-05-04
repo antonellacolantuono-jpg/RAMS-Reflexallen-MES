@@ -49,6 +49,14 @@ export interface ValidateDrawerState {
   open: boolean
 }
 
+export type WorkflowNodeKind = 'phaseNode' | 'groupNode' | 'stepNode'
+
+export interface DeleteConfirmState {
+  open: boolean
+  nodeId: string | null
+  kind: WorkflowNodeKind | null
+}
+
 interface WorkflowCanvasStore {
   nodes: Node[]
   edges: Edge[]
@@ -64,6 +72,7 @@ interface WorkflowCanvasStore {
   addPhaseDrawer: AddPhaseDrawerState
   addGroupModal: AddGroupModalState
   validateDrawer: ValidateDrawerState
+  deleteConfirm: DeleteConfirmState
   // Callbacks registered by WorkflowCanvas so the configurator forms can
   // mutate the canvas's local React Flow state and trigger the auto-save
   // debounce without forms importing the canvas component.
@@ -159,6 +168,11 @@ interface WorkflowCanvasStore {
   closeAddGroupModal: () => void
   openValidateDrawer: () => void
   closeValidateDrawer: () => void
+  // FIX-1 ESTESO — confirmation slice for the inline delete buttons in
+  // Tabella + Card views. The actual cascade lives in `deleteNode`; this
+  // slice carries only what the dialog needs to render.
+  openDeleteConfirm: (nodeId: string, kind: WorkflowNodeKind) => void
+  closeDeleteConfirm: () => void
 }
 
 function newId(): string {
@@ -185,6 +199,7 @@ export const useWorkflowStore = create<WorkflowCanvasStore>((set, get) => ({
   addPhaseDrawer: { open: false },
   addGroupModal: { open: false, phaseId: null },
   validateDrawer: { open: false },
+  deleteConfirm: { open: false, nodeId: null, kind: null },
   canvasSetNodes: null,
   triggerAutoSave: null,
   scrollToNode: null,
@@ -448,6 +463,8 @@ export const useWorkflowStore = create<WorkflowCanvasStore>((set, get) => ({
   closeAddGroupModal: () => set({ addGroupModal: { open: false, phaseId: null } }),
   openValidateDrawer: () => set({ validateDrawer: { open: true } }),
   closeValidateDrawer: () => set({ validateDrawer: { open: false } }),
+  openDeleteConfirm: (nodeId, kind) => set({ deleteConfirm: { open: true, nodeId, kind } }),
+  closeDeleteConfirm: () => set({ deleteConfirm: { open: false, nodeId: null, kind: null } }),
   addGroupNodeToPhase: (phaseId, payload) => {
     const { nodes, edges, canvasSetNodes, triggerAutoSave } = get()
     const phase = nodes.find((n) => n.id === phaseId && n.type === 'phaseNode')

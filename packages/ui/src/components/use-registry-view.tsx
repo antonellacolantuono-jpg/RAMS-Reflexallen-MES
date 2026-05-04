@@ -23,6 +23,20 @@ export interface UseRegistryViewOptions {
    * for a hierarchical tree and labels it "Tabella" rather than "Lista").
    */
   labels?: Partial<Record<ViewMode, string>>
+  /**
+   * Optional URL synchronisation. When provided, the hook reads the initial
+   * view from the URL (`read()` is called once on mount, takes priority over
+   * localStorage) and pushes every subsequent change back into it via
+   * `write(next)`. The hook is framework-agnostic — callers wire their router
+   * (e.g. Next.js `useRouter().replace`) inside the callbacks.
+   *
+   * `read()` returning `null` falls back to localStorage hydration, so a
+   * URL without `?view=` does not clobber the persisted preference.
+   */
+  urlSync?: {
+    read: () => ViewMode | null
+    write: (next: ViewMode) => void
+  }
 }
 
 export interface UseRegistryViewResult {
@@ -84,6 +98,7 @@ export function useRegistryView({
   defaultView,
   onChange,
   labels,
+  urlSync,
 }: UseRegistryViewOptions): UseRegistryViewResult {
   if (availableViews.length === 0) {
     throw new Error('useRegistryView: availableViews must contain at least one view')
@@ -95,7 +110,22 @@ export function useRegistryView({
 
   const [view, setViewState] = React.useState<ViewMode>(initial)
 
+  // Stash the latest urlSync callbacks in a ref so the mount effect / setView
+  // closure don't depend on the object identity — callers don't have to memoise
+  // the object they pass in.
+  const urlSyncRef = React.useRef(urlSync)
   React.useEffect(() => {
+    urlSyncRef.current = urlSync
+  })
+
+  React.useEffect(() => {
+    // Priority on first paint: URL `?view=` (if caller supplied urlSync) wins,
+    // localStorage falls back, finally `defaultView` (already in state).
+    const fromUrl = urlSyncRef.current?.read() ?? null
+    if (fromUrl && (availableViews as string[]).includes(fromUrl)) {
+      setViewState((prev) => (prev === fromUrl ? prev : fromUrl))
+      return
+    }
     const stored = readStored(registryId, availableViews)
     if (stored && stored !== view) {
       setViewState(stored)
@@ -107,6 +137,7 @@ export function useRegistryView({
     (next: ViewMode) => {
       setViewState(next)
       writeStored(registryId, next)
+      urlSyncRef.current?.write(next)
       onChange?.(next)
     },
     [registryId, onChange],

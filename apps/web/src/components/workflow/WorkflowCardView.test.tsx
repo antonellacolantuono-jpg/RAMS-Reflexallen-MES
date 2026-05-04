@@ -155,4 +155,31 @@ describe('WorkflowCardView', () => {
     const header2 = screen.getByTestId('phase-header-phase-2')
     expect(header2.getAttribute('style')).toMatch(/var\(--c-outbound\)/)
   })
+
+  it('group "+ Step" button opens AddStepDialog with the groupId pre-filled (no row select)', () => {
+    render(<WorkflowCardView workflow={makeWorkflow()} />)
+    fireEvent.click(screen.getByTestId('card-add-step-group-1'))
+    const state = useWorkflowStore.getState()
+    expect(state.addStepDialog.open).toBe(true)
+    expect(state.addStepDialog.groupId).toBe('group-1')
+    expect(state.selectedNodeId).toBeNull()
+  })
+
+  it('phase delete button opens the confirm slice for that phase', () => {
+    render(<WorkflowCardView workflow={makeWorkflow()} />)
+    fireEvent.click(screen.getByTestId('card-delete-phase-1'))
+    expect(useWorkflowStore.getState().deleteConfirm).toEqual({
+      open: true,
+      nodeId: 'phase-1',
+      kind: 'phaseNode',
+    })
+  })
+
+  it('step edit button calls selectNode and stops propagation', () => {
+    render(<WorkflowCardView workflow={makeWorkflow()} />)
+    fireEvent.click(screen.getByTestId('card-edit-step-1'))
+    const state = useWorkflowStore.getState()
+    expect(state.selectedNodeId).toBe('step-1')
+    expect(state.selectedNodeType).toBe('stepNode')
+  })
 })

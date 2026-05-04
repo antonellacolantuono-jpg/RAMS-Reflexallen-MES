@@ -132,6 +132,42 @@ describe('useRegistryView', () => {
     expect(window.localStorage.getItem('rams.view.recipes')).toBe('card')
   })
 
+  it('reads initial view from urlSync.read() with priority over localStorage', async () => {
+    window.localStorage.setItem('rams.view.workflows', 'card')
+    const read = vi.fn(() => 'list' as const)
+    const write = vi.fn()
+    const { result } = renderHook(() =>
+      useRegistryView({
+        registryId: 'workflows',
+        availableViews: ['flow', 'list', 'card'],
+        defaultView: 'flow',
+        urlSync: { read, write },
+      }),
+    )
+    await act(async () => {})
+    expect(read).toHaveBeenCalledTimes(1)
+    expect(result.current.view).toBe('list')
+  })
+
+  it('falls back to localStorage when urlSync.read() returns null and writes URL on setView', () => {
+    window.localStorage.setItem('rams.view.workflows', 'card')
+    const read = vi.fn(() => null)
+    const write = vi.fn()
+    const { result } = renderHook(() =>
+      useRegistryView({
+        registryId: 'workflows',
+        availableViews: ['flow', 'list', 'card'],
+        defaultView: 'flow',
+        urlSync: { read, write },
+      }),
+    )
+    expect(result.current.view).toBe('card')
+    expect(write).not.toHaveBeenCalled()
+    act(() => result.current.setView('flow'))
+    expect(write).toHaveBeenCalledWith('flow')
+    expect(window.localStorage.getItem('rams.view.workflows')).toBe('flow')
+  })
+
   it('survives a localStorage write failure (private mode / quota) without throwing', () => {
     const setItem = window.localStorage.setItem
     window.localStorage.setItem = () => {

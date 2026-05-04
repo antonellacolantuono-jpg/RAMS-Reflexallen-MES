@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useCallback, useState } from 'react'
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels'
+import type { ViewMode } from '@mes/ui'
 import { PageHeader, StatusBadge, useRegistryView } from '@mes/ui'
 import { sdk } from '../../../../lib/sdk'
 import { WorkflowCanvas } from '../../../../components/workflow/WorkflowCanvas'
@@ -21,12 +22,15 @@ import { AddStepDialog } from '../../../../components/workflow/AddStepDialog'
 import { AddPhaseDrawer } from '../../../../components/workflow/AddPhaseDrawer'
 import { AddGroupModal } from '../../../../components/workflow/AddGroupModal'
 import { ValidateDrawer } from '../../../../components/workflow/ValidateDrawer'
+import { DeleteNodeDialog } from '../../../../components/workflow/DeleteNodeDialog'
 import { WorkflowTopBar } from '../../../../components/workflow/WorkflowTopBar'
 import { useWorkflowStore } from '../../../../components/workflow/store'
 
 export default function WorkflowEditorPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [approveOpen, setApproveOpen] = useState(false)
   const [deprecateOpen, setDeprecateOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -35,11 +39,31 @@ export default function WorkflowEditorPage() {
   // the existing "Storico" Version History pane.
   const [previewOpen, setPreviewOpen] = useState(true)
   const addPhaseDrawer = useWorkflowStore((s) => s.addPhaseDrawer)
+  const openAddPhaseDrawer = useWorkflowStore((s) => s.openAddPhaseDrawer)
   const closeAddPhaseDrawer = useWorkflowStore((s) => s.closeAddPhaseDrawer)
   const addGroupModal = useWorkflowStore((s) => s.addGroupModal)
   const closeAddGroupModal = useWorkflowStore((s) => s.closeAddGroupModal)
   const validateDrawer = useWorkflowStore((s) => s.validateDrawer)
   const closeValidateDrawer = useWorkflowStore((s) => s.closeValidateDrawer)
+
+  // FIX-1 ESTESO — bidirectional URL sync (?view=list|card|flow). The hook is
+  // framework-agnostic; we wire Next.js router here. `flow` is the default and
+  // is represented by the absence of `?view=` to keep links short.
+  const readViewFromUrl = useCallback((): ViewMode | null => {
+    const raw = searchParams?.get('view') ?? null
+    if (raw === 'list' || raw === 'card' || raw === 'flow') return raw
+    return null
+  }, [searchParams])
+  const writeViewToUrl = useCallback(
+    (next: ViewMode) => {
+      const params = new URLSearchParams(searchParams?.toString() ?? '')
+      if (next === 'flow') params.delete('view')
+      else params.set('view', next)
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    },
+    [pathname, router, searchParams],
+  )
 
   // PROMPT_VIEWSWITCHER_WORKFLOWS — 3-mode toggle (Flusso default + Tabella + Card).
   // The canvas stays mounted even when not active so its useEffect keeps the
@@ -50,7 +74,14 @@ export default function WorkflowEditorPage() {
     availableViews: ['flow', 'list', 'card'],
     defaultView: 'flow',
     labels: { list: 'Tabella' },
+    urlSync: { read: readViewFromUrl, write: writeViewToUrl },
   })
+
+  // FIX-1 ESTESO — non-Flusso modes drop Validation + Palette to give the
+  // table/cards full-width center. In Flusso, the Palette is the entry point
+  // for adding nodes (drag-drop); in Tabella/Card, expose an explicit "+ Nuova
+  // Fase" header button that opens the existing AddPhaseDrawer.
+  const isFlow = workflowView === 'flow'
 
   const { data: workflow, isLoading } = useQuery({
     queryKey: ['workflows', id],
@@ -131,6 +162,16 @@ export default function WorkflowEditorPage() {
               Rilascia WO
             </button>
           )}
+          {!isFlow && (
+            <button
+              type="button"
+              onClick={openAddPhaseDrawer}
+              className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700"
+              data-testid="header-add-phase"
+            >
+              + Nuova Fase
+            </button>
+          )}
           {workflowSwitcher}
           <button
             type="button"
@@ -152,34 +193,38 @@ export default function WorkflowEditorPage() {
 
       <div className="flex-1 overflow-hidden">
           <PanelGroup orientation="horizontal" className="h-full">
-          {/* Wizard / Validation pane — 20% */}
-          <Panel defaultSize={20} minSize={15}>
-            <div className="h-full flex flex-col bg-[var(--paper-2)] hairline-r overflow-hidden">
-              <div className="px-3 py-2 hairline-b flex-shrink-0">
-                <span className="uppercase-label">Validazione</span>
-              </div>
-              <ValidationPanel />
-            </div>
-          </Panel>
+          {isFlow && (
+            <>
+              {/* Wizard / Validation pane — 20% */}
+              <Panel defaultSize={20} minSize={15}>
+                <div className="h-full flex flex-col bg-[var(--paper-2)] hairline-r overflow-hidden">
+                  <div className="px-3 py-2 hairline-b flex-shrink-0">
+                    <span className="uppercase-label">Validazione</span>
+                  </div>
+                  <ValidationPanel />
+                </div>
+              </Panel>
 
-          <PanelResizeHandle className="w-1 bg-neutral-200 hover:bg-primary-400 transition-colors cursor-col-resize" />
+              <PanelResizeHandle className="w-1 bg-neutral-200 hover:bg-primary-400 transition-colors cursor-col-resize" />
 
-          {/* Palette pane — 20% */}
-          <Panel defaultSize={20} minSize={15}>
-            <div className="h-full flex flex-col bg-[var(--paper-1)] hairline-r overflow-hidden">
-              <div className="px-3 py-2 hairline-b flex-shrink-0">
-                <span className="uppercase-label">Palette</span>
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <WorkflowPalette />
-              </div>
-            </div>
-          </Panel>
+              {/* Palette pane — 20% */}
+              <Panel defaultSize={20} minSize={15}>
+                <div className="h-full flex flex-col bg-[var(--paper-1)] hairline-r overflow-hidden">
+                  <div className="px-3 py-2 hairline-b flex-shrink-0">
+                    <span className="uppercase-label">Palette</span>
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <WorkflowPalette />
+                  </div>
+                </div>
+              </Panel>
 
-          <PanelResizeHandle className="w-1 bg-neutral-200 hover:bg-primary-400 transition-colors cursor-col-resize" />
+              <PanelResizeHandle className="w-1 bg-neutral-200 hover:bg-primary-400 transition-colors cursor-col-resize" />
+            </>
+          )}
 
-          {/* Canvas / Tabella / Card pane — 35% */}
-          <Panel defaultSize={35} minSize={25}>
+          {/* Canvas / Tabella / Card pane — 35% in Flusso, ~50% in Tabella/Card. */}
+          <Panel defaultSize={isFlow ? 35 : 53} minSize={25}>
             <div className="h-full flex flex-col bg-neutral-50 hairline-r overflow-hidden">
               <div className="px-3 py-2 hairline-b flex-shrink-0">
                 <span className="uppercase-label">
@@ -195,7 +240,7 @@ export default function WorkflowEditorPage() {
                     seeded for Inspector + Live Preview, regardless of which
                     view is active. Hidden via `display:none` when not in
                     flow mode — preserves auto-save, history, keyboard wiring. */}
-                <div className={workflowView === 'flow' ? 'h-full' : 'hidden'}>
+                <div className={isFlow ? 'h-full' : 'hidden'}>
                   <WorkflowCanvas workflow={workflow} />
                 </div>
                 {workflowView === 'list' && (
@@ -277,6 +322,7 @@ export default function WorkflowEditorPage() {
         open={validateDrawer.open}
         onClose={closeValidateDrawer}
       />
+      <DeleteNodeDialog />
     </div>
     </WorkflowValidationProvider>
   )

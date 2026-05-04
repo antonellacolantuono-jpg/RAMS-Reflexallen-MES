@@ -6,10 +6,42 @@
 // Click on a step card drives `useWorkflowStore.selectNode(id, 'stepNode')`
 // so Inspector + Live Preview stay in sync regardless of view mode.
 
+import type { ReactNode } from 'react'
+import { Pencil, Plus, Trash2, type LucideIcon } from 'lucide-react'
 import type { WorkflowModel, WorkflowStepModel } from '@mes/sdk'
 import { Badge } from '@mes/ui'
 import { useWorkflowStore } from './store'
 import { phaseColor } from '../../lib/phase-color'
+
+interface CardActionButtonProps {
+  label: string
+  testId: string
+  onClick: () => void
+  Icon: LucideIcon
+  tone?: 'default' | 'danger'
+}
+
+function CardActionButton({ label, testId, onClick, Icon, tone = 'default' }: CardActionButtonProps) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      data-testid={testId}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      className={
+        tone === 'danger'
+          ? 'p-1 rounded text-error-600 hover:text-error-700 hover:bg-error-50'
+          : 'p-1 rounded text-ink-3 hover:text-ink hover:bg-paper-3'
+      }
+    >
+      <Icon size={14} />
+    </button>
+  )
+}
 
 function formatDuration(seconds: number | null | undefined): string {
   if (seconds == null || seconds <= 0) return '—'
@@ -27,17 +59,25 @@ interface StepCardProps {
   groupName: string
   selected: boolean
   onSelect: () => void
+  actionsNode?: ReactNode
 }
 
-function StepCard({ step, groupName, selected, onSelect }: StepCardProps) {
+function StepCard({ step, groupName, selected, onSelect, actionsNode }: StepCardProps) {
   return (
-    <button
-      type="button"
+    <div
       onClick={onSelect}
       data-testid={`card-step-${step.id}`}
       data-selected={selected ? 'true' : 'false'}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect()
+        }
+      }}
       className={[
-        'block w-full text-left rounded-md border p-3 transition-colors',
+        'block w-full text-left rounded-md border p-3 transition-colors cursor-pointer',
         selected
           ? 'border-accent bg-accent-soft text-accent-ink ring-1 ring-accent'
           : 'border-line bg-paper hover:bg-paper-2',
@@ -48,14 +88,17 @@ function StepCard({ step, groupName, selected, onSelect }: StepCardProps) {
           <div className="text-sm font-semibold truncate">{step.name}</div>
           <div className="text-[11px] text-ink-3 mt-0.5 truncate">{groupName}</div>
         </div>
-        <Badge tone="neutral" className="!text-[10px] shrink-0">
-          {step.actionType ?? step.category}
-        </Badge>
+        <div className="flex items-center gap-1 shrink-0">
+          <Badge tone="neutral" className="!text-[10px]">
+            {step.actionType ?? step.category}
+          </Badge>
+          {actionsNode}
+        </div>
       </div>
       <div className="mt-2 flex items-center gap-2 text-[11px] text-ink-3 tabular">
         <span>Durata: {formatDuration(step.standardTimeSec)}</span>
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -67,6 +110,9 @@ export function WorkflowCardView({ workflow }: WorkflowCardViewProps) {
   const phases = workflow.currentVersion?.phases ?? []
   const selectedNodeId = useWorkflowStore((s) => s.selectedNodeId)
   const selectNode = useWorkflowStore((s) => s.selectNode)
+  const openAddGroupModal = useWorkflowStore((s) => s.openAddGroupModal)
+  const openAddStepDialog = useWorkflowStore((s) => s.openAddStepDialog)
+  const openDeleteConfirm = useWorkflowStore((s) => s.openDeleteConfirm)
 
   if (phases.length === 0) {
     return (
@@ -105,26 +151,105 @@ export function WorkflowCardView({ workflow }: WorkflowCardViewProps) {
                 <span className="ml-auto font-mono text-[11px] text-ink-3">
                   {totalSteps} step · {formatDuration(totalDuration)}
                 </span>
+                <div className="flex items-center gap-1">
+                  <CardActionButton
+                    label="Aggiungi gruppo"
+                    testId={`card-add-group-${phase.id}`}
+                    onClick={() => openAddGroupModal(phase.id)}
+                    Icon={Plus}
+                  />
+                  <CardActionButton
+                    label="Modifica"
+                    testId={`card-edit-${phase.id}`}
+                    onClick={() => selectNode(phase.id, 'phaseNode')}
+                    Icon={Pencil}
+                  />
+                  <CardActionButton
+                    label="Elimina"
+                    testId={`card-delete-${phase.id}`}
+                    onClick={() => openDeleteConfirm(phase.id, 'phaseNode')}
+                    Icon={Trash2}
+                    tone="danger"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 pl-3">
-              {phase.groups.flatMap((group) =>
-                group.steps.map((step) => (
-                  <StepCard
-                    key={`step-${step.id}`}
-                    step={step}
-                    groupName={group.name}
-                    selected={selectedNodeId === step.id}
-                    onSelect={() => selectNode(step.id, 'stepNode')}
-                  />
-                )),
-              )}
-              {totalSteps === 0 && (
+            <div className="space-y-3 pl-3">
+              {phase.groups.length === 0 && (
                 <div className="text-[11px] text-ink-3 italic px-2 py-1.5">
-                  Nessuno step in questa fase.
+                  Nessun gruppo in questa fase.
                 </div>
               )}
+              {phase.groups.map((group) => (
+                <div
+                  key={`group-${group.id}`}
+                  data-testid={`card-group-section-${group.id}`}
+                  className="space-y-2"
+                >
+                  <div
+                    className="flex items-center gap-2 px-2 py-1 text-[11px] uppercase tracking-wide text-ink-3"
+                    data-testid={`card-group-header-${group.id}`}
+                  >
+                    <span className="font-semibold">{group.name}</span>
+                    <span className="font-mono">· {group.steps.length} step</span>
+                    <div className="ml-auto flex items-center gap-1">
+                      <CardActionButton
+                        label="Aggiungi step"
+                        testId={`card-add-step-${group.id}`}
+                        onClick={() => openAddStepDialog({ groupId: group.id })}
+                        Icon={Plus}
+                      />
+                      <CardActionButton
+                        label="Modifica"
+                        testId={`card-edit-${group.id}`}
+                        onClick={() => selectNode(group.id, 'groupNode')}
+                        Icon={Pencil}
+                      />
+                      <CardActionButton
+                        label="Elimina"
+                        testId={`card-delete-${group.id}`}
+                        onClick={() => openDeleteConfirm(group.id, 'groupNode')}
+                        Icon={Trash2}
+                        tone="danger"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    {group.steps.length === 0 && (
+                      <div className="text-[11px] text-ink-3 italic px-2 py-1">
+                        Nessuno step in questo gruppo.
+                      </div>
+                    )}
+                    {group.steps.map((step) => (
+                      <StepCard
+                        key={`step-${step.id}`}
+                        step={step}
+                        groupName={group.name}
+                        selected={selectedNodeId === step.id}
+                        onSelect={() => selectNode(step.id, 'stepNode')}
+                        actionsNode={
+                          <>
+                            <CardActionButton
+                              label="Modifica"
+                              testId={`card-edit-${step.id}`}
+                              onClick={() => selectNode(step.id, 'stepNode')}
+                              Icon={Pencil}
+                            />
+                            <CardActionButton
+                              label="Elimina"
+                              testId={`card-delete-${step.id}`}
+                              onClick={() => openDeleteConfirm(step.id, 'stepNode')}
+                              Icon={Trash2}
+                              tone="danger"
+                            />
+                          </>
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
         )

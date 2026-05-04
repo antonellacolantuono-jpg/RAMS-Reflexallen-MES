@@ -176,4 +176,40 @@ describe('WorkflowHierarchyTable', () => {
     expect(state.selectedNodeId).toBeNull()
     expect(state.selectedNodeType).toBeNull()
   })
+
+  it('phase row "+ Gruppo" button opens AddGroupModal with the phaseId pre-filled and does not select the row', () => {
+    render(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
+    fireEvent.click(screen.getByTestId('row-add-group-phase-1'))
+    const state = useWorkflowStore.getState()
+    expect(state.addGroupModal.open).toBe(true)
+    expect(state.addGroupModal.phaseId).toBe('phase-1')
+    // stopPropagation: row click handler must not have run
+    expect(state.selectedNodeId).toBeNull()
+  })
+
+  it('group row "+ Step" button opens AddStepDialog with the groupId pre-filled', () => {
+    render(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
+    fireEvent.click(screen.getByTestId('row-add-step-group-1'))
+    const state = useWorkflowStore.getState()
+    expect(state.addStepDialog.open).toBe(true)
+    expect(state.addStepDialog.groupId).toBe('group-1')
+    expect(state.selectedNodeId).toBeNull()
+  })
+
+  it('delete button opens the confirm slice with the correct nodeId + kind', () => {
+    render(<WorkflowHierarchyTable workflow={makeWorkflow()} />)
+    fireEvent.click(screen.getByTestId('row-delete-phase-1'))
+    expect(useWorkflowStore.getState().deleteConfirm).toEqual({
+      open: true,
+      nodeId: 'phase-1',
+      kind: 'phaseNode',
+    })
+  })
+
+  it('readOnly mode hides the action buttons entirely', () => {
+    render(<WorkflowHierarchyTable workflow={makeWorkflow()} readOnly />)
+    expect(screen.queryByTestId('row-add-group-phase-1')).toBeNull()
+    expect(screen.queryByTestId('row-edit-step-1')).toBeNull()
+    expect(screen.queryByTestId('row-delete-phase-1')).toBeNull()
+  })
 })
