@@ -13,7 +13,7 @@
 // mirror tests in LivePreviewStepCard.test.tsx.
 
 import * as React from 'react'
-import { Badge } from '@mes/ui'
+import { Badge, ImageDisplay } from '@mes/ui'
 import type { PreviewState, HmiStatus } from './livePreview/states'
 import { PREVIEW_TO_HMI_STATUS } from './livePreview/states'
 import type {
@@ -242,12 +242,11 @@ export function LivePreviewStepCard({
               className="flex flex-col gap-1"
               data-testid="live-preview-photo"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <ImageDisplay
                 src={step.photoUrl}
                 alt="Foto di riferimento"
-                className="rounded-2 border border-line max-w-xs object-cover"
-                style={{ maxHeight: 160 }}
+                size="reference"
+                fallback="none"
               />
               <figcaption className="text-[10px] text-ink-3">
                 Foto di riferimento

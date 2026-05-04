@@ -1,6 +1,6 @@
 'use client'
 import * as React from 'react'
-import { Badge, Button } from '@mes/ui'
+import { Badge, Button, ImageDisplay } from '@mes/ui'
 import type {
   StepExecutionStatus,
   WorkOrderStep,
@@ -257,12 +257,11 @@ export function StepCard({
               className="flex flex-col gap-1"
               data-testid="step-card-photo"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <ImageDisplay
                 src={step.data.photoUrl}
                 alt="Foto di riferimento"
-                className="rounded-2 border border-line max-w-xs object-cover"
-                style={{ maxHeight: 200 }}
+                size="reference"
+                fallback="none"
               />
               <figcaption className="text-[10px] text-ink-3">
                 Foto di riferimento

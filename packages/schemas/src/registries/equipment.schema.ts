@@ -13,6 +13,8 @@ export const CreateEquipmentNodeSchema = z.object({
   parentId: z.string().cuid().optional(),
   plantId: z.string().cuid(),
   description: z.string().max(2000).optional(),
+  // Base64 data URL or S3 URL. See TODO-066 for S3 migration.
+  imageUrl: z.string().max(700_000).nullish(),
 })
 
 export const UpdateEquipmentNodeSchema = CreateEquipmentNodeSchema

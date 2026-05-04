@@ -185,3 +185,45 @@ describe('buildSavePayload — recoveryConfig persistence (PROMPT_7 D1)', () => 
     expect(reparsed).toEqual(dataPayload)
   })
 })
+
+// ── Fix-2 — Phase imageUrl serialization ──────────────────────────────────────
+describe('buildSavePayload — Phase imageUrl (Fix-2)', () => {
+  it('serializes phase imageUrl when present on node.data', () => {
+    const phase: Node = {
+      id: 'phase-img',
+      type: 'phaseNode',
+      position: { x: 0, y: 0 },
+      data: {
+        label: 'Estrusione',
+        category: 'production',
+        order: 1,
+        isCycleBased: true,
+        imageUrl: 'data:image/png;base64,XYZ',
+      },
+    } as Node
+    const out = buildSavePayload([phase])
+    expect(out[0]?.imageUrl).toBe('data:image/png;base64,XYZ')
+  })
+
+  it('emits imageUrl=null when node.data has no imageUrl', () => {
+    const out = buildSavePayload([makePhase('p1', 1)])
+    expect(out[0]?.imageUrl).toBeNull()
+  })
+
+  it('emits imageUrl=null when node.data.imageUrl is empty string', () => {
+    const phase: Node = {
+      id: 'phase-empty',
+      type: 'phaseNode',
+      position: { x: 0, y: 0 },
+      data: {
+        label: 'P',
+        category: 'production',
+        order: 1,
+        isCycleBased: false,
+        imageUrl: '',
+      },
+    } as Node
+    const out = buildSavePayload([phase])
+    expect(out[0]?.imageUrl).toBeNull()
+  })
+})

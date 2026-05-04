@@ -45,7 +45,7 @@ import {
   buildAutofilledDescription,
 } from '../../lib/step-title-templates'
 import { useFirstSelectedResourceCode } from '../../lib/use-resource-code'
-import { PhotoUploadField } from './configurator/PhotoUploadField'
+import { ImageUpload } from '@mes/ui'
 import type { ZodTypeAny } from 'zod'
 
 function toggleId(prev: string[], id: string): string[] {
@@ -455,7 +455,12 @@ export function AddStepDialog() {
               setActionConfig((s) => ({ ...s, setupTeardown: v }))
             }
           />
-          <PhotoUploadField value={photoBase64} onChange={setPhotoBase64} />
+          <ImageUpload
+            label="Foto allegata"
+            value={photoBase64}
+            onChange={setPhotoBase64}
+            testId="photo-upload-field"
+          />
           {kindDescriptor && (
             <p className="mt-1 text-[10px] text-neutral-500">
               Tipo selezionato:{' '}

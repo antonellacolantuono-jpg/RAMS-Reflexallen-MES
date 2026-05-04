@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { PageHeader, EntityForm, Field, Input, Select, Skeleton } from '@mes/ui'
+import { PageHeader, EntityForm, Field, Input, Select, Skeleton, ImageUpload } from '@mes/ui'
 import { sdk } from '../../../../../lib/sdk'
 import { useState, useEffect } from 'react'
 
@@ -40,13 +40,22 @@ export default function EditEquipmentPage({ params }: { params: { id: string } }
   const qc = useQueryClient()
   const { id } = params
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    name: string
+    level: string
+    class: string
+    status: string
+    parentId: string
+    description: string
+    imageUrl: string | null
+  }>({
     name: '',
     level: '',
     class: '',
     status: '',
     parentId: '',
     description: '',
+    imageUrl: null,
   })
   const [isDirty, setIsDirty] = useState(false)
 
@@ -64,6 +73,7 @@ export default function EditEquipmentPage({ params }: { params: { id: string } }
         status: eq.status,
         parentId: eq.parentId ?? '',
         description: eq.description ?? '',
+        imageUrl: eq.imageUrl ?? null,
       })
     }
   }, [eq])
@@ -77,6 +87,7 @@ export default function EditEquipmentPage({ params }: { params: { id: string } }
         status: form.status,
         parentId: form.parentId || undefined,
         description: form.description || undefined,
+        imageUrl: form.imageUrl,
       } as unknown as Record<string, unknown>),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['equipment', id] })
@@ -159,6 +170,16 @@ export default function EditEquipmentPage({ params }: { params: { id: string } }
             className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </Field>
+
+        <ImageUpload
+          label="Immagine equipaggiamento"
+          value={form.imageUrl}
+          onChange={(next) => {
+            setForm((prev) => ({ ...prev, imageUrl: next }))
+            setIsDirty(true)
+          }}
+          testId="equipment-image-upload"
+        />
       </EntityForm>
     </div>
   )

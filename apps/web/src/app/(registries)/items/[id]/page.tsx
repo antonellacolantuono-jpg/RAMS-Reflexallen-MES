@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { EntityDetail, StatusBadge, ActivityFeed, ConfirmModal } from '@mes/ui'
+import { EntityDetail, StatusBadge, ActivityFeed, ConfirmModal, ImageDisplay } from '@mes/ui'
 import type { AuditEntry } from '@mes/ui'
 import { sdk } from '../../../../lib/sdk'
 import Link from 'next/link'
@@ -53,7 +53,16 @@ export default function ItemDetailPage({ params }: { params: { id: string } }) {
       key: 'details',
       label: 'Dettagli',
       content: item ? (
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+        <div className="flex gap-6">
+          <ImageDisplay
+            src={item.imageUrl ?? null}
+            alt={item.name}
+            size="large"
+            iconCategory="item"
+            entityName={item.name}
+            testId="item-detail-image"
+          />
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm flex-1">
           {[
             ['Codice', item.code],
             ['Nome', item.name],
@@ -75,7 +84,8 @@ export default function ItemDetailPage({ params }: { params: { id: string } }) {
               <dd className="text-neutral-800 mt-0.5">{item.description}</dd>
             </div>
           )}
-        </dl>
+          </dl>
+        </div>
       ) : null,
     },
     {

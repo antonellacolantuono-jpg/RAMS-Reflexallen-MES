@@ -63,6 +63,7 @@ function buildGraph(workflow: WorkflowModel): { nodes: Node[]; edges: Edge[] } {
         category: phase.category,
         order: phase.order,
         isCycleBased: phase.isCycleBased,
+        imageUrl: phase.imageUrl ?? null,
       },
     })
 

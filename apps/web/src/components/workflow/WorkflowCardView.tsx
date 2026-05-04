@@ -9,9 +9,10 @@
 import type { ReactNode } from 'react'
 import { Pencil, Plus, Trash2, type LucideIcon } from 'lucide-react'
 import type { WorkflowModel, WorkflowStepModel } from '@mes/sdk'
-import { Badge } from '@mes/ui'
+import { Badge, ImageDisplay } from '@mes/ui'
 import { useWorkflowStore } from './store'
 import { phaseColor } from '../../lib/phase-color'
+import { parseStepData } from './save-payload'
 
 interface CardActionButtonProps {
   label: string
@@ -63,6 +64,7 @@ interface StepCardProps {
 }
 
 function StepCard({ step, groupName, selected, onSelect, actionsNode }: StepCardProps) {
+  const stepData = parseStepData(step.data ?? null)
   return (
     <div
       onClick={onSelect}
@@ -83,20 +85,31 @@ function StepCard({ step, groupName, selected, onSelect, actionsNode }: StepCard
           : 'border-line bg-paper hover:bg-paper-2',
       ].join(' ')}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold truncate">{step.name}</div>
-          <div className="text-[11px] text-ink-3 mt-0.5 truncate">{groupName}</div>
+      <div className="flex items-start gap-3">
+        <ImageDisplay
+          src={stepData?.photoUrl ?? null}
+          alt={step.name}
+          size="medium"
+          iconCategory="step"
+          entityName={step.name}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold truncate">{step.name}</div>
+              <div className="text-[11px] text-ink-3 mt-0.5 truncate">{groupName}</div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <Badge tone="neutral" className="!text-[10px]">
+                {step.actionType ?? step.category}
+              </Badge>
+              {actionsNode}
+            </div>
+          </div>
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-ink-3 tabular">
+            <span>Durata: {formatDuration(step.standardTimeSec)}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <Badge tone="neutral" className="!text-[10px]">
-            {step.actionType ?? step.category}
-          </Badge>
-          {actionsNode}
-        </div>
-      </div>
-      <div className="mt-2 flex items-center gap-2 text-[11px] text-ink-3 tabular">
-        <span>Durata: {formatDuration(step.standardTimeSec)}</span>
       </div>
     </div>
   )

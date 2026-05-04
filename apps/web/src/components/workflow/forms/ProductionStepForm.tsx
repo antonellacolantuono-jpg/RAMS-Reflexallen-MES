@@ -5,7 +5,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
-import { Field, Input, Select } from '@mes/ui'
+import { Field, ImageUpload, Input, Select } from '@mes/ui'
 import type { SelectProps } from '@mes/ui'
 import { sdk } from '../../../lib/sdk'
 import { useWorkflowStore } from '../store'
@@ -33,6 +33,8 @@ const ProductionFormSchema = z.object({
   deviceCategory: z.enum(DEVICE_CATEGORIES, {
     errorMap: () => ({ message: 'Categoria dispositivo richiesta' }),
   }),
+  // Persisted under Step.data.photoUrl (StepDataSchema.photoUrl) — see save-payload.ts.
+  photoUrl: z.string().nullable(),
 })
 
 type ProductionFormValues = z.infer<typeof ProductionFormSchema>
@@ -64,6 +66,7 @@ export function ProductionStepForm({
     deviceCategory: isDeviceCategory(data['deviceCategory'])
       ? (data['deviceCategory'] as (typeof DEVICE_CATEGORIES)[number])
       : 'device_main',
+    photoUrl: typeof data['photoUrl'] === 'string' ? (data['photoUrl'] as string) : null,
   }
 
   const {
@@ -208,6 +211,22 @@ export function ProductionStepForm({
         />
         Step obbligatorio
       </label>
+
+      <Controller
+        control={control}
+        name="photoUrl"
+        render={({ field }) => (
+          <ImageUpload
+            label="Foto di riferimento"
+            value={field.value}
+            onChange={(next) => {
+              field.onChange(next)
+              commit({ photoUrl: next })
+            }}
+            testId="step-image-upload"
+          />
+        )}
+      />
     </form>
   )
 }

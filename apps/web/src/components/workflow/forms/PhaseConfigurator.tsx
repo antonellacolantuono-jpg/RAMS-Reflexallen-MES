@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Field, Input, Select } from '@mes/ui'
+import { Field, ImageUpload, Input, Select } from '@mes/ui'
 import { useWorkflowStore } from '../store'
 
 const PHASE_CATEGORIES = [
@@ -30,6 +30,7 @@ const PhaseFormSchema = z.object({
     errorMap: () => ({ message: 'Categoria fase richiesta' }),
   }),
   isCycleBased: z.boolean(),
+  imageUrl: z.string().nullable(),
 })
 
 type PhaseFormValues = z.infer<typeof PhaseFormSchema>
@@ -56,9 +57,11 @@ export function PhaseConfigurator({
     category: initialCategory,
     isCycleBased:
       typeof data['isCycleBased'] === 'boolean' ? (data['isCycleBased'] as boolean) : false,
+    imageUrl: typeof data['imageUrl'] === 'string' ? (data['imageUrl'] as string) : null,
   }
 
   const {
+    control,
     register,
     reset,
     formState: { errors },
@@ -110,6 +113,22 @@ export function PhaseConfigurator({
         />
         Fase ciclica (per produzione continua)
       </label>
+
+      <Controller
+        control={control}
+        name="imageUrl"
+        render={({ field }) => (
+          <ImageUpload
+            label="Immagine fase"
+            value={field.value}
+            onChange={(next) => {
+              field.onChange(next)
+              commit({ imageUrl: next })
+            }}
+            testId="phase-image-upload"
+          />
+        )}
+      />
     </form>
   )
 }

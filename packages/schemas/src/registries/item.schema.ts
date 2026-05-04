@@ -11,6 +11,9 @@ export const CreateItemSchema = z.object({
   trackingMode: z.enum(TRACKING_MODES).default('lot'),
   uom: z.enum(UNITS_OF_MEASURE).default('pc'),
   description: z.string().max(2000).optional(),
+  // Base64 data URL or S3 URL. Cap covers a 500KB raw image base64-encoded
+  // (~666KB) with margin. See TODO-066 for S3 migration.
+  imageUrl: z.string().max(700_000).nullish(),
   plantId: z.string().cuid(),
 })
 

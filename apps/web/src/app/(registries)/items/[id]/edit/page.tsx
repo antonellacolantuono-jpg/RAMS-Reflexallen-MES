@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { PageHeader, EntityForm, Field, Input, Select, Skeleton } from '@mes/ui'
+import { PageHeader, EntityForm, Field, Input, Select, Skeleton, ImageUpload } from '@mes/ui'
 import { sdk } from '../../../../../lib/sdk'
 import { useState, useEffect } from 'react'
 
@@ -35,7 +35,14 @@ export default function EditItemPage({ params }: { params: { id: string } }) {
   const qc = useQueryClient()
   const { id } = params
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [form, setForm] = useState({ name: '', itemType: '', trackingMode: '', uom: '', description: '' })
+  const [form, setForm] = useState<{
+    name: string
+    itemType: string
+    trackingMode: string
+    uom: string
+    description: string
+    imageUrl: string | null
+  }>({ name: '', itemType: '', trackingMode: '', uom: '', description: '', imageUrl: null })
   const [isDirty, setIsDirty] = useState(false)
 
   const { data: item, isLoading } = useQuery({
@@ -51,6 +58,7 @@ export default function EditItemPage({ params }: { params: { id: string } }) {
         trackingMode: item.trackingMode,
         uom: item.uom,
         description: item.description ?? '',
+        imageUrl: item.imageUrl ?? null,
       })
     }
   }, [item])
@@ -63,6 +71,7 @@ export default function EditItemPage({ params }: { params: { id: string } }) {
         trackingMode: form.trackingMode,
         uom: form.uom,
         description: form.description || undefined,
+        imageUrl: form.imageUrl,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['items', id] })
@@ -141,6 +150,16 @@ export default function EditItemPage({ params }: { params: { id: string } }) {
             className="w-full rounded-md border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </Field>
+
+        <ImageUpload
+          label="Immagine articolo"
+          value={form.imageUrl}
+          onChange={(next) => {
+            setForm((prev) => ({ ...prev, imageUrl: next }))
+            setIsDirty(true)
+          }}
+          testId="item-image-upload"
+        />
       </EntityForm>
     </div>
   )

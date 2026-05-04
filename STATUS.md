@@ -1,8 +1,105 @@
 # RAMS-Reflexallen-MES — Project Status
 
-> **Last update**: May 6, 2026 (GO BATCH B+C Phase 1 — TODO-061 closure: preRetryStepIds populated in pneumatic seed via two-pass resolution; PROMPT_PNE_5 deferred per S6+S8 recon surprises)
+> **Last update**: May 4, 2026 (GO FIX-2 — Image upload + display for Items + Equipment + Workflow Steps + Phases)
 > **Repository**: https://github.com/antonellacolantuono-jpg/RAMS-Reflexallen-MES
 > **Stack**: NestJS + Next.js 14 + Prisma SQLite + pnpm Turborepo + shadcn-style + Reflexallen design system
+
+---
+
+## ✅ GO FIX-2 — Image upload + display generico per 4 entità (May 4, 2026)
+
+Closes the user-feedback gap surfaced during the 2026-05-04 manual smoke ("manca il fix dell'inserimento delle immagini nella pagina di dettaglio e nelle tabelle. c'è solo nello step"). Pre-Fix-2 only Steps had an image surface (a session-only mock in AddStepDialog rendered by HMI StepCard); Items, Equipment, and Phases had no image plumbing at all and registry list / detail / Workflow Tabella / Card / Live Preview never rendered images.
+
+### Scope delivered
+
+- **Component A** — New `<ImageUpload>` primitive in `@mes/ui` ([packages/ui/src/components/image-upload.tsx](packages/ui/src/components/image-upload.tsx)). Drag-drop + click-to-browse + FileReader → canvas resize to max 1024px / JPEG q0.85 → base64 data URL → `onChange`. MIME + size validation (default 500KB raw, 3 MIME types). Italian copy. 5 vitest cases.
+- **Component B** — New `<ImageDisplay>` primitive in `@mes/ui` ([packages/ui/src/components/image-display.tsx](packages/ui/src/components/image-display.tsx)). 5 size variants (thumbnail / small / medium / large / reference) + Lucide-icon or first-letter-initial fallback. 9 vitest cases (5 base + 4 iconCategory parameterized).
+- **Component C — Schema + Zod + SDK + snapshot serializer.** Added `imageUrl String?` to Item, EquipmentNode, Phase ([packages/prisma/schema.prisma](packages/prisma/schema.prisma)). Step intentionally keeps using `step.data.photoUrl` (already wired end-to-end via StepExecution service). Extended Zod create/update schemas in `@mes/schemas` ([item](packages/schemas/src/registries/item.schema.ts), [equipment](packages/schemas/src/registries/equipment.schema.ts), [workflow](packages/schemas/src/registries/workflow.schema.ts)). Updated `@mes/sdk` types ([packages/sdk/src/clients/registry-clients.ts](packages/sdk/src/clients/registry-clients.ts)). Critical trap: snapshot serializer at [release.service.ts](apps/api/src/modules/work-orders/release.service.ts:171) is an explicit allowlist — Phase imageUrl needed adding to the cloned shape (`SourcePhase` + `ClonedPhase` in [packages/domain/src/rules/workflow-snapshot.rules.ts](packages/domain/src/rules/workflow-snapshot.rules.ts) + the mapper). Projection type updated at [work-orders.service.ts](apps/api/src/modules/work-orders/work-orders.service.ts) and parser populates `imageUrl: ph['imageUrl'] ?? null`.
+- **Component D — Form integration on 4 entities + retire legacy.**
+  - Item: [edit](apps/web/src/app/(registries)/items/[id]/edit/page.tsx) + [new](apps/web/src/app/(registries)/items/new/page.tsx) — `<ImageUpload>` bolted onto existing `useState` pattern (RHF migration deferred to TODO-069).
+  - Equipment: [edit](apps/web/src/app/(registries)/equipment/[id]/edit/page.tsx) + [new](apps/web/src/app/(registries)/equipment/new/page.tsx).
+  - Workflow Phase: [PhaseConfigurator.tsx](apps/web/src/components/workflow/forms/PhaseConfigurator.tsx) — `imageUrl` added to `PhaseFormSchema` + Controller-wrapped `<ImageUpload>`. `WorkflowCanvas` load and `buildSavePayload` updated to round-trip the field through the workflow editor session state.
+  - Workflow Step: [ProductionStepForm.tsx](apps/web/src/components/workflow/forms/ProductionStepForm.tsx) — `photoUrl` exposed via Controller (Zod `StepDataSchema.photoUrl` already present, max bumped from 2000 to 700_000 to allow base64).
+  - Legacy: `PhotoUploadField` (was used only by AddStepDialog) **deleted**; `AddStepDialog` migrated to `<ImageUpload>` from `@mes/ui`.
+- **Component E — Display integration on 7 surfaces.**
+  - Item + Equipment detail pages: hero `<ImageDisplay size="large">` in the Details tab (top-left, beside the dl).
+  - Item + Equipment registry list pages: 32px-wide thumbnail column at the left edge ([items page](apps/web/src/app/(registries)/items/page.tsx), [equipment page](apps/web/src/app/(registries)/equipment/page.tsx)).
+  - Workflow Tabella ([WorkflowHierarchyTable.tsx](apps/web/src/components/workflow/WorkflowHierarchyTable.tsx)): thumbnail next to the name on Phase + Step rows (Group rows skip per spec).
+  - Workflow Card ([WorkflowCardView.tsx](apps/web/src/components/workflow/WorkflowCardView.tsx)): `size="medium"` thumbnail in step card top-left.
+  - Live Preview ([LivePreviewStepCard.tsx](apps/web/src/components/workflow/LivePreviewStepCard.tsx)): raw `<img>` swapped for `<ImageDisplay size="reference">` for fallback consistency.
+  - HMI runtime ([apps/hmi/src/components/StepCard.tsx](apps/hmi/src/components/StepCard.tsx)): same swap, photo behavior preserved.
+  - Workflow Flusso canvas StepNode/PhaseNode **explicitly deferred** to TODO-067.
+- **Component F — Tests.** +16 tests across 4 files (5 image-upload, 9 image-display, 1 phase-imageUrl in domain, 3 phase-imageUrl in save-payload). Plus extension of existing `release.service.test.ts` and `work-orders.service.test.ts` snapshot-fixture assertions.
+- **Component G — Bookkeeping.** TODO-066 (S3 migration), TODO-067 (Flusso canvas), TODO-068 (remaining 5 entities), TODO-069 (RHF migration), TODO-070 (list-endpoint projection).
+
+### Architectural decisions (recon-driven, confirmed with user)
+
+- **Phase imageUrl flows through `WorkflowSnapshot`** (ADR-001 immutability). Serializer allowlist + projection + test fixtures all updated together.
+- **Step keeps `data.photoUrl`** (no top-level column). End-to-end flow already exists through StepExecution service; adding a parallel column would force changes across 5+ files for zero behavior gain.
+- **Item + Equipment forms keep raw `useState`** (RHF migration filed as TODO-069). Bolt-on `<ImageUpload>` was trivial.
+- **`PhotoUploadField` retired** (was a 155-line session-only mock). New `<ImageUpload>` is a strict superset (resize, MIME validation, size cap). Single call site (AddStepDialog) migrated in same batch.
+- **Storage strategy = base64-in-DB until TODO-066.** SQLite TEXT is unbounded; 1024px JPEG q0.85 averages ~150-300KB base64. Zod cap = 700KB on each `imageUrl` and on `Step.data.photoUrl`.
+- **List-endpoint base64 projection optimization deferred** to TODO-070 — non-issue at current dataset size.
+- **Workflow Flusso canvas StepNode/PhaseNode deferred** to TODO-067 — scope creep risk on @xyflow node layout.
+
+### Test count
+
+Pre-batch baseline: 998 across 10 packages.
+Post-batch verified: **1014 across 10 packages** (target was 1014-1018; on the lower bound).
+
+| Package | Tests | Δ |
+|---|---|---|
+| @mes/cache | 8 | 0 |
+| @mes/queue | 5 | 0 |
+| @mes/storage | 6 | 0 |
+| @mes/prisma | 26 | 0 |
+| @mes/domain | 198 | +1 (phase imageUrl preserved) |
+| @mes/schemas | 39 | 0 |
+| @mes/api | 319 | +1 (phase imageUrl in release snapshot test) |
+| @mes/ui | 197 | +14 (5 ImageUpload + 9 ImageDisplay) |
+| @mes/web | 160 | +3 (Phase imageUrl in save-payload) |
+| @mes/hmi | 56 | 0 |
+| **Total** | **1014** | **+16** |
+
+### Files changed (by area)
+
+- **Schema + DB**: [packages/prisma/schema.prisma](packages/prisma/schema.prisma) — 3 new `imageUrl` columns. SQLite db pushed (`db:push`), Prisma client regenerated.
+- **Domain**: [packages/domain/src/rules/workflow-snapshot.rules.ts](packages/domain/src/rules/workflow-snapshot.rules.ts) (+ test) — Phase serializer.
+- **Schemas (Zod)**: 3 files in [packages/schemas/src/registries/](packages/schemas/src/registries/).
+- **SDK types**: [packages/sdk/src/clients/registry-clients.ts](packages/sdk/src/clients/registry-clients.ts) — Item / Equipment / WorkflowPhase / WorkOrderSnapshotPhase models.
+- **API**: items.repository, equipment.repository, workflows.repository (3 phase-create call sites), work-orders/release.service + projection in work-orders.service. Test fixtures updated.
+- **Web — primitives**: 4 new files in [packages/ui/src/components/](packages/ui/src/components/) (image-upload, image-display, + tests).
+- **Web — forms**: items/equipment/phase/step pages and configurators.
+- **Web — displays**: 7 files (item+equipment detail, item+equipment list, WorkflowHierarchyTable, WorkflowCardView, LivePreviewStepCard).
+- **HMI**: [StepCard.tsx](apps/hmi/src/components/StepCard.tsx) — `<ImageDisplay>` swap.
+- **Save payload**: [save-payload.ts](apps/web/src/components/workflow/save-payload.ts) — Phase imageUrl serialized; [WorkflowCanvas.tsx](apps/web/src/components/workflow/WorkflowCanvas.tsx) — Phase imageUrl loaded into node.data.
+- **Legacy retired**: `apps/web/src/components/workflow/configurator/PhotoUploadField.tsx` + colocated test deleted.
+
+### Surprises absorbed
+
+- **S11 (new — caught in recon)**: Snapshot serializer is an explicit allowlist; schema migration alone would have silently dropped Phase imageUrl from released WOs. Required updating release.service.ts, the `SourcePhase`/`ClonedPhase` types in domain, the snapshotProjection type in work-orders.service.ts, plus 2 test fixtures.
+- **S12 (new — caught in pre-flight)**: Dev servers on ports 3000/3001/3002 held a Windows file lock on `query_engine-windows.dll.node`, blocking `pnpm --filter @mes/prisma generate`. Stopped before Component C.
+- **S10 absorbed (HMI already worked)**: HMI StepCard already rendered `step.data.photoUrl` end-to-end. Replacement with `<ImageDisplay>` was purely cosmetic for fallback consistency.
+
+### Conventional commit (suggested)
+
+```
+feat(images): add image upload + display for Items + Equipment + Workflow Steps + Phases (Fix 2)
+
+- New @mes/ui primitives: ImageUpload (drag-drop + base64 + canvas resize)
+  and ImageDisplay (5 sizes + Lucide-icon / initial fallback).
+- Prisma schema: imageUrl String? on Item, EquipmentNode, Phase. Step keeps
+  using step.data.photoUrl. SQLite db pushed.
+- Snapshot serializer + projection extended for Phase imageUrl
+  (release.service.ts allowlist + work-orders.service.ts projection +
+  cloneWorkflowTree clonePhase + SourcePhase/ClonedPhase types).
+- 4 forms wired (item + equipment + phase + step). PhotoUploadField legacy
+  retired; AddStepDialog migrated to ImageUpload from @mes/ui.
+- 7 display surfaces wired: Item/Equipment detail hero + registry list
+  thumbnail + WorkflowHierarchyTable + WorkflowCardView + LivePreviewStepCard
+  + HMI StepCard. Workflow Flusso canvas deferred (TODO-067).
+- Tests: 998 → 1014 (+16). New TODO-066/067/068/069/070.
+```
 
 ---
 

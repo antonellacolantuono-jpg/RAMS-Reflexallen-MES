@@ -208,4 +208,15 @@ export type { EntityDetailProps, EntityTab, Breadcrumb } from './components/Enti
 export { EntityForm } from './components/EntityForm'
 export type { EntityFormProps } from './components/EntityForm'
 
+export { ImageUpload } from './components/image-upload'
+export type { ImageUploadProps } from './components/image-upload'
+
+export { ImageDisplay } from './components/image-display'
+export type {
+  ImageDisplayProps,
+  ImageDisplaySize,
+  ImageDisplayFallback,
+  ImageDisplayCategory,
+} from './components/image-display'
+
 export { cn } from './utils/cn'

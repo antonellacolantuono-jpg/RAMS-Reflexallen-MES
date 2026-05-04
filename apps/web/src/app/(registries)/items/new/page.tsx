@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { PageHeader, EntityForm, Field, Input, Select } from '@mes/ui'
+import { PageHeader, EntityForm, Field, Input, Select, ImageUpload } from '@mes/ui'
 import { sdk } from '../../../../lib/sdk'
 import { useState } from 'react'
 
@@ -35,7 +35,16 @@ export default function NewItemPage() {
   const qc = useQueryClient()
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    code: string
+    name: string
+    itemType: string
+    trackingMode: string
+    uom: string
+    description: string
+    plantId: string
+    imageUrl: string | null
+  }>({
     code: '',
     name: '',
     itemType: 'component',
@@ -43,6 +52,7 @@ export default function NewItemPage() {
     uom: 'pc',
     description: '',
     plantId: '',
+    imageUrl: null,
   })
 
   const mutation = useMutation({
@@ -54,6 +64,7 @@ export default function NewItemPage() {
         trackingMode: form.trackingMode,
         uom: form.uom,
         description: form.description || undefined,
+        imageUrl: form.imageUrl,
         plantId: form.plantId,
       }),
     onSuccess: (item) => {
@@ -151,6 +162,13 @@ export default function NewItemPage() {
             placeholder="Descrizione opzionale"
           />
         </Field>
+
+        <ImageUpload
+          label="Immagine articolo"
+          value={form.imageUrl}
+          onChange={(next) => setForm((prev) => ({ ...prev, imageUrl: next }))}
+          testId="item-image-upload"
+        />
       </EntityForm>
     </div>
   )

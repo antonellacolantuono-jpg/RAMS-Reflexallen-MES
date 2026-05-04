@@ -12,6 +12,7 @@ export type ItemModel = {
   trackingMode: string
   uom: string
   description: string | null
+  imageUrl: string | null
   plantId: string
   isActive: boolean
   createdAt: Date
@@ -59,6 +60,7 @@ export class ItemsRepository {
     trackingMode: string
     uom: string
     description?: string | null | undefined
+    imageUrl?: string | null | undefined
     plantId: string
     createdBy: string
   }): Promise<ItemModel> {
@@ -70,6 +72,7 @@ export class ItemsRepository {
         trackingMode: data.trackingMode,
         uom: data.uom,
         description: data.description ?? null,
+        imageUrl: data.imageUrl ?? null,
         plantId: data.plantId,
         createdBy: data.createdBy,
         updatedBy: data.createdBy,
@@ -85,6 +88,7 @@ export class ItemsRepository {
       trackingMode?: string | undefined
       uom?: string | undefined
       description?: string | null | undefined
+      imageUrl?: string | null | undefined
       isActive?: boolean | undefined
       updatedBy: string
     },
@@ -97,6 +101,7 @@ export class ItemsRepository {
         ...(data.trackingMode !== undefined ? { trackingMode: data.trackingMode } : {}),
         ...(data.uom !== undefined ? { uom: data.uom } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.imageUrl !== undefined ? { imageUrl: data.imageUrl } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
         updatedBy: data.updatedBy,
         version: { increment: 1 },

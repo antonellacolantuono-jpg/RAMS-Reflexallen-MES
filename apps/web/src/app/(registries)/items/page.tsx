@@ -9,6 +9,7 @@ import {
   ConfirmModal,
   OperationalTable,
   useRegistryView,
+  ImageDisplay,
 } from '@mes/ui'
 import type {
   OpTableColumn,
@@ -38,6 +39,20 @@ const TYPE_VIEWS: { id: string; label: string; itemType: string }[] = [
 ]
 
 const COLUMNS: OpTableColumn<ItemModel>[] = [
+  {
+    id: 'imageUrl',
+    label: '',
+    width: 48,
+    render: (row) => (
+      <ImageDisplay
+        src={row.imageUrl ?? null}
+        alt={row.name}
+        size="thumbnail"
+        iconCategory="item"
+        entityName={row.name}
+      />
+    ),
+  },
   { id: 'code', label: 'Codice', sortable: true, width: 120 },
   { id: 'name', label: 'Nome', sortable: true },
   {

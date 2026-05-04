@@ -14,6 +14,7 @@ export type EquipmentModel = {
   parentId: string | null
   plantId: string
   description: string | null
+  imageUrl: string | null
   lastMaintenanceAt: Date | null
   nextMaintenanceDueAt: Date | null
   totalCyclesCount: number
@@ -74,6 +75,7 @@ export class EquipmentRepository {
     parentId?: string | undefined
     plantId: string
     description?: string | null | undefined
+    imageUrl?: string | null | undefined
     createdBy: string
   }): Promise<EquipmentModel> {
     return this.prisma.equipmentNode.create({
@@ -86,6 +88,7 @@ export class EquipmentRepository {
         parentId: data.parentId ?? null,
         plantId: data.plantId,
         description: data.description ?? null,
+        imageUrl: data.imageUrl ?? null,
         createdBy: data.createdBy,
         updatedBy: data.createdBy,
       },
@@ -101,6 +104,7 @@ export class EquipmentRepository {
       status?: string | undefined
       parentId?: string | undefined
       description?: string | null | undefined
+      imageUrl?: string | null | undefined
       updatedBy: string
     },
   ): Promise<EquipmentModel> {
@@ -113,6 +117,7 @@ export class EquipmentRepository {
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.parentId !== undefined ? { parentId: data.parentId } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.imageUrl !== undefined ? { imageUrl: data.imageUrl } : {}),
         updatedBy: data.updatedBy,
         version: { increment: 1 },
       },

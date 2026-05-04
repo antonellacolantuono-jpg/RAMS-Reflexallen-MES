@@ -2,7 +2,7 @@
 
 > **Purpose**: Track known issues and technical debt that cannot be fixed in the current session but must not be forgotten.
 > **Owner**: Antonella
-> **Last updated**: 2026-05-06 (GO BATCH B+C Phase 1 closure — TODO-061 RESOLVED, seed populates preRetryStepIds for STEP-LEAK-003 + camera test via two-pass resolution; PROMPT_PNE_5 deferred per S6+S8 surprises in recon)
+> **Last updated**: 2026-05-04 (GO FIX-2 closure — Image upload + display for Items + Equipment + Workflow Steps + Phases; new TODO-066/067/068/069/070 opened for S3 storage migration, Flusso canvas thumbnail deferral, remaining-entity coverage, RHF pattern alignment, list-endpoint base64 projection)
 >
 > **Tier guidance** (post DESIGN_ALIGNMENT closure, May 3 2026):
 > - **Tier 1 (critical pre-MVP)**: TODO-017 (Argon2id PIN auth + JWT cookies), TODO-021 (WO release flow), TODO-018 (full 11-state step machine), TODO-019 (parallel ops), TODO-020 (recovery 4-stage)
@@ -794,6 +794,72 @@ WARNING  no output files found for task @mes/storage#build. Please check your `o
 - Implementation note: `WorkflowCanvas` stays mounted (CSS `hidden`) when not in Flusso view so its store-seeding `useEffect` keeps `nodes[]` populated for Inspector + Live Preview lookups.
 - Companion change: 16 sidebar emoji icons migrated to Lucide React (Package, Layers, Factory, MonitorSmartphone, BookOpen, Award, User, AlertTriangle, Bell, Wrench, HardHat, PackageOpen, Package2, Cog, GitBranch, Trash2).
 - Companion change: `ViewSwitcher` extended with optional `labels` override prop (Workflows uses `{ list: 'Tabella' }`); `useRegistryView` forwards the override. Backwards-compatible — existing 3 vitest cases on ViewSwitcher untouched.
+
+---
+
+### TODO-066 — Migrate base64 image storage to S3-backed (MinIO/R2) post-DEPLOYMENT
+
+**Discovered**: 2026-05-04 (Fix-2 Image upload + display batch)
+**Status**: Open. Pre-demo trade-off — base64 in DB is acceptable for the May 18-22 Reflexallen demo.
+**File**: `packages/storage/` (placeholder), `packages/prisma/schema.prisma` (`Item.imageUrl`, `EquipmentNode.imageUrl`, `Phase.imageUrl`, `Step.data.photoUrl`).
+**Symptom**: Fix-2 shipped image upload as base64 data URLs persisted directly in TEXT columns (`imageUrl` on Item / EquipmentNode / Phase; `Step.data.photoUrl` JSON). A 1024px JPEG q0.85 averages ~150-300KB base64; SQLite handles it but row size balloons list responses.
+**Acceptance criterion**:
+- New `Attachment` (or rename `MediaAsset`) Prisma model with `id`, `mimeType`, `size`, `s3Key`, `createdBy`, `entityType`, `entityId`.
+- Upload endpoint POSTs file → S3 (MinIO local / R2 prod) → writes Attachment row → returns short URL.
+- `imageUrl` columns flip to nullable `attachmentId` FK (or simply contain the short URL).
+- Migration script reads existing `data:` URLs, posts them to storage, rewrites column.
+- `@mes/storage` placeholder upgraded to a real S3 client (kept behind the existing interface).
+**Estimated effort**: 6-8 hours (schema + migration + upload endpoint + storage adapter + Zod tightening on imageUrl max length).
+**Blocker for**: nothing pre-demo. Revisit immediately after May 22 demo if image library grows past ~50 entities.
+
+---
+
+### TODO-067 — Workflow Flusso canvas: thumbnail on StepNode + PhaseNode
+
+**Discovered**: 2026-05-04 (Fix-2 batch — explicitly out of scope per recon)
+**Status**: Open. Deferred to limit Fix-2 surface area (canvas node layout work has higher regression risk than table/card).
+**File**: `apps/web/src/components/workflow/nodes/StepNode.tsx` + `PhaseNode.tsx` (240px wide nodes).
+**Symptom**: Fix-2 shipped image thumbnails on Tabella + Card + Live Preview + HMI but the canvas Flusso view still renders icon-only nodes for Phase + Step. Inconsistent with the rest of the editor.
+**Acceptance criterion**: Each StepNode renders an `ImageDisplay size="small" iconCategory="step"` next to the title (or as background overlay), reading `step.data.photoUrl`. Same for PhaseNode reading `phase.imageUrl`. Test with both populated and null sources to confirm fallback Lucide icon still shows. No layout regression on the 240px node width.
+**Estimated effort**: 60-90 minutes including a couple of @xyflow visual regression tests.
+**Blocker for**: nothing. Cosmetic consistency.
+
+---
+
+### TODO-068 — Image upload for remaining entities (Tools, Box Types, Boxes, Operators photoUrl wiring)
+
+**Discovered**: 2026-05-04 (Fix-2 batch — out of scope per user)
+**Status**: Open. Fix-2 covered Items + EquipmentNode + WorkflowStep + WorkflowPhase only. Other entities with image relevance still lack upload.
+**File**: `packages/prisma/schema.prisma` (Tool / Operator already have photoUrl; Box / BoxType missing). Form pages under `apps/web/src/app/(registries)/{tools,operators,boxes,box-types}/`.
+**Acceptance criterion**:
+- Audit which 5 remaining registries genuinely need an image (Tools, Box Types, Boxes likely yes; Skill = probably not; Cause Code = no).
+- For Operator, wire the existing `photoUrl` column into the registry form using `<ImageUpload>` and detail page using `<ImageDisplay>`.
+- Note naming inconsistency: `Operator.photoUrl` vs `Item/Equipment/Phase.imageUrl`. Either rename Operator (risky, touches HMI badge avatar paths) or document the divergence.
+- WorkflowGroups intentionally excluded per user (2026-05-04 recon).
+**Estimated effort**: 3-4 hours.
+**Blocker for**: nothing. Coverage completeness.
+
+---
+
+### TODO-069 — Migrate Item + Equipment edit forms from raw `useState` to react-hook-form + Zod
+
+**Discovered**: 2026-05-04 (Fix-2 batch — kept original pattern to limit scope)
+**Status**: Open. Workflow Step + Phase configurators use react-hook-form + Zod; Item + Equipment edit/new pages still use raw `useState` + manual error handling.
+**File**: `apps/web/src/app/(registries)/items/[id]/edit/page.tsx`, `apps/web/src/app/(registries)/items/new/page.tsx`, same pair under `equipment/`.
+**Acceptance criterion**: Each form rebuilt with `useForm` + `zodResolver(CreateItemSchema)` (or Update); field errors come from `formState.errors`; existing submit + dirty-tracking behavior preserved. No new behavior, just pattern alignment.
+**Estimated effort**: 2-3 hours (4 files × ~30 min each).
+**Blocker for**: nothing. Pattern consistency only.
+
+---
+
+### TODO-070 — `select` projections on registry list endpoints to omit `imageUrl` (avoid base64 ballooning responses)
+
+**Discovered**: 2026-05-04 (Fix-2 batch — observed during recon, not yet a problem)
+**Status**: Open. Until TODO-066 lands, every list query (`GET /api/items`, `GET /api/equipment`) returns the full base64 `imageUrl` per row, multiplying response size by ~200-400KB per record with an image.
+**File**: `apps/api/src/modules/items/items.repository.ts` (`findAll`), `apps/api/src/modules/equipment/equipment.repository.ts` (`findAll`).
+**Acceptance criterion**: Add a `select` clause that returns the full row minus `imageUrl`, or a `thumbnailUrl` shortened variant. Detail endpoint still returns full `imageUrl`. List page thumbnail column gracefully falls back to icon when `imageUrl` is undefined.
+**Estimated effort**: 30-45 minutes including tests + matching SDK type relaxation.
+**Blocker for**: nothing pre-demo with a small dataset. Revisit if the items table grows beyond ~50 rows with images, OR if list response size becomes visible in the browser network panel.
 
 ---
 

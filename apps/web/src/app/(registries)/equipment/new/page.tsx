@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { PageHeader, EntityForm, Field, Input, Select } from '@mes/ui'
+import { PageHeader, EntityForm, Field, Input, Select, ImageUpload } from '@mes/ui'
 import { sdk } from '../../../../lib/sdk'
 import { useState } from 'react'
 
@@ -40,7 +40,17 @@ export default function NewEquipmentPage() {
   const qc = useQueryClient()
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    code: string
+    name: string
+    level: string
+    class: string
+    status: string
+    parentId: string
+    plantId: string
+    description: string
+    imageUrl: string | null
+  }>({
     code: '',
     name: '',
     level: 'work_center',
@@ -49,6 +59,7 @@ export default function NewEquipmentPage() {
     parentId: '',
     plantId: '',
     description: '',
+    imageUrl: null,
   })
 
   const mutation = useMutation({
@@ -62,6 +73,7 @@ export default function NewEquipmentPage() {
         parentId: form.parentId || undefined,
         plantId: form.plantId,
         description: form.description || undefined,
+        imageUrl: form.imageUrl,
       } as unknown as Record<string, unknown>),
     onSuccess: (eq) => {
       void qc.invalidateQueries({ queryKey: ['equipment'] })
@@ -152,6 +164,13 @@ export default function NewEquipmentPage() {
             placeholder="Descrizione opzionale"
           />
         </Field>
+
+        <ImageUpload
+          label="Immagine equipaggiamento"
+          value={form.imageUrl}
+          onChange={(next) => setForm((prev) => ({ ...prev, imageUrl: next }))}
+          testId="equipment-image-upload"
+        />
 
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
           La visualizzazione ad albero della gerarchia ISA-95 sarà disponibile in un batch successivo (TODO-052).
